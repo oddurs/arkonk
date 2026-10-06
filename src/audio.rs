@@ -2,8 +2,9 @@ use arkonk::game::Events;
 use macroquad::audio::{PlaySoundParams, Sound, load_sound_from_bytes, play_sound};
 
 pub struct Audio {
-    clips: [Option<Sound>; 7],
+    clips: [Option<Sound>; 14],
     pub muted: bool,
+    pub volume: f32,
 }
 impl Audio {
     pub async fn new() -> Self {
@@ -21,12 +22,19 @@ impl Audio {
         .enumerate()
         {
             // Synthesize and decode once at startup; gameplay only plays handles.
-            let wave = tone(start, end, seconds);
+            let wave = tone(start, end, seconds, i == 4);
             clips[i] = load_sound_from_bytes(&wave).await.ok();
+        }
+        for (i, slot) in clips.iter_mut().enumerate().skip(7) {
+            let pitch = 2.0_f32.powf((i - 6) as f32 / 12.0);
+            *slot = load_sound_from_bytes(&tone(640.0 * pitch, 330.0 * pitch, 0.07, false))
+                .await
+                .ok();
         }
         Self {
             clips,
             muted: false,
+            volume: 0.6,
         }
     }
     pub fn play(&self, e: Events) {
@@ -34,17 +42,28 @@ impl Audio {
             return;
         }
         for (i, enabled) in [
-            e.brick, e.paddle, e.wall, e.lost, e.clear, e.pickup, e.launch,
+            e.brick,
+            e.paddle,
+            e.wall && !e.brick && !e.paddle,
+            e.lost,
+            e.clear,
+            e.pickup,
+            e.launch,
         ]
         .into_iter()
         .enumerate()
         {
-            if enabled && let Some(sound) = &self.clips[i] {
+            let clip = if i == 0 && e.combo > 1 {
+                5 + e.combo.min(8) as usize
+            } else {
+                i
+            };
+            if enabled && let Some(sound) = &self.clips[clip] {
                 play_sound(
                     sound,
                     PlaySoundParams {
                         looped: false,
-                        volume: 0.22,
+                        volume: self.volume * if i == 2 { 0.10 } else { 0.32 },
                     },
                 );
             }
@@ -55,7 +74,7 @@ impl Audio {
     }
 }
 
-fn tone(start: f32, end: f32, seconds: f32) -> Vec<u8> {
+fn tone(start: f32, end: f32, seconds: f32, arpeggio: bool) -> Vec<u8> {
     let rate = 22050_u32;
     let samples = (seconds * rate as f32) as u32;
     let bytes = samples * 2;
@@ -75,7 +94,12 @@ fn tone(start: f32, end: f32, seconds: f32) -> Vec<u8> {
     let mut phase = 0.0;
     for i in 0..samples {
         let progress = i as f32 / samples as f32;
-        phase += std::f32::consts::TAU * (start + (end - start) * progress) / rate as f32;
+        let frequency = if arpeggio {
+            [440.0, 554.37, 659.25, 880.0][((progress * 4.0) as usize).min(3)]
+        } else {
+            start + (end - start) * progress
+        };
+        phase += std::f32::consts::TAU * frequency / rate as f32;
         let envelope = (progress * 35.0).min(1.0) * (1.0 - progress).powi(2);
         let value = (phase.sin() + 0.18 * (phase * 2.0).sin()) * envelope * 16000.0;
         wav.extend_from_slice(&(value as i16).to_le_bytes());

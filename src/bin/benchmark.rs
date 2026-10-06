@@ -40,8 +40,8 @@ unsafe impl GlobalAlloc for CountingAllocator {
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
-fn setup(stress: bool) -> Game {
-    let mut g = Game::new();
+fn setup(stress: bool, level: usize) -> Game {
+    let mut g = Game::at(level, Mode::Journey);
     g.step(&Input {
         launch: true,
         ..Default::default()
@@ -73,24 +73,25 @@ fn setup(stress: bool) -> Game {
 fn run(stress: bool) {
     const BATCH: usize = 64;
     const BATCHES: usize = 4096;
-    let mut game = setup(stress);
+    let mut game = setup(stress, 0);
     let mut samples = Vec::with_capacity(BATCHES);
     let mut score = 0_u64;
     let mut caps = 0_u64;
     let mut impacts = 0_u64;
-    let mut level_mask = 0_u8;
+    let mut level_mask = 0_u16;
     let mut tick = 0;
     ALLOCATIONS.store(0, Ordering::Relaxed);
     COUNTING.store(true, Ordering::Relaxed);
     for _ in 0..BATCHES {
         let start = Instant::now();
         for _ in 0..BATCH {
-            if matches!(game.phase, Phase::GameOver | Phase::Victory)
+            if tick % 20000 == 0
+                || matches!(game.phase, Phase::GameOver | Phase::Victory)
                 || (stress && (tick % 240 == 0 || game.phase != Phase::Playing))
             {
                 score += u64::from(game.score);
                 caps += game.collision_caps;
-                game = setup(stress);
+                game = setup(stress, (tick / 20000) % LEVEL_COUNT);
             }
             level_mask |= 1 << game.level;
             if stress {
@@ -158,15 +159,16 @@ fn run(stress: bool) {
         samples[BATCHES * 99 / 100]
     );
     println!(
-        "  allocations {allocations}, collision caps {caps}, brick impact ticks {impacts}, score checksum {score}, level mask {level_mask:05b}"
+        "  allocations {allocations}, collision caps {caps}, brick impact ticks {impacts}, score checksum {score}, level mask {level_mask:012b}"
     );
     assert_eq!(allocations, 0, "Simulation allocated on the heap");
     assert_eq!(caps, 0, "Collision budget exhausted");
     assert!(impacts > 100, "Benchmark must exercise real collisions");
     if !stress {
         assert_eq!(
-            level_mask, 0b11111,
-            "Gameplay must exercise all five levels"
+            level_mask,
+            (1 << LEVEL_COUNT) - 1,
+            "Gameplay must exercise all twelve sectors"
         );
     }
 }

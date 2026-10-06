@@ -73,7 +73,7 @@ impl Perf {
         }
         let _ = write!(
             self.lines[0],
-            "{:.0} FPS / 120 Hz physics",
+            "{:.0} FPS / 240 Hz physics",
             if frame > 0.0 { 1000.0 / frame } else { 0.0 }
         );
         let _ = write!(self.lines[1], "Frame  p95 {p95:.2} / p99 {p99:.2} ms");

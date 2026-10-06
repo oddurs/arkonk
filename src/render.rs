@@ -2,8 +2,9 @@ use crate::{
     crt::{CURVATURE, Crt},
     perf::Perf,
     pixel_font::PixelFont,
+    ui::{self, Screen, Ui},
 };
-use arkonk::{game::*, physics::V2};
+use arkonk::{game::*, levels::CHAPTERS, physics::V2, profile::Profile};
 use macroquad::prelude::*;
 use std::fmt::Write;
 
@@ -298,25 +299,29 @@ impl Renderer {
         self.previous_score = game.score;
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
         game: &Game,
+        ui: &Ui,
+        profile: &Profile,
         alpha: f32,
-        started: bool,
-        paused: bool,
-        high: u32,
-        muted: bool,
         perf: Option<&Perf>,
-        crt: bool,
     ) {
+        let crt = profile.crt;
         let screen = View::new();
         self.crt.begin();
         let v = View::scene(&self.font);
         clear_background(BG);
-        if !started {
+        if ui.screen != Screen::Play {
             self.background(&v);
-            self.attract(&v, high, muted, crt);
+            if ui.screen == Screen::Title {
+                self.attract(&v, ui, profile);
+            } else {
+                self.sectors(&v, ui, profile);
+            }
+            if ui.save_error {
+                v.centered("PROGRESS COULD NOT BE SAVED", 881.0, 11.0, AMBER);
+            }
             self.crt.present(screen.x, screen.y, screen.scale, crt);
             return;
         }
@@ -324,7 +329,7 @@ impl Renderer {
         self.background(&v);
         self.bricks(&v, game);
         self.effects(&v, game);
-        self.paddle(&v, game, alpha);
+        self.paddle(&v, game);
         self.balls(&v, game, alpha);
         for drop in &game.drops {
             if drop.active {
@@ -349,7 +354,7 @@ impl Renderer {
             }
         }
         // Keep font-atlas work together after the geometry batches.
-        self.hud(&v, game, high);
+        self.hud(&v, game, profile.best_score);
         for drop in &game.drops {
             if drop.active {
                 v.text(
@@ -382,47 +387,114 @@ impl Renderer {
             let _ = write!(self.scratch, "SLOW {:02.0}", game.slow_time.ceil());
         }
         v.centered(&self.scratch, 739.0, 12.0, CYAN);
-        if paused {
-            self.overlay(&v, "PAUSED", "SPACE / P / ESC TO RESUME", CYAN);
-            self.options(&v, muted, crt, 667.0);
-            v.centered("R RESTART / Q QUIT", 696.0, 11.0, DIM);
+        if ui.paused {
+            v.rect(160.0, 344.0, 640.0, 385.0, opacity(BG, 0.98));
+            v.centered("TAKE YOUR TIME", 403.0, 22.0, INK);
+            self.menu(&v, ui.choice, ["RESUME", "RETRY SECTOR", "MAIN MENU"], None);
+            v.centered("RETRY RETURNS TO THE SECTOR CHECKPOINT", 659.0, 11.0, DIM);
+            self.options(&v, profile, 699.0);
         } else {
             match game.phase {
                 Phase::Ready => {
-                    v.centered("P L A Y E R   O N E", 574.0, 22.0, INK);
                     self.scratch.clear();
                     let _ = write!(
                         self.scratch,
-                        "SECTOR 0{} / {}",
+                        "{:02} / {}",
                         game.level + 1,
-                        LEVELS[game.level]
+                        LEVELS[game.level].name
                     );
-                    v.centered(&self.scratch, 603.0, 13.0, AMBER);
-                    v.centered("SPACE / CLICK TO SERVE", 649.0, 15.0, CYAN);
+                    v.centered(&self.scratch, 560.0, 22.0, INK);
+                    v.centered(CHAPTERS[LEVELS[game.level].chapter], 593.0, 11.0, AMBER);
+                    v.centered("SPACE / CLICK TO SERVE", 646.0, 13.0, CYAN);
+                    if game.level == 0 {
+                        v.centered("W WIDE / S SLOW / M MULTIBALL", 680.0, 11.0, DIM);
+                    }
+                    let start = game.balls[0].pos;
+                    let direction = game.launch_velocity().normalized();
+                    for i in 1..=5 {
+                        v.circle(
+                            start + direction * (14.0 * i as f32),
+                            1.0,
+                            opacity(CYAN, 0.40 - i as f32 * 0.05),
+                        );
+                    }
                 }
-                Phase::GameOver => {
-                    self.overlay(&v, "G A M E  O V E R", "R / ENTER FOR ONE MORE RUN", RED)
+                Phase::Cleared => self.cleared(&v, game),
+                Phase::GameOver | Phase::Victory => {
+                    v.rect(160.0, 318.0, 640.0, 420.0, opacity(BG, 0.98));
+                    v.centered(
+                        if game.phase == Phase::Victory {
+                            "JOURNEY COMPLETE"
+                        } else {
+                            "ONE MORE ORBIT?"
+                        },
+                        395.0,
+                        22.0,
+                        INK,
+                    );
+                    self.scratch.clear();
+                    let _ = write!(
+                        self.scratch,
+                        "{:06} POINTS / {} MEDALS",
+                        game.score,
+                        profile.medals()
+                    );
+                    v.centered(&self.scratch, 432.0, 11.0, AMBER);
+                    self.menu(
+                        &v,
+                        ui.choice,
+                        [
+                            "SECTOR SELECT",
+                            if game.phase == Phase::Victory {
+                                "NEW JOURNEY"
+                            } else {
+                                "RETRY SECTOR"
+                            },
+                            "MAIN MENU",
+                        ],
+                        None,
+                    );
+                    v.centered("YOUR PROGRESS IS SAVED", 699.0, 11.0, DIM);
                 }
-                Phase::Victory => self.overlay(
-                    &v,
-                    "H I G H  O R B I T",
-                    "ALL SECTORS CLEAR / R TO PLAY AGAIN",
-                    AMBER,
-                ),
                 Phase::Playing => {}
             }
         }
-        if !paused && game.phase == Phase::Playing {
-            self.scratch.clear();
-            let _ = write!(self.scratch, "SECTOR 0{}", game.level + 1);
-            v.text(&self.scratch, LEFT, BOTTOM + 34.0, 11.0, opacity(DIM, 0.65));
-            v.text(
-                "P PAUSE",
-                RIGHT - PixelFont::width("P PAUSE", 11.0),
-                BOTTOM + 34.0,
-                11.0,
-                opacity(DIM, 0.65),
+        self.scratch.clear();
+        let _ = write!(
+            self.scratch,
+            "{:02} / {}",
+            game.level + 1,
+            if game.mode == Mode::Practice {
+                "PRACTICE"
+            } else {
+                LEVELS[game.level].name
+            }
+        );
+        v.text(&self.scratch, LEFT, BOTTOM + 34.0, 11.0, opacity(DIM, 0.7));
+        for i in 0..LEVEL_COUNT {
+            v.rect(
+                421.0 + i as f32 * 10.0,
+                BOTTOM + 27.0,
+                5.0,
+                3.0,
+                if i == game.level {
+                    CYAN
+                } else if profile.records[i].medals > 0 {
+                    shade(AMBER, 0.6)
+                } else {
+                    shade(DIM, 0.25)
+                },
             );
+        }
+        v.text(
+            "P PAUSE",
+            RIGHT - PixelFont::width("P PAUSE", 11.0),
+            BOTTOM + 34.0,
+            11.0,
+            opacity(DIM, 0.65),
+        );
+        if ui.save_error && (ui.paused || game.phase != Phase::Playing) {
+            v.centered("PROGRESS COULD NOT BE SAVED", 881.0, 11.0, AMBER);
         }
         if let Some(perf) = perf {
             v.rect(80.0, 440.0, 416.0, 184.0, opacity(BG, 0.97));
@@ -456,7 +528,7 @@ impl Renderer {
     fn bricks(&self, v: &View, game: &Game) {
         for (i, &hp) in game.bricks.iter().enumerate() {
             let r = Game::brick_rect(i);
-            let c = PALETTE[i / COLS];
+            let c = sector_color(i / COLS, LEVELS[game.level].chapter);
             let flash = self.brick_flash[i] / 0.18;
             if hp == 0 {
                 if flash > 0.0 {
@@ -478,7 +550,7 @@ impl Renderer {
                 r.y + 4.0,
                 r.w - 4.0,
                 r.h - 9.0,
-                shade(c, if hp == 2 { 0.48 } else { 0.70 }),
+                shade(c, if hp > 1 { 0.48 } else { 0.70 }),
             );
             v.rect(r.x + 1.0, r.y + 1.0, r.w - 2.0, 2.0, c);
             v.rect(r.x + 1.0, r.y + 3.0, 1.0, r.h - 6.0, opacity(INK, 0.42));
@@ -487,8 +559,10 @@ impl Renderer {
             for x in [r.x + 5.0, r.x + r.w - 6.0] {
                 v.rect(x, r.y + 9.0, 2.0, 2.0, opacity(INK, 0.5));
             }
-            if hp == 2 {
-                for x in [r.x + 20.0, r.x + 32.0] {
+            if hp > 1 {
+                for j in 0..hp {
+                    let x =
+                        r.x + r.w / 2.0 - (f32::from(hp) * 12.0 - 6.0) / 2.0 + f32::from(j) * 12.0;
                     v.rect(x, r.y + 8.0, 6.0, 6.0, INK);
                 }
             } else {
@@ -504,7 +578,10 @@ impl Renderer {
             if p.life <= 0.0 {
                 continue;
             }
-            let c = opacity(PALETTE[p.hue % 7], (p.life * 3.0).min(1.0));
+            let c = opacity(
+                sector_color(p.hue % 7, LEVELS[game.level].chapter),
+                (p.life * 3.0).min(1.0),
+            );
             v.line(
                 p.pos - p.velocity * 0.012,
                 p.pos,
@@ -524,8 +601,8 @@ impl Renderer {
             );
         }
     }
-    fn paddle(&self, v: &View, game: &Game, alpha: f32) {
-        let paddle = game.paddle_previous + (game.paddle_x - game.paddle_previous) * alpha;
+    fn paddle(&self, v: &View, game: &Game) {
+        let paddle = game.paddle_x;
         let x = paddle - game.paddle_width / 2.0;
         let w = game.paddle_width;
         v.glow_rect(x - 2.0, PADDLE_Y, w + 4.0, 16.0, CYAN);
@@ -574,50 +651,273 @@ impl Renderer {
         v.digits(game.score, 96.0, 80.0, AMBER);
         v.text("HI-SCORE", 416.0, 66.0, 11.0, DIM);
         v.digits(high.max(game.score), 416.0, 80.0, INK);
-        for i in 0..3 {
-            v.ship(790.0 + i as f32 * 29.0, 85.0, i < game.lives);
+        for i in 0..game.lives.max(3) {
+            v.ship(850.0 - i as f32 * 29.0, 85.0, i < game.lives);
         }
     }
-    fn options(&self, v: &View, muted: bool, crt: bool, y: f32) {
-        v.text(
-            if muted { "M SOUND OFF" } else { "M SOUND ON" },
-            288.0,
-            y,
-            11.0,
-            DIM,
+    fn options(&mut self, v: &View, profile: &Profile, y: f32) {
+        self.scratch.clear();
+        let _ = write!(
+            self.scratch,
+            "M SOUND {}   C CRT {}   F FULLSCREEN",
+            if profile.muted { "OFF" } else { "ON" },
+            if profile.crt { "ON" } else { "OFF" }
         );
-        v.text(
-            if crt { "C CRT ON" } else { "C CRT OFF" },
-            447.0,
-            y,
-            11.0,
-            DIM,
+        v.centered(&self.scratch, y, 11.0, DIM);
+        self.scratch.clear();
+        let _ = write!(
+            self.scratch,
+            "VOLUME {} / 10   [ LOWER / ] HIGHER",
+            profile.volume
         );
-        v.text("F FULLSCREEN", 594.0, y, 11.0, DIM);
+        v.centered(&self.scratch, y + 27.0, 11.0, shade(DIM, 0.7));
     }
-    fn attract(&mut self, v: &View, high: u32, muted: bool, crt: bool) {
-        // The marquee belongs to the title screen, not the in-game scoreboard.
-        v.logo(254.0, 287.0, 11.5);
-        v.centered("BREAK THE COSMOS", 443.0, 14.0, AMBER);
-        if high > 0 {
+    fn menu(&self, v: &View, selected: usize, labels: [&str; 3], disabled: Option<usize>) {
+        for (i, label) in labels.iter().enumerate() {
+            let rect = ui::menu_rect(i);
+            let available = disabled != Some(i);
+            let color = if !available {
+                shade(DIM, 0.4)
+            } else if i == selected {
+                CYAN
+            } else {
+                INK
+            };
+            if i == selected && available {
+                v.rect(rect.x, rect.y, rect.w, rect.h, opacity(CYAN, 0.035));
+                v.rect(rect.x, rect.y + 15.0, 2.0, 13.0, CYAN);
+            }
+            v.centered(label, rect.y + 28.0, 14.0, color);
+        }
+    }
+    fn attract(&mut self, v: &View, ui: &Ui, profile: &Profile) {
+        v.logo(254.0, 188.0, 11.5);
+        v.centered("BREAK THE COSMOS", 342.0, 13.0, AMBER);
+        self.scratch.clear();
+        let _ = write!(
+            self.scratch,
+            "{:02} / 12 SECTORS   {:02} / 36 MEDALS",
+            profile.unlocked,
+            profile.medals()
+        );
+        v.centered(&self.scratch, 406.0, 11.0, DIM);
+        self.menu(
+            v,
+            ui.choice,
+            ["CONTINUE JOURNEY", "NEW JOURNEY", "SECTOR SELECT"],
+            profile.checkpoint.is_none().then_some(0),
+        );
+        if let Some(c) = profile.checkpoint {
             self.scratch.clear();
-            let _ = write!(self.scratch, "HI-SCORE {high:06}");
-            v.centered(&self.scratch, 488.0, 11.0, DIM);
+            let _ = write!(
+                self.scratch,
+                "SAVED AT {:02} / {}",
+                c.level + 1,
+                LEVELS[c.level].name
+            );
+            v.centered(&self.scratch, 671.0, 11.0, DIM);
+        } else {
+            v.centered("A SMALL JOURNEY THROUGH TWELVE SECTORS", 671.0, 11.0, DIM);
         }
-        let pulse = 0.75 + 0.25 * (get_time() as f32 * 3.0).sin();
-        v.centered("PRESS START", 559.0, 22.0, opacity(CYAN, pulse));
-        v.centered("SPACE / ENTER / CLICK", 591.0, 11.0, INK);
-        v.centered("MOUSE / ARROWS TO MOVE", 647.0, 11.0, DIM);
-        v.centered("W WIDE / S SLOW / M MULTIBALL", 676.0, 11.0, DIM);
-        self.options(v, muted, crt, 749.0);
+        v.centered("MOUSE / ARROWS TO MOVE   SPACE TO SERVE", 714.0, 11.0, DIM);
+        self.options(v, profile, 778.0);
+        if profile.best_score > 0 {
+            self.scratch.clear();
+            let _ = write!(self.scratch, "PERSONAL BEST {:06}", profile.best_score);
+            v.centered(&self.scratch, 859.0, 11.0, shade(AMBER, 0.75));
+        }
     }
-    fn overlay(&self, v: &View, title: &str, subtitle: &str, color: Color) {
-        v.rect(192.0, 494.0, 576.0, 155.0, opacity(BG, 0.97));
-        v.centered(title, 568.0, 29.0, color);
-        v.centered(subtitle, 611.0, 13.0, INK);
+    fn sectors(&mut self, v: &View, ui: &Ui, profile: &Profile) {
+        v.text("ESC / BACK", 105.0, 127.0, 11.0, DIM);
+        v.centered("YOUR ORBIT", 130.0, 22.0, INK);
+        v.centered(
+            "RETURN TO A FAVORITE. MAKE IT A LITTLE BETTER.",
+            169.0,
+            11.0,
+            DIM,
+        );
+        for (chapter, title) in CHAPTERS.iter().enumerate() {
+            v.text(
+                title,
+                117.0 + chapter as f32 * 255.0,
+                217.0,
+                11.0,
+                sector_color(0, chapter),
+            );
+        }
+        for (i, level) in LEVELS.iter().enumerate() {
+            let r = ui::sector_rect(i);
+            let unlocked = i < profile.unlocked;
+            let selected = i == ui.sector;
+            v.rect(
+                r.x,
+                r.y,
+                r.w,
+                r.h,
+                if selected {
+                    opacity(CYAN, 0.065)
+                } else {
+                    opacity(DIM, 0.018)
+                },
+            );
+            if selected {
+                v.line(
+                    V2::new(r.x, r.y),
+                    V2::new(r.x, r.y + r.h),
+                    2.0,
+                    if unlocked { CYAN } else { DIM },
+                );
+            }
+            self.scratch.clear();
+            let _ = write!(self.scratch, "{:02} / {}", i + 1, level.name);
+            v.text(
+                &self.scratch,
+                r.x + 12.0,
+                r.y + 21.0,
+                11.0,
+                if unlocked { INK } else { shade(DIM, 0.55) },
+            );
+            for (row, pattern) in level.rows.iter().enumerate() {
+                for (col, hp) in pattern.bytes().enumerate() {
+                    if hp != b'.' {
+                        v.rect(
+                            r.x + 12.0 + col as f32 * 9.0,
+                            r.y + 34.0 + row as f32 * 7.0,
+                            7.0,
+                            4.0,
+                            if unlocked {
+                                shade(sector_color(row, level.chapter), 0.8)
+                            } else {
+                                shade(DIM, 0.16)
+                            },
+                        );
+                    }
+                }
+            }
+            if unlocked {
+                for j in 0..3 {
+                    v.circle(
+                        V2::new(r.x + 163.0 + j as f32 * 19.0, r.y + 48.0),
+                        3.0,
+                        if profile.records[i].medals & (1 << j) != 0 {
+                            AMBER
+                        } else {
+                            shade(DIM, 0.22)
+                        },
+                    );
+                }
+                v.text(
+                    if profile.records[i].medals > 0 {
+                        "CLEARED"
+                    } else {
+                        "OPEN"
+                    },
+                    r.x + 149.0,
+                    r.y + 78.0,
+                    11.0,
+                    DIM,
+                );
+            } else {
+                v.text("LOCKED", r.x + 149.0, r.y + 67.0, 11.0, shade(DIM, 0.45));
+            }
+        }
+        let record = profile.records[ui.sector];
+        self.scratch.clear();
+        if record.best_ticks > 0 {
+            let seconds = record.best_ticks / TICK_HZ;
+            let _ = write!(
+                self.scratch,
+                "BEST {:02}:{:02}   /   SWIFT UNDER {} SECONDS",
+                seconds / 60,
+                seconds % 60,
+                LEVELS[ui.sector].par_seconds
+            );
+        } else {
+            let _ = write!(
+                self.scratch,
+                "SWIFT TARGET / {} SECONDS",
+                LEVELS[ui.sector].par_seconds
+            );
+        }
+        v.centered(&self.scratch, 771.0, 11.0, AMBER);
+        v.centered(
+            "CLEAR / FINISH   CLEAN / NO LIVES LOST   SWIFT / BEAT THE CLOCK",
+            809.0,
+            11.0,
+            DIM,
+        );
+        v.centered(
+            if ui.sector < profile.unlocked {
+                "ENTER / CLICK TO PRACTICE"
+            } else {
+                "CLEAR THE PREVIOUS SECTOR TO UNLOCK"
+            },
+            854.0,
+            13.0,
+            if ui.sector < profile.unlocked {
+                CYAN
+            } else {
+                DIM
+            },
+        );
+    }
+    fn cleared(&mut self, v: &View, game: &Game) {
+        v.rect(160.0, 439.0, 640.0, 269.0, opacity(BG, 0.98));
+        v.centered("SECTOR CLEAR", 485.0, 22.0, INK);
+        let seconds = game.summary.ticks / TICK_HZ;
+        self.scratch.clear();
+        let _ = write!(
+            self.scratch,
+            "{:02}:{:02}   +{} POINTS   {} CHAIN",
+            seconds / 60,
+            seconds % 60,
+            game.summary.bonus,
+            game.summary.best_combo
+        );
+        v.centered(&self.scratch, 526.0, 11.0, AMBER);
+        for (i, label) in ["CLEAR", "CLEAN", "SWIFT"].iter().enumerate() {
+            let x = 334.0 + i as f32 * 126.0;
+            let earned = game.summary.medals & (1 << i) != 0;
+            v.circle(
+                V2::new(x - 13.0, 566.0),
+                3.0,
+                if earned { AMBER } else { shade(DIM, 0.3) },
+            );
+            v.text(
+                label,
+                x,
+                571.0,
+                11.0,
+                if earned { INK } else { shade(DIM, 0.5) },
+            );
+        }
+        if game.summary.life_earned {
+            v.centered("CHAPTER COMPLETE / EXTRA LIFE", 610.0, 11.0, CYAN);
+        }
+        v.rect(280.0, 622.0, 400.0, 44.0, opacity(CYAN, 0.045));
+        v.centered(
+            if game.mode == Mode::Practice {
+                "RETURN TO SECTORS"
+            } else {
+                "CONTINUE JOURNEY"
+            },
+            651.0,
+            14.0,
+            CYAN,
+        );
+        v.centered("ENTER / CLICK", 690.0, 11.0, DIM);
     }
 }
 
+fn sector_color(row: usize, chapter: usize) -> Color {
+    const BLUE: [usize; 7] = [4, 4, 5, 5, 6, 5, 4];
+    const DUSK: [usize; 7] = [6, 0, 1, 2, 1, 0, 6];
+    PALETTE[match chapter {
+        1 => BLUE[row % 7],
+        2 => DUSK[row % 7],
+        _ => row % 7,
+    }]
+}
 fn power_color(power: Power) -> Color {
     match power {
         Power::Wide => PALETTE[3],

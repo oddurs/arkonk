@@ -8,7 +8,9 @@ pub const TOP: f32 = 136.0;
 pub const BOTTOM: f32 = 814.0;
 pub const PADDLE_Y: f32 = 770.0;
 pub const RADIUS: f32 = 7.0;
-pub const DT: f32 = 1.0 / 120.0;
+pub const TICK_HZ: u32 = 240;
+pub const DT: f32 = 1.0 / TICK_HZ as f32;
+pub const PADDLE_WIDTH: f32 = 118.0;
 pub const COLS: usize = 12;
 pub const ROWS: usize = 7;
 pub const GRID_X: f32 = 96.0;
@@ -16,18 +18,29 @@ pub const GRID_Y: f32 = 190.0;
 pub const CELL_W: f32 = 64.0;
 pub const CELL_H: f32 = 32.0;
 pub const MAX_BALLS: usize = 3;
-pub const LEVELS: [&str; 5] = [
-    "FIRST CONTACT",
-    "SIGNAL PATH",
-    "DIAMOND ARRAY",
-    "THE FORTRESS",
-    "FINAL FREQUENCY",
-];
+pub use crate::levels::{LEVEL_COUNT, LEVELS};
+
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub enum Mode {
+    #[default]
+    Journey,
+    Practice,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RoundSummary {
+    pub ticks: u32,
+    pub medals: u8,
+    pub bonus: u32,
+    pub best_combo: u32,
+    pub life_earned: bool,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Phase {
     Ready,
     Playing,
+    Cleared,
     GameOver,
     Victory,
 }
@@ -87,10 +100,37 @@ pub struct Events {
     pub clear: bool,
     pub pickup: bool,
     pub launch: bool,
+    pub combo: u32,
+}
+
+impl Events {
+    pub fn merge(&mut self, other: Self) {
+        self.brick |= other.brick;
+        self.paddle |= other.paddle;
+        self.wall |= other.wall;
+        self.lost |= other.lost;
+        self.clear |= other.clear;
+        self.pickup |= other.pickup;
+        self.launch |= other.launch;
+        self.combo = self.combo.max(other.combo);
+    }
 }
 
 pub struct Game {
     pub phase: Phase,
+    pub mode: Mode,
+    pub summary: RoundSummary,
+    pub sector_ticks: u32,
+    pub run_ticks: u32,
+    pub phase_ticks: u32,
+    pub initial_bricks: usize,
+    pub combo: u32,
+    pub best_combo: u32,
+    lost_in_sector: bool,
+    rally_hits: u32,
+    quiet_ticks: u32,
+    since_drop: u32,
+    advance_requested: bool,
     pub balls: [Ball; MAX_BALLS],
     pub bricks: [u8; ROWS * COLS],
     pub particles: [Particle; 384],
@@ -108,7 +148,6 @@ pub struct Game {
     pub collision_caps: u64,
     random: u32,
     particle_cursor: usize,
-    combo: u32,
 }
 
 impl Default for Game {
@@ -120,13 +159,25 @@ impl Game {
     pub fn new() -> Self {
         let mut game = Self {
             phase: Phase::Ready,
+            mode: Mode::Journey,
+            summary: RoundSummary::default(),
+            sector_ticks: 0,
+            run_ticks: 0,
+            phase_ticks: 0,
+            initial_bricks: 0,
+            best_combo: 0,
+            lost_in_sector: false,
+            rally_hits: 0,
+            quiet_ticks: 0,
+            since_drop: 0,
+            advance_requested: false,
             balls: [Ball::default(); MAX_BALLS],
             bricks: [0; ROWS * COLS],
             particles: [Particle::default(); 384],
             drops: [Drop::default(); 12],
             paddle_x: WIDTH / 2.0,
             paddle_previous: WIDTH / 2.0,
-            paddle_width: 112.0,
+            paddle_width: PADDLE_WIDTH,
             score: 0,
             lives: 3,
             level: 0,
@@ -159,37 +210,67 @@ impl Game {
         }
     }
 
+    pub fn at(level: usize, mode: Mode) -> Self {
+        let mut game = Self::new();
+        game.level = level.min(LEVEL_COUNT - 1);
+        game.mode = mode;
+        game.load_level();
+        game
+    }
+
     fn load_level(&mut self) {
-        for row in 0..ROWS {
-            for col in 0..COLS {
-                let filled = match self.level {
-                    0 => true,
-                    1 => (row + col) % 3 != 0,
-                    2 => (col as i32 * 2 - 11).abs() + (row as i32 - 3).abs() * 2 < 13,
-                    3 => row < 2 || !(2..COLS - 2).contains(&col) || row == 5,
-                    _ => (row + col) % 2 == 0 || row == 0 || row == ROWS - 1,
-                };
-                self.bricks[row * COLS + col] = if !filled {
-                    0
-                } else if self.level > 0 && (row + col + self.level).is_multiple_of(4) {
-                    2
-                } else {
-                    1
-                };
-            }
-        }
+        self.bricks = crate::levels::layout(self.level);
         self.remaining = self.bricks.iter().filter(|&&hp| hp > 0).count();
+        self.initial_bricks = self.remaining;
+        self.sector_ticks = 0;
+        self.lost_in_sector = false;
+        self.best_combo = 0;
+        self.since_drop = 0;
+        self.particles.fill(Particle::default());
         self.reset_serve();
+    }
+
+    fn finish_sector(&mut self) {
+        let clean = !self.lost_in_sector;
+        let swift = self.sector_ticks <= LEVELS[self.level].par_seconds * TICK_HZ;
+        let bonus = 1000 + u32::from(clean) * 500 + u32::from(swift) * 500;
+        let life_earned =
+            self.mode == Mode::Journey && (self.level + 1).is_multiple_of(4) && self.lives < 5;
+        if life_earned {
+            self.lives += 1;
+        }
+        self.score += bonus;
+        self.summary = RoundSummary {
+            ticks: self.sector_ticks,
+            medals: 1 | (u8::from(clean) << 1) | (u8::from(swift) << 2),
+            bonus,
+            best_combo: self.best_combo,
+            life_earned,
+        };
+        self.phase = if self.level + 1 == LEVEL_COUNT && self.mode == Mode::Journey {
+            Phase::Victory
+        } else {
+            Phase::Cleared
+        };
+        self.phase_ticks = 0;
+        self.advance_requested = false;
+        self.events.clear = true;
+        self.drops.fill(Drop::default());
     }
 
     fn reset_serve(&mut self) {
         self.phase = Phase::Ready;
+        self.phase_ticks = 0;
+        self.rally_hits = 0;
+        self.quiet_ticks = 0;
         self.balls = [Ball::default(); MAX_BALLS];
         self.drops = [Drop::default(); 12];
         self.wide_time = 0.0;
         self.slow_time = 0.0;
-        self.paddle_width = 112.0;
-        self.paddle_x = self.paddle_x.clamp(LEFT + 56.0, RIGHT - 56.0);
+        self.paddle_width = PADDLE_WIDTH;
+        self.paddle_x = self
+            .paddle_x
+            .clamp(LEFT + PADDLE_WIDTH / 2.0, RIGHT - PADDLE_WIDTH / 2.0);
         self.paddle_previous = self.paddle_x;
         self.combo = 0;
         let pos = V2::new(self.paddle_x, PADDLE_Y - RADIUS - 2.0);
@@ -202,11 +283,35 @@ impl Game {
     }
 
     pub fn speed(&self) -> f32 {
-        (440.0 + self.level as f32 * 45.0) * if self.slow_time > 0.0 { 0.72 } else { 1.0 }
+        (LEVELS[self.level].speed + self.rally_hits.min(20) as f32 * 4.0)
+            * if self.slow_time > 0.0 { 0.74 } else { 1.0 }
+    }
+
+    pub fn launch_velocity(&self) -> V2 {
+        let toward_center = if self.paddle_x > WIDTH / 2.0 + 40.0 {
+            -1.0
+        } else {
+            1.0
+        };
+        V2::new(0.30 * toward_center, -0.954).normalized() * self.speed()
+    }
+
+    fn keep_ball_moving(velocity: V2) -> V2 {
+        let speed = velocity.length();
+        if speed < 1.0 {
+            return velocity;
+        }
+        let mut direction = velocity * (1.0 / speed);
+        if direction.y.abs() < 0.24 {
+            direction.y = 0.24 * if direction.y < 0.0 { -1.0 } else { 1.0 };
+            direction.x = (1.0 - direction.y * direction.y).sqrt() * direction.x.signum();
+        }
+        direction * speed
     }
 
     pub fn step(&mut self, input: &Input) {
         self.events = Events::default();
+        self.phase_ticks = self.phase_ticks.saturating_add(1);
         for p in &mut self.particles {
             if p.life > 0.0 {
                 p.life -= DT;
@@ -217,11 +322,22 @@ impl Game {
         if matches!(self.phase, Phase::GameOver | Phase::Victory) {
             return;
         }
+        if self.phase == Phase::Cleared {
+            self.advance_requested |= input.launch;
+            if self.mode == Mode::Journey
+                && self.advance_requested
+                && self.phase_ticks >= TICK_HZ / 2
+            {
+                self.level += 1;
+                self.load_level();
+            }
+            return;
+        }
         self.paddle_previous = self.paddle_x;
         let target = input
             .mouse_x
-            .unwrap_or(self.paddle_x + input.axis * 800.0 * DT);
-        self.paddle_x += (target - self.paddle_x).clamp(-1400.0 * DT, 1400.0 * DT);
+            .unwrap_or(self.paddle_x + input.axis * 980.0 * DT);
+        self.paddle_x = target;
         self.paddle_x = self.paddle_x.clamp(
             LEFT + self.paddle_width / 2.0,
             RIGHT - self.paddle_width / 2.0,
@@ -232,15 +348,35 @@ impl Game {
             self.balls[0].previous = pos;
             if input.launch {
                 self.phase = Phase::Playing;
-                self.balls[0].velocity = V2::new(0.38, -0.925).normalized() * self.speed();
+                self.balls[0].velocity = self.launch_velocity();
                 self.events.launch = true;
             }
             return;
         }
+        self.sector_ticks += 1;
+        self.run_ticks += 1;
+        self.quiet_ticks += 1;
+        // A gentle, infrequent correction breaks exact vertical repeats after
+        // several empty rallies, without changing normal player-directed shots.
+        if self.quiet_ticks > TICK_HZ * 8 {
+            for ball in &mut self.balls {
+                if ball.active && ball.velocity.x.abs() < ball.velocity.length() * 0.08 {
+                    let speed = ball.velocity.length();
+                    let sign = if ball.pos.x > WIDTH / 2.0 { -1.0 } else { 1.0 };
+                    ball.velocity =
+                        V2::new(speed * 0.16 * sign, ball.velocity.y).normalized() * speed;
+                }
+            }
+            self.quiet_ticks = 0;
+        }
         self.wide_time = (self.wide_time - DT).max(0.0);
         let was_slow = self.slow_time > 0.0;
         self.slow_time = (self.slow_time - DT).max(0.0);
-        self.paddle_width = if self.wide_time > 0.0 { 170.0 } else { 112.0 };
+        self.paddle_width = if self.wide_time > 0.0 {
+            174.0
+        } else {
+            PADDLE_WIDTH
+        };
         if was_slow && self.slow_time == 0.0 {
             let speed = self.speed();
             for ball in &mut self.balls {
@@ -253,17 +389,12 @@ impl Game {
             }
         }
         if self.remaining == 0 {
-            self.events.clear = true;
-            if self.level + 1 == LEVELS.len() {
-                self.phase = Phase::Victory;
-            } else {
-                self.level += 1;
-                self.load_level();
-            }
+            self.finish_sector();
             return;
         }
         if !self.balls.iter().any(|b| b.active) {
             self.lives -= 1;
+            self.lost_in_sector = true;
             self.events.lost = true;
             if self.lives == 0 {
                 self.phase = Phase::GameOver;
@@ -335,7 +466,8 @@ impl Game {
                     kind = k;
                 }
             }
-            if ball.velocity.y > 0.0 {
+            if ball.velocity.y > 0.0 && ball.pos.y <= PADDLE_Y {
+                // Only the upper half can save a ball; never scoop one from below.
                 // Sweep against the moving paddle in its relative frame.
                 let paddle_speed = (self.paddle_x - self.paddle_previous) / DT;
                 let paddle = Rect {
@@ -395,12 +527,17 @@ impl Game {
                     self.paddle_previous + (self.paddle_x - self.paddle_previous) * (elapsed / DT);
                 let offset =
                     ((ball.pos.x - paddle_at_hit) / (self.paddle_width / 2.0)).clamp(-1.0, 1.0);
-                let angle = offset * 1.08;
+                let angle = offset * 1.12;
+                self.rally_hits += 1;
                 ball.velocity = V2::new(angle.sin(), -angle.cos()) * self.speed();
                 self.combo = 0;
                 self.events.paddle = true;
             } else {
                 ball.velocity = ball.velocity - normal * (2.0 * ball.velocity.dot(normal));
+                // Preserve deliberately extreme velocities used by stress tests.
+                if ball.velocity.length() < 2000.0 {
+                    ball.velocity = Self::keep_ball_moving(ball.velocity);
+                }
                 if kind == 3 {
                     self.hit_brick(brick_index, ball.pos);
                 } else {
@@ -418,12 +555,17 @@ impl Game {
     fn hit_brick(&mut self, index: usize, pos: V2) {
         self.bricks[index] -= 1;
         self.events.brick = true;
+        self.quiet_ticks = 0;
         self.burst(pos, index / COLS, 10);
         if self.bricks[index] == 0 {
             self.remaining -= 1;
             self.combo += 1;
+            self.best_combo = self.best_combo.max(self.combo);
+            self.events.combo = self.combo;
             self.score += 100 + 25 * self.combo.min(8);
-            if self.random() < 0.14 {
+            self.since_drop += 1;
+            if self.since_drop >= 7 || (self.since_drop >= 3 && self.random() < 0.18) {
+                self.since_drop = 0;
                 let power = match (self.random() * 3.0) as u32 {
                     0 => Power::Wide,
                     1 => Power::Slow,
@@ -483,8 +625,8 @@ impl Game {
         match power {
             Power::Wide => {
                 self.wide_time = 14.0;
-                self.paddle_width = 170.0;
-                self.paddle_x = self.paddle_x.clamp(LEFT + 85.0, RIGHT - 85.0);
+                self.paddle_width = 174.0;
+                self.paddle_x = self.paddle_x.clamp(LEFT + 87.0, RIGHT - 87.0);
             }
             Power::Slow => {
                 self.slow_time = 12.0;
@@ -502,7 +644,10 @@ impl Game {
                             let (s, c) = angle.sin_cos();
                             let v = source.velocity;
                             *b = Ball {
-                                velocity: V2::new(v.x * c - v.y * s, v.x * s + v.y * c),
+                                velocity: Self::keep_ball_moving(V2::new(
+                                    v.x * c - v.y * s,
+                                    v.x * s + v.y * c,
+                                )),
                                 ..source
                             };
                             n += 1;
@@ -615,6 +760,16 @@ mod tests {
         g.bricks.fill(0);
         g.remaining = 0;
         g.step(&Input::default());
+        assert_eq!(g.level, 0);
+        assert_eq!(g.phase, Phase::Cleared);
+        for _ in 0..TICK_HZ {
+            g.step(&Input::default());
+        }
+        assert_eq!(g.phase, Phase::Cleared);
+        g.step(&Input {
+            launch: true,
+            ..Input::default()
+        });
         assert_eq!(g.level, 1);
         assert_eq!(g.phase, Phase::Ready);
         g.level = LEVELS.len() - 1;
@@ -630,21 +785,100 @@ mod tests {
         g.apply_power(Power::Multi);
         assert_eq!(g.balls.iter().filter(|b| b.active).count(), 3);
         g.apply_power(Power::Wide);
-        assert_eq!(g.paddle_width, 170.0);
+        assert_eq!(g.paddle_width, 174.0);
         g.apply_power(Power::Slow);
         assert!((g.balls[0].velocity.length() - g.speed()).abs() < 0.001);
         g.slow_time = DT / 2.0;
         g.wide_time = DT / 2.0;
         g.step(&Input::default());
-        assert_eq!(g.paddle_width, 112.0);
+        assert_eq!(g.paddle_width, PADDLE_WIDTH);
         assert!((g.balls[0].velocity.length() - g.speed()).abs() < 0.001);
+    }
+    #[test]
+    fn mouse_tracks_in_one_tick_and_keyboard_has_consistent_speed() {
+        let mut g = Game::new();
+        g.step(&Input {
+            mouse_x: Some(700.0),
+            ..Input::default()
+        });
+        assert_eq!(g.paddle_x, 700.0);
+        assert_eq!(g.balls[0].pos.x, 700.0);
+        g.step(&Input {
+            axis: -1.0,
+            ..Input::default()
+        });
+        assert!((g.paddle_x - (700.0 - 980.0 * DT)).abs() < 0.001);
+    }
+    #[test]
+    fn chapter_rewards_and_medals_follow_actual_play() {
+        let mut g = Game::at(3, Mode::Journey);
+        g.phase = Phase::Playing;
+        g.remaining = 0;
+        g.bricks.fill(0);
+        g.step(&Input::default());
+        assert_eq!(g.summary.medals, 7);
+        assert_eq!(g.summary.bonus, 2000);
+        assert_eq!(g.lives, 4);
+        assert!(g.summary.life_earned);
+        let ticks = g.sector_ticks;
+        for _ in 0..100 {
+            g.step(&Input::default());
+        }
+        assert_eq!(g.sector_ticks, ticks);
+        assert_eq!(g.lives, 4);
+        let mut g = Game::at(0, Mode::Practice);
+        g.phase = Phase::Playing;
+        g.remaining = 0;
+        g.bricks.fill(0);
+        g.lost_in_sector = true;
+        g.sector_ticks = LEVELS[0].par_seconds * TICK_HZ;
+        g.step(&Input::default());
+        assert_eq!(g.summary.medals, 1);
+        assert_eq!(g.summary.bonus, 1000);
+        for _ in 0..TICK_HZ {
+            g.step(&Input {
+                launch: true,
+                ..Input::default()
+            });
+        }
+        assert_eq!(g.phase, Phase::Cleared);
+        assert_eq!(g.level, 0);
+    }
+    #[test]
+    fn flat_rallies_are_corrected_without_changing_speed() {
+        let v = Game::keep_ball_moving(V2::new(500.0, -1.0));
+        assert!(v.y < -100.0);
+        assert!((v.length() - 500.001).abs() < 0.01);
+        let mut g = playing();
+        g.balls[0].pos = V2::new(500.0, 600.0);
+        g.balls[0].velocity = V2::new(0.0, -500.0);
+        g.quiet_ticks = TICK_HZ * 8;
+        g.step(&Input::default());
+        assert!(g.balls[0].velocity.x < -50.0);
+    }
+    #[test]
+    fn drop_cadence_has_a_bounded_dry_spell() {
+        let mut g = playing();
+        g.bricks.fill(1);
+        g.remaining = ROWS * COLS;
+        let mut dry = 0;
+        for i in 0..ROWS * COLS {
+            g.drops.fill(Drop::default());
+            g.hit_brick(i, V2::new(400.0, 300.0));
+            dry += 1;
+            if g.drops.iter().any(|d| d.active) {
+                assert!(dry <= 7);
+                dry = 0;
+            }
+            assert!(dry < 7);
+        }
     }
     #[test]
     fn deterministic_long_run_stays_finite() {
         let mut a = Game::new();
         let mut b = Game::new();
         let mut impacts = 0;
-        for tick in 0..40000 {
+        for tick in 0..80000 {
             if matches!(a.phase, Phase::GameOver | Phase::Victory) {
                 a = Game::new();
                 b = Game::new();
