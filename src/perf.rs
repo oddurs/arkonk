@@ -1,0 +1,89 @@
+use std::fmt::Write;
+
+struct Samples {
+    data: [f64; 360],
+    cursor: usize,
+    len: usize,
+}
+impl Samples {
+    fn new() -> Self {
+        Self {
+            data: [0.0; 360],
+            cursor: 0,
+            len: 0,
+        }
+    }
+    fn push(&mut self, value: f64) {
+        self.data[self.cursor] = value;
+        self.cursor = (self.cursor + 1) % self.data.len();
+        self.len = (self.len + 1).min(self.data.len());
+    }
+    fn stats(&self) -> (f64, f64, f64) {
+        if self.len == 0 {
+            return (0.0, 0.0, 0.0);
+        }
+        let mut sorted = self.data;
+        sorted[..self.len].sort_unstable_by(f64::total_cmp);
+        let mean = sorted[..self.len].iter().sum::<f64>() / self.len as f64;
+        (
+            mean,
+            sorted[(self.len - 1) * 95 / 100],
+            sorted[(self.len - 1) * 99 / 100],
+        )
+    }
+}
+pub struct Perf {
+    frames: Samples,
+    simulation: Samples,
+    draw: Samples,
+    pub lines: [String; 6],
+    pub dropped_ticks: u64,
+    last_report: f64,
+}
+impl Perf {
+    pub fn new() -> Self {
+        Self {
+            frames: Samples::new(),
+            simulation: Samples::new(),
+            draw: Samples::new(),
+            lines: std::array::from_fn(|_| String::with_capacity(96)),
+            dropped_ticks: 0,
+            last_report: -1.0,
+        }
+    }
+    pub fn frame(&mut self, ms: f64) {
+        self.frames.push(ms);
+    }
+    pub fn simulation(&mut self, ms: f64) {
+        self.simulation.push(ms);
+    }
+    pub fn draw(&mut self, ms: f64) {
+        self.draw.push(ms);
+    }
+    pub fn refresh(&mut self, now: f64, caps: u64) {
+        if now - self.last_report < 0.5 {
+            return;
+        }
+        self.last_report = now;
+        let (frame, p95, p99) = self.frames.stats();
+        let (sim, sim95, _) = self.simulation.stats();
+        let (draw, draw95, _) = self.draw.stats();
+        for line in &mut self.lines {
+            line.clear();
+        }
+        let _ = write!(
+            self.lines[0],
+            "{:.0} FPS / 120 Hz physics",
+            if frame > 0.0 { 1000.0 / frame } else { 0.0 }
+        );
+        let _ = write!(self.lines[1], "Frame  p95 {p95:.2} / p99 {p99:.2} ms");
+        let _ = write!(self.lines[2], "Tick   avg {sim:.3} / p95 {sim95:.3} ms");
+        let _ = write!(self.lines[3], "Draw CPU  {draw:.3} / p95 {draw95:.3} ms");
+        let _ = write!(
+            self.lines[4],
+            "Dropped ticks {} / collision caps {caps}",
+            self.dropped_ticks
+        );
+        self.lines[5].push_str("F3 close / draw time excludes GPU & present");
+    }
+}
