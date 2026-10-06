@@ -4,9 +4,11 @@ A compact Arkanoid-style game written in Rust. Five brick layouts, three lives,
 angle-controlled paddle bounces, reinforced bricks, combo scoring, three power-ups,
 particles, ball trails, synthesized sound, and a saved best score.
 
-Late-80s space-cabinet art direction: a slanted pixel marquee, amber score displays,
+Late-80s CRT arcade art direction: a menu-only pixel marquee, amber score displays,
 beveled spectrum bricks, a silver-and-red paddle, phosphor trails, and curved CRT
-glass. [See the start screen](docs/attract.png).
+glass. Gameplay keeps a sparse score/lives display and thin playfield edges;
+controls and settings live on the start and pause screens.
+[See the start screen](docs/attract.png).
 
 ![ARKONK in play](docs/screenshot.png)
 

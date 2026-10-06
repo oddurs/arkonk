@@ -314,7 +314,13 @@ impl Renderer {
         self.crt.begin();
         let v = View::scene(&self.font);
         clear_background(BG);
-        self.cabinet(&v);
+        if !started {
+            self.background(&v);
+            self.attract(&v, high, muted, crt);
+            self.crt.present(screen.x, screen.y, screen.scale, crt);
+            return;
+        }
+        self.playfield(&v);
         self.background(&v);
         self.bricks(&v, game);
         self.effects(&v, game);
@@ -344,7 +350,6 @@ impl Renderer {
         }
         // Keep font-atlas work together after the geometry batches.
         self.hud(&v, game, high);
-        self.footer(&v, muted, crt);
         for drop in &game.drops {
             if drop.active {
                 v.text(
@@ -377,10 +382,10 @@ impl Renderer {
             let _ = write!(self.scratch, "SLOW {:02.0}", game.slow_time.ceil());
         }
         v.centered(&self.scratch, 739.0, 12.0, CYAN);
-        if !started {
-            self.attract(&v);
-        } else if paused {
-            self.overlay(&v, "P A U S E", "P / ESC / SPACE TO RESUME", CYAN);
+        if paused {
+            self.overlay(&v, "PAUSED", "SPACE / P / ESC TO RESUME", CYAN);
+            self.options(&v, muted, crt, 667.0);
+            v.centered("R RESTART / Q QUIT", 696.0, 11.0, DIM);
         } else {
             match game.phase {
                 Phase::Ready => {
@@ -407,6 +412,18 @@ impl Renderer {
                 Phase::Playing => {}
             }
         }
+        if !paused && game.phase == Phase::Playing {
+            self.scratch.clear();
+            let _ = write!(self.scratch, "SECTOR 0{}", game.level + 1);
+            v.text(&self.scratch, LEFT, BOTTOM + 34.0, 11.0, opacity(DIM, 0.65));
+            v.text(
+                "P PAUSE",
+                RIGHT - PixelFont::width("P PAUSE", 11.0),
+                BOTTOM + 34.0,
+                11.0,
+                opacity(DIM, 0.65),
+            );
+        }
         if let Some(perf) = perf {
             v.rect(80.0, 440.0, 416.0, 184.0, opacity(BG, 0.97));
             v.frame(80.0, 440.0, 416.0, 184.0, shade(CYAN, 0.4));
@@ -418,70 +435,22 @@ impl Renderer {
         self.crt.present(screen.x, screen.y, screen.scale, crt);
     }
 
-    fn cabinet(&self, v: &View) {
-        v.rect(
-            42.0,
-            113.0,
-            876.0,
-            720.0,
-            Color::new(0.006, 0.009, 0.02, 1.0),
-        );
-        v.frame(43.0, 114.0, 874.0, 718.0, shade(DIM, 0.18));
-        v.frame(47.0, 118.0, 866.0, 710.0, METAL);
-        v.rect(51.0, 122.0, 858.0, 702.0, METAL);
+    fn playfield(&self, v: &View) {
         v.rect(LEFT, TOP, RIGHT - LEFT, BOTTOM - TOP, GLASS);
-        for side in [LEFT - 3.0, RIGHT + 1.0] {
-            v.rect(
-                side,
-                TOP,
-                2.0,
-                BOTTOM - TOP,
-                opacity(CYAN, 0.27 + self.wall_flash * 3.0),
-            );
-        }
-        v.rect(LEFT, TOP - 3.0, RIGHT - LEFT, 2.0, shade(CYAN, 0.48));
-        v.rect(LEFT, BOTTOM + 1.0, RIGHT - LEFT, 2.0, shade(RED, 0.42));
-        for x in [54.0, 900.0] {
-            for y in (179..714).step_by(52) {
-                v.rect(x, y as f32, 6.0, 32.0, BG);
-                v.rect(x + 1.0, y as f32 + 1.0, 2.0, 15.0, shade(CYAN, 0.22));
-            }
-            for y in (734..795).step_by(9) {
-                v.rect(x, y as f32, 6.0, 3.0, shade(AMBER, 0.56));
-            }
-        }
-        for x in [56.0, 904.0] {
-            for y in [128.0, 820.0] {
-                v.circle(V2::new(x, y), 4.0, BG);
-                v.circle(V2::new(x - 0.5, y - 0.5), 2.5, shade(DIM, 0.6));
-                v.line(V2::new(x - 1.5, y), V2::new(x + 1.5, y), 1.0, BG);
-            }
-        }
-        for x in (80..886).step_by(18) {
-            v.rect(x as f32, BOTTOM - 5.0, 7.0, 1.0, opacity(RED, 0.30));
-        }
+        let edge = opacity(CYAN, 0.15 + self.wall_flash * 2.0);
+        v.line(V2::new(LEFT, TOP), V2::new(LEFT, BOTTOM), 1.0, edge);
+        v.line(V2::new(RIGHT, TOP), V2::new(RIGHT, BOTTOM), 1.0, edge);
+        v.line(V2::new(LEFT, TOP), V2::new(RIGHT, TOP), 1.0, edge);
+        v.line(
+            V2::new(LEFT, BOTTOM),
+            V2::new(RIGHT, BOTTOM),
+            1.0,
+            opacity(RED, 0.15),
+        );
     }
     fn background(&self, v: &View) {
         for &(pos, light) in &self.stars {
             v.rect(pos.x, pos.y, 1.0, 1.0, opacity(DIM, light));
-        }
-        let grid = Color::new(0.035, 0.073, 0.10, 1.0);
-        for x in (112..850).step_by(92) {
-            v.line(
-                V2::new(480.0 + (x as f32 - 480.0) * 0.12, 451.0),
-                V2::new(x as f32, 724.0),
-                1.0,
-                grid,
-            );
-        }
-        for y in [468.0, 489.0, 518.0, 556.0, 603.0, 660.0, 724.0] {
-            let span = (y - 430.0) / 294.0 * 368.0;
-            v.line(
-                V2::new(480.0 - span, y),
-                V2::new(480.0 + span, y),
-                1.0,
-                grid,
-            );
         }
     }
     fn bricks(&self, v: &View, game: &Game) {
@@ -599,97 +568,51 @@ impl Renderer {
             v.rect(pos.x - 3.0, pos.y - 3.0, 3.0, 3.0, WHITE);
         }
     }
-    fn hud(&mut self, v: &View, game: &Game, high: u32) {
-        v.logo(68.0, 38.0, 5.5);
-        v.text(
-            "D E E P  S P A C E  B R I C K  B R E A K E R",
-            69.0,
-            104.0,
-            10.0,
-            DIM,
-        );
-        v.text("1UP", 410.0, 44.0, 14.0, RED);
-        v.digits(game.score, 409.0, 58.0, AMBER);
-        v.text("HI-SCORE", 609.0, 44.0, 14.0, AMBER);
-        v.digits(high.max(game.score), 609.0, 58.0, INK);
-        v.text("SHIPS", 809.0, 44.0, 13.0, DIM);
+    fn hud(&self, v: &View, game: &Game, high: u32) {
+        // A sparse arcade scoreboard: gameplay information, aligned to the field.
+        v.text("1UP", 96.0, 66.0, 11.0, RED);
+        v.digits(game.score, 96.0, 80.0, AMBER);
+        v.text("HI-SCORE", 416.0, 66.0, 11.0, DIM);
+        v.digits(high.max(game.score), 416.0, 80.0, INK);
         for i in 0..3 {
-            v.ship(810.0 + i as f32 * 29.0, 62.0, i < game.lives);
+            v.ship(790.0 + i as f32 * 29.0, 85.0, i < game.lives);
         }
-        v.rect(70.0, 114.0, 54.0, 2.0, RED);
-        v.rect(128.0, 114.0, 24.0, 2.0, AMBER);
-        v.rect(156.0, 114.0, 12.0, 2.0, CYAN);
-        self.scratch.clear();
-        let _ = write!(
-            self.scratch,
-            "SECTOR 0{}  /  {}",
-            game.level + 1,
-            LEVELS[game.level]
-        );
-        v.text(&self.scratch, 82.0, 163.0, 12.0, DIM);
-        self.scratch.clear();
-        let _ = write!(self.scratch, "TARGETS {:02}", game.remaining);
-        v.text(&self.scratch, 778.0, 163.0, 12.0, DIM);
     }
-    fn footer(&self, v: &View, muted: bool, crt: bool) {
+    fn options(&self, v: &View, muted: bool, crt: bool, y: f32) {
         v.text(
-            "MOUSE / ARROWS  MOVE    SPACE  SERVE",
-            64.0,
-            854.0,
-            12.0,
-            INK,
-        );
-        v.text(
-            "P PAUSE    R RESTART    F FULLSCREEN    F3 STATS    Q QUIT",
-            64.0,
-            878.0,
-            10.0,
-            DIM,
-        );
-        v.text(
-            if crt { "C  CRT ON" } else { "C  CRT OFF" },
-            620.0,
-            854.0,
-            11.0,
-            CYAN,
-        );
-        v.text(
-            if muted { "M  SOUND OFF" } else { "M  SOUND ON" },
-            786.0,
-            854.0,
+            if muted { "M SOUND OFF" } else { "M SOUND ON" },
+            288.0,
+            y,
             11.0,
             DIM,
         );
-        v.text("FREE PLAY / 2026", 786.0, 878.0, 10.0, shade(AMBER, 0.7));
+        v.text(
+            if crt { "C CRT ON" } else { "C CRT OFF" },
+            447.0,
+            y,
+            11.0,
+            DIM,
+        );
+        v.text("F FULLSCREEN", 594.0, y, 11.0, DIM);
     }
-    fn attract(&self, v: &View) {
-        v.rect(208.0, 442.0, 544.0, 278.0, opacity(BG, 0.97));
-        v.frame(208.0, 442.0, 544.0, 278.0, shade(CYAN, 0.30));
-        for x in [208.0, 730.0] {
-            v.rect(x, 442.0, 22.0, 2.0, RED);
-            v.rect(x, 718.0, 22.0, 2.0, RED);
+    fn attract(&mut self, v: &View, high: u32, muted: bool, crt: bool) {
+        // The marquee belongs to the title screen, not the in-game scoreboard.
+        v.logo(254.0, 287.0, 11.5);
+        v.centered("BREAK THE COSMOS", 443.0, 14.0, AMBER);
+        if high > 0 {
+            self.scratch.clear();
+            let _ = write!(self.scratch, "HI-SCORE {high:06}");
+            v.centered(&self.scratch, 488.0, 11.0, DIM);
         }
-        v.centered("1 PLAYER / 5 SECTORS / NO CONTINUES", 471.0, 12.0, AMBER);
-        v.logo(254.0, 493.0, 11.5);
-        for i in 0..4 {
-            v.rect(
-                269.0,
-                589.0 + i as f32 * 4.0,
-                422.0,
-                2.0,
-                opacity(RED, 0.3 - i as f32 * 0.065),
-            );
-        }
-        v.centered("KEEP THE BALL ALIVE. BREAK THE COSMOS.", 624.0, 14.0, INK);
-        let pulse = 0.65 + 0.35 * (get_time() as f32 * 3.0).sin();
-        v.centered("P R E S S  S T A R T", 663.0, 22.0, opacity(CYAN, pulse));
-        v.centered("SPACE / ENTER / CLICK     FREE PLAY", 687.0, 11.0, DIM);
-        v.centered("CATCH  W WIDE / S SLOW / M MULTIBALL", 710.0, 11.0, AMBER);
+        let pulse = 0.75 + 0.25 * (get_time() as f32 * 3.0).sin();
+        v.centered("PRESS START", 559.0, 22.0, opacity(CYAN, pulse));
+        v.centered("SPACE / ENTER / CLICK", 591.0, 11.0, INK);
+        v.centered("MOUSE / ARROWS TO MOVE", 647.0, 11.0, DIM);
+        v.centered("W WIDE / S SLOW / M MULTIBALL", 676.0, 11.0, DIM);
+        self.options(v, muted, crt, 749.0);
     }
     fn overlay(&self, v: &View, title: &str, subtitle: &str, color: Color) {
         v.rect(192.0, 494.0, 576.0, 155.0, opacity(BG, 0.97));
-        v.frame(192.0, 494.0, 576.0, 155.0, shade(color, 0.35));
-        v.rect(446.0, 513.0, 68.0, 2.0, color);
         v.centered(title, 568.0, 29.0, color);
         v.centered(subtitle, 611.0, 13.0, INK);
     }
