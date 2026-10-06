@@ -9,6 +9,7 @@ pub struct Crt {
     camera: Camera2D,
     target: RenderTarget,
     material: Material,
+    plain: Material,
 }
 
 impl Crt {
@@ -30,10 +31,19 @@ impl Crt {
             },
         )
         .expect("CRT shader compilation failed");
+        let plain = load_material(
+            ShaderSource::Glsl {
+                vertex: VERTEX,
+                fragment: PLAIN,
+            },
+            Default::default(),
+        )
+        .expect("Plain presentation shader compilation failed");
         Self {
             camera,
             target,
             material,
+            plain,
         }
     }
 
@@ -50,6 +60,10 @@ impl Crt {
                 vec4(get_time() as f32, HEIGHT * scale, 0.0, 0.0),
             );
             gl_use_material(&self.material);
+        } else {
+            // The scene is opaque. Keep the no-effects copy on an explicit
+            // opaque pipeline too, instead of the alpha-blended shape pipeline.
+            gl_use_material(&self.plain);
         }
         draw_texture_ex(
             &self.target.texture,
@@ -114,4 +128,11 @@ void main() {
     c += (grain - 0.5) * 0.004;
     gl_FragColor = vec4(c, 1.0);
 }
+"#;
+
+const PLAIN: &str = r#"#version 100
+precision highp float;
+varying highp vec2 uv;
+uniform sampler2D Texture;
+void main() { gl_FragColor = vec4(texture2D(Texture, uv).rgb, 1.0); }
 "#;
