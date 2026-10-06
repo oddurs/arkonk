@@ -1,5 +1,7 @@
 mod audio;
+mod crt;
 mod perf;
+mod pixel_font;
 mod render;
 
 use arkonk::game::*;
@@ -52,6 +54,7 @@ fn save_score(path: &Option<PathBuf>, score: u32) {
 async fn main() {
     prevent_quit();
     let smoke = std::env::args().any(|a| a == "--smoke-test");
+    let mut crt = !std::env::args().any(|a| a == "--no-crt");
     let path = if smoke { None } else { score_path() };
     let mut best = path
         .as_ref()
@@ -69,7 +72,7 @@ async fn main() {
     let mut fullscreen = false;
     let mut accumulator = 0.0_f64;
     let mut last_frame = get_time();
-    let mut last_mouse = View::new().mouse();
+    let mut last_mouse = View::new().mouse(crt);
     let mut mouse_control = false;
     let mut pending_launch = false;
     let mut frames = 0;
@@ -87,6 +90,10 @@ async fn main() {
         if is_key_pressed(KeyCode::F3) {
             stats = !stats;
         }
+        if is_key_pressed(KeyCode::C) {
+            crt = !crt;
+            last_mouse = View::new().mouse(crt);
+        }
         if is_key_pressed(KeyCode::F) {
             fullscreen = !fullscreen;
             set_fullscreen(fullscreen);
@@ -97,7 +104,7 @@ async fn main() {
                 && is_key_pressed(KeyCode::Enter))
         {
             game = Game::new();
-            renderer = Renderer::new();
+            renderer.reset();
             started = true;
             paused = false;
             pending_launch = false;
@@ -115,7 +122,7 @@ async fn main() {
             started = true;
             pending_launch = true;
         }
-        let mouse = View::new().mouse();
+        let mouse = View::new().mouse(crt);
         if (mouse.x - last_mouse.x).abs() > 0.5 || (mouse.y - last_mouse.y).abs() > 0.5 {
             mouse_control = true;
         }
@@ -172,22 +179,50 @@ async fn main() {
             (accumulator / f64::from(DT)) as f32
         };
         let draw_start = get_time();
+        let actual_phase = game.phase;
+        if smoke && crt && frames == 160 {
+            game.phase = Phase::GameOver;
+        }
         renderer.draw(
             &game,
             alpha,
-            started,
-            paused,
+            started && !(smoke && crt && frames == 30),
+            paused || (smoke && crt && frames == 150),
             best,
             audio.muted,
-            stats.then_some(&perf),
+            (stats || (smoke && crt && frames == 170)).then_some(&perf),
+            crt,
         );
+        game.phase = actual_phase;
         perf.draw((get_time() - draw_start) * 1000.0);
-        if smoke && frames == 120 {
-            get_screen_data().export_png("target/smoke-test.png");
+        if smoke {
+            let capture = match frames {
+                30 if crt => Some("target/attract.png"),
+                120 => Some(if crt {
+                    "target/smoke-test.png"
+                } else {
+                    "target/smoke-plain.png"
+                }),
+                150 if crt => Some("target/paused.png"),
+                160 if crt => Some("target/game-over.png"),
+                170 if crt => Some("target/stats.png"),
+                230 if crt => Some("target/resized.png"),
+                _ => None,
+            };
+            if let Some(path) = capture {
+                get_screen_data().export_png(path);
+            }
+            if crt && frames == 200 {
+                request_new_screen_size(800.0, 600.0);
+            }
+            if crt && frames == 240 {
+                request_new_screen_size(960.0, 900.0);
+            }
         }
-        if smoke && frames >= 180 {
+        if smoke && frames >= 660 {
             println!(
-                "Render smoke test: 181 frames, score {}, collision caps {}, sounds loaded {}/7",
+                "Render smoke test: 661 frames, CRT {}, score {}, collision caps {}, sounds loaded {}/7",
+                crt,
                 game.score,
                 game.collision_caps,
                 audio.loaded()
