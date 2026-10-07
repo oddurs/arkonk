@@ -5,7 +5,7 @@ use crate::{
     ui::{self, Screen, Ui},
 };
 use ark::{
-    Game, Medals, Mode, Power, Stage,
+    Events, Game, Medals, Mode, Power, SectorSummary, Stage,
     clock::{DT, TICK_HZ},
     field::{
         BALL_RADIUS as RADIUS, BOTTOM, CELL_H, CELL_W, CELLS, Cell, LEFT, PADDLE_Y, RIGHT, TOP,
@@ -472,15 +472,16 @@ impl Renderer {
         self.wall_flash = 0.0;
         self.pickup_flash = 0.0;
     }
-    pub fn record(&mut self, game: &Game) {
-        if self.previous_sector != Some(game.sector) {
+    /// Updates trails and flashes after one tick that raised `events`.
+    pub fn record(&mut self, game: &Game, events: Events) {
+        if self.previous_sector != Some(game.sector()) {
             self.reset();
-            self.previous_sector = Some(game.sector);
+            self.previous_sector = Some(game.sector());
             self.previous_bricks = hp_grid(game);
-            self.previous_score = game.score;
+            self.previous_score = game.score();
         }
-        for (i, ball) in game.balls.iter().enumerate() {
-            if !ball.active || ball.held || game.stage != Stage::Playing {
+        for (i, ball) in game.balls().iter().enumerate() {
+            if !ball.active || ball.held || game.stage() != Stage::Playing {
                 self.trail_len[i] = 0;
                 continue;
             }
@@ -491,13 +492,13 @@ impl Renderer {
         self.paddle_flash = (self.paddle_flash - DT).max(0.0);
         self.wall_flash = (self.wall_flash - DT).max(0.0);
         self.pickup_flash = (self.pickup_flash - DT).max(0.0);
-        if game.events.paddle {
+        if events.paddle {
             self.paddle_flash = 0.16;
         }
-        if game.events.wall {
+        if events.wall {
             self.wall_flash = 0.12;
         }
-        if game.events.pickup {
+        if events.pickup {
             self.pickup_flash = 0.65;
         }
         for popup in &mut self.popups {
@@ -508,16 +509,16 @@ impl Renderer {
         for (cell, flash) in Cell::all().zip(&mut self.brick_flash) {
             let i = cell.index();
             *flash = (*flash - DT).max(0.0);
-            if game.events.brick && game.board.hp(cell) < self.previous_bricks[i] {
+            if events.brick && game.board().hp(cell) < self.previous_bricks[i] {
                 *flash = 0.18;
-                if !popup_spawned && game.score > self.previous_score {
+                if !popup_spawned && game.score() > self.previous_score {
                     let r = cell_rect(cell);
                     self.popups[self.popup_cursor] = Popup {
                         pos: V2::new(r.x + r.w / 2.0, r.y),
                         life: 0.65,
-                        value: (game.score - self.previous_score).saturating_sub(
-                            if game.events.clear {
-                                game.summary.bonus
+                        value: (game.score() - self.previous_score).saturating_sub(
+                            if events.clear {
+                                game.summary().bonus
                             } else {
                                 0
                             },
@@ -529,7 +530,7 @@ impl Renderer {
             }
         }
         self.previous_bricks = hp_grid(game);
-        self.previous_score = game.score;
+        self.previous_score = game.score();
     }
 
     pub fn draw(
@@ -612,6 +613,10 @@ impl Renderer {
         alpha: f32,
         perf: Option<&Perf>,
     ) {
+        // The smoke test previews screens the game has not reached.
+        let (stage, summary) = ui
+            .preview
+            .map_or((game.stage(), game.summary()), |p| (p.stage, p.summary));
         if ui.screen != Screen::Play {
             if ui.screen == Screen::Title {
                 self.attract(v, ui, profile);
@@ -627,7 +632,7 @@ impl Renderer {
         self.bricks(v, game);
         self.effects(v, game);
         self.paddle(v, game);
-        for drop in &game.capsules {
+        for drop in game.capsules() {
             if drop.active {
                 v.rounded(
                     drop.pos.x - 15.0,
@@ -642,7 +647,7 @@ impl Renderer {
         self.balls(v, game, alpha);
         // Keep font-atlas work together after the geometry batches.
         self.hud(v, game, profile);
-        for drop in &game.capsules {
+        for drop in game.capsules() {
             if drop.active {
                 v.center_at(drop.power.label(), drop.pos.x, drop.pos.y + 7.0, 13.0, BG);
             }
@@ -660,8 +665,8 @@ impl Renderer {
                 );
             }
         }
-        if !ui.paused && game.stage == Stage::Playing {
-            if game.balls.iter().any(|b| b.active && b.held) {
+        if !ui.paused && stage == Stage::Playing {
+            if game.balls().iter().any(|b| b.active && b.held) {
                 v.hint(
                     "CLICK OR SPACE TO RELEASE",
                     &[Pad(Glyph::A), Text(" TO RELEASE")],
@@ -670,10 +675,10 @@ impl Renderer {
                     CYAN,
                 );
             }
-            if game.effects.notice_ticks > 0
-                && let Some(power) = game.effects.notice
+            if game.effects().notice_ticks > 0
+                && let Some(power) = game.effects().notice
             {
-                let fade = (game.effects.notice_ticks as f32 / 60.0).min(1.0);
+                let fade = (game.effects().notice_ticks as f32 / 60.0).min(1.0);
                 v.centered(power.name(), 687.0, 13.0, opacity(power_color(power), fade));
             }
         }
@@ -702,14 +707,14 @@ impl Renderer {
                 self.options(v, profile, 610.0);
             }
         } else {
-            match game.stage {
+            match stage {
                 Stage::Ready => self.ready(v, game),
-                Stage::Cleared => self.cleared(v, game),
+                Stage::Cleared => self.cleared(v, game, summary),
                 Stage::GameOver | Stage::Victory => {
                     v.scrim();
                     v.panel(280.0, 290.0, 400.0, 346.0);
                     v.centered(
-                        if game.stage == Stage::Victory {
+                        if stage == Stage::Victory {
                             "JOURNEY COMPLETE"
                         } else {
                             "ONE MORE ORBIT?"
@@ -719,7 +724,7 @@ impl Renderer {
                         INK,
                     );
                     self.scratch.clear();
-                    grouped(&mut self.scratch, game.score);
+                    grouped(&mut self.scratch, game.score());
                     let _ = write!(self.scratch, " POINTS   {} MEDALS", profile.medals());
                     v.centered(&self.scratch, 362.0, 11.0, DIM);
                     self.menu(
@@ -727,7 +732,7 @@ impl Renderer {
                         ui.choice,
                         [
                             "SECTOR SELECT",
-                            if game.stage == Stage::Victory {
+                            if stage == Stage::Victory {
                                 "NEW JOURNEY"
                             } else {
                                 "RETRY SECTOR"
@@ -741,7 +746,7 @@ impl Renderer {
                 Stage::Playing => {}
             }
         }
-        if ui.save_error && (ui.paused || game.stage != Stage::Playing) {
+        if ui.save_error && (ui.paused || stage != Stage::Playing) {
             v.centered("PROGRESS COULD NOT BE SAVED", 860.0, 11.0, AMBER);
         }
         if let Some(perf) = perf {
@@ -764,13 +769,13 @@ impl Renderer {
     fn bricks(&self, v: &Scene, game: &Game) {
         // Quiet connections make the actual orthogonal blast routes readable.
         for cell in Cell::all() {
-            if !game.board.is_core(cell) || game.board.hp(cell) == 0 {
+            if !game.board().is_core(cell) || game.board().hp(cell) == 0 {
                 continue;
             }
             let r = cell_rect(cell);
             let [_, right, _, down] = cell.neighbors();
             for other in [right, down].into_iter().flatten() {
-                if game.board.is_core(other) && game.board.hp(other) > 0 {
+                if game.board().is_core(other) && game.board().hp(other) > 0 {
                     let next = cell_rect(other);
                     v.line(
                         V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0),
@@ -781,15 +786,15 @@ impl Renderer {
                 }
             }
         }
-        let pulse = 0.7 + 0.15 * (game.stage_ticks as f32 * DT * 2.0).sin();
+        let pulse = 0.7 + 0.15 * (game.stage_ticks() as f32 * DT * 2.0).sin();
         for cell in Cell::all() {
             let i = cell.index();
-            let hp = game.board.hp(cell);
+            let hp = game.board().hp(cell);
             let r = cell_rect(cell);
-            let c = if game.board.is_core(cell) {
+            let c = if game.board().is_core(cell) {
                 AMBER
             } else {
-                sector_color(cell.row(), game.sector.sector().chapter)
+                sector_color(cell.row(), game.sector().sector().chapter)
             };
             let flash = self.brick_flash[i] / 0.18;
             if hp == 0 {
@@ -804,7 +809,7 @@ impl Renderer {
                 }
                 continue;
             }
-            let fill = if game.board.is_core(cell) {
+            let fill = if game.board().is_core(cell) {
                 shade(AMBER, 0.24)
             } else if hp > 1 {
                 shade(c, 0.42)
@@ -813,7 +818,7 @@ impl Renderer {
             };
             v.rounded(r.x, r.y, r.w, r.h, 4.0, fill);
             v.rect(r.x + 4.0, r.y, r.w - 8.0, 2.0, mix(fill, INK, 0.22));
-            if game.board.is_core(cell) {
+            if game.board().is_core(cell) {
                 let center = V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
                 for (from, to) in [
                     (V2::new(-6.0, 0.0), V2::new(0.0, -5.0)),
@@ -837,7 +842,7 @@ impl Renderer {
     }
     fn effects(&self, v: &Scene, game: &Game) {
         for cell in Cell::all() {
-            let flash = game.effects.relay_flash[cell.index()];
+            let flash = game.effects().relay_flash[cell.index()];
             if flash == 0 {
                 continue;
             }
@@ -866,12 +871,12 @@ impl Renderer {
                 );
             }
         }
-        for p in &game.effects.particles {
+        for p in &game.effects().particles {
             if p.life <= 0.0 {
                 continue;
             }
             let c = opacity(
-                sector_color(p.hue % 7, game.sector.sector().chapter),
+                sector_color(p.hue % 7, game.sector().sector().chapter),
                 (p.life * 3.0).min(1.0),
             );
             v.line(
@@ -885,7 +890,7 @@ impl Renderer {
         if self.pickup_flash > 0.0 {
             let progress = 1.0 - self.pickup_flash / 0.65;
             v.ring(
-                V2::new(game.paddle.x, PADDLE_Y),
+                V2::new(game.paddle().x, PADDLE_Y),
                 20.0 + progress * 90.0,
                 2.0,
                 opacity(CYAN, (1.0 - progress) * 0.6),
@@ -893,19 +898,19 @@ impl Renderer {
         }
     }
     fn paddle(&self, v: &Scene, game: &Game) {
-        let paddle = game.paddle.x;
-        let x = paddle - game.paddle.width / 2.0;
-        let w = game.paddle.width;
+        let paddle = game.paddle().x;
+        let x = paddle - game.paddle().width / 2.0;
+        let w = game.paddle().width;
         v.rounded(x, PADDLE_Y, w, PADDLE_HEIGHT, PADDLE_HEIGHT / 2.0, INK);
         // The center sends the ball straight up; the ends steer it.
         v.rounded(paddle - 9.0, PADDLE_Y + 5.0, 18.0, 4.0, 2.0, CYAN);
-        if game.powers.anchor_charges > 0 || game.balls.iter().any(|b| b.active && b.held) {
+        if game.powers().anchor_charges > 0 || game.balls().iter().any(|b| b.active && b.held) {
             v.rect(x + 12.0, PADDLE_Y - 3.0, w - 24.0, 1.0, CYAN);
             for i in 0..ANCHOR_CHARGES {
                 v.circle(
                     V2::new(paddle - 8.0 + f32::from(i) * 8.0, PADDLE_Y + 22.0),
                     2.0,
-                    if i < game.powers.anchor_charges {
+                    if i < game.powers().anchor_charges {
                         CYAN
                     } else {
                         MUTED
@@ -913,20 +918,20 @@ impl Renderer {
                 );
             }
         }
-        if game.powers.wide() {
+        if game.powers().wide() {
             v.rect(
                 x,
                 PADDLE_Y + 28.0,
-                w * (game.powers.wide_seconds / WIDE_SECONDS).min(1.0),
+                w * (game.powers().wide_seconds / WIDE_SECONDS).min(1.0),
                 2.0,
                 power_color(Power::Wide),
             );
         }
-        if game.powers.slow() {
+        if game.powers().slow() {
             v.rect(
                 x,
                 PADDLE_Y + 32.0,
-                w * (game.powers.slow_seconds / SLOW_SECONDS).min(1.0),
+                w * (game.powers().slow_seconds / SLOW_SECONDS).min(1.0),
                 2.0,
                 power_color(Power::Slow),
             );
@@ -943,7 +948,7 @@ impl Renderer {
         }
     }
     fn balls(&self, v: &Scene, game: &Game, alpha: f32) {
-        for (i, ball) in game.balls.iter().enumerate() {
+        for (i, ball) in game.balls().iter().enumerate() {
             if !ball.active {
                 continue;
             }
@@ -994,29 +999,29 @@ impl Renderer {
     fn hud(&mut self, v: &Scene, game: &Game, profile: &Profile) {
         v.text("SCORE", LEFT, 72.0, 11.0, DIM);
         self.scratch.clear();
-        grouped(&mut self.scratch, game.score);
+        grouped(&mut self.scratch, game.score());
         v.text(&self.scratch, LEFT, 108.0, 22.0, INK);
 
         self.scratch.clear();
         let _ = write!(
             self.scratch,
             "{} {:02}",
-            if game.mode == Mode::Practice {
+            if game.mode() == Mode::Practice {
                 "PRACTICE"
             } else {
                 "SECTOR"
             },
-            game.sector.index() + 1
+            game.sector().index() + 1
         );
         v.centered(&self.scratch, 72.0, 11.0, DIM);
-        v.centered(game.sector.sector().name, 104.0, 13.0, INK);
+        v.centered(game.sector().sector().name, 104.0, 13.0, INK);
         for id in SectorId::all() {
             v.rect(
                 WIDTH / 2.0 - 94.0 + id.index() as f32 * 16.0,
                 116.0,
                 12.0,
                 2.0,
-                if id == game.sector {
+                if id == game.sector() {
                     CYAN
                 } else if profile.records[id.index()].medals != Medals::NONE {
                     DIM
@@ -1027,23 +1032,23 @@ impl Renderer {
         }
 
         v.right("LIVES", RIGHT, 72.0, 11.0, DIM);
-        let shown = game.lives.max(3);
+        let shown = game.lives().max(3);
         for i in 0..shown {
             v.circle(
                 V2::new(RIGHT - 5.0 - f32::from(shown - 1 - i) * 16.0, 97.0),
                 5.0,
-                if i < game.lives { INK } else { MUTED },
+                if i < game.lives() { INK } else { MUTED },
             );
         }
     }
     fn ready(&mut self, v: &Scene, game: &Game) {
-        let level = game.sector.sector();
+        let level = game.sector().sector();
         self.scratch.clear();
         let _ = write!(
             self.scratch,
             "{}   SECTOR {:02}",
             CHAPTERS[level.chapter],
-            game.sector.index() + 1
+            game.sector().index() + 1
         );
         v.centered(&self.scratch, 548.0, 11.0, sector_color(0, level.chapter));
         v.centered(level.name, 584.0, 22.0, INK);
@@ -1055,7 +1060,7 @@ impl Renderer {
             13.0,
             CYAN,
         );
-        let start = game.balls[0].pos;
+        let start = game.balls()[0].pos;
         let direction = game.launch_velocity().normalized();
         for i in 1..=5 {
             v.circle(
@@ -1278,7 +1283,7 @@ impl Renderer {
             MUTED,
         );
     }
-    fn cleared(&mut self, v: &Scene, game: &Game) {
+    fn cleared(&mut self, v: &Scene, game: &Game, summary: SectorSummary) {
         v.scrim();
         v.panel(280.0, 296.0, 400.0, 340.0);
         v.centered("SECTOR CLEAR", 346.0, 22.0, INK);
@@ -1286,13 +1291,13 @@ impl Renderer {
             let x = WIDTH / 2.0 + (i as f32 - 1.0) * 110.0;
             self.scratch.clear();
             match i {
-                0 => clock(&mut self.scratch, game.summary.ticks),
+                0 => clock(&mut self.scratch, summary.ticks),
                 1 => {
                     self.scratch.push('+');
-                    grouped(&mut self.scratch, game.summary.bonus);
+                    grouped(&mut self.scratch, summary.bonus);
                 }
                 _ => {
-                    let _ = write!(self.scratch, "{}", game.summary.best_combo);
+                    let _ = write!(self.scratch, "{}", summary.best_combo);
                 }
             }
             v.center_at(label, x, 388.0, 11.0, DIM);
@@ -1300,7 +1305,7 @@ impl Renderer {
         }
         for (i, label) in ["CLEAR", "CLEAN", "SWIFT"].iter().enumerate() {
             let x = WIDTH / 2.0 + (i as f32 - 1.0) * 110.0;
-            let earned = game.summary.medals.contains(MEDAL_ORDER[i]);
+            let earned = summary.medals.contains(MEDAL_ORDER[i]);
             v.rounded(
                 x - 46.0,
                 438.0,
@@ -1311,12 +1316,12 @@ impl Renderer {
             );
             v.center_at(label, x, 455.0, 11.0, if earned { AMBER } else { MUTED });
         }
-        if game.summary.life_earned {
+        if summary.life_earned {
             v.centered("CHAPTER COMPLETE / EXTRA LIFE", 498.0, 11.0, CYAN);
         }
         v.button(
             ui::next_rect(),
-            if game.mode == Mode::Practice {
+            if game.mode() == Mode::Practice {
                 "BACK TO SECTORS"
             } else {
                 "NEXT SECTOR"
@@ -1401,7 +1406,7 @@ const MEDAL_ORDER: [Medals; 3] = [Medals::CLEAR, Medals::CLEAN, Medals::SWIFT];
 fn hp_grid(game: &Game) -> [u8; CELLS] {
     let mut hp = [0; CELLS];
     for cell in Cell::all() {
-        hp[cell.index()] = game.board.hp(cell);
+        hp[cell.index()] = game.board().hp(cell);
     }
     hp
 }

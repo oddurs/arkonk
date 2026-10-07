@@ -18,7 +18,7 @@ mod steam;
 mod ui;
 
 use ark::{
-    Events, Game, Input, Medals, Mode, Stage,
+    Events, Game, Input, Medals, Mode, SectorSummary, Stage,
     clock::FixedClock,
     field::{BOTTOM, FIELD, LEFT, RIGHT, TOP},
     geom::V2,
@@ -33,8 +33,20 @@ use perf::Perf;
 use render::Renderer;
 use std::{path::PathBuf, time::Instant};
 use steam::Steam;
-use ui::{Controls, Screen, Ui};
+use ui::{Controls, Preview, Screen, Ui};
 
+/// A results card for screens the smoke test shows without playing to them.
+fn preview(stage: Stage) -> Option<Preview> {
+    Some(Preview {
+        stage,
+        summary: SectorSummary {
+            ticks: 18240,
+            medals: Medals::ALL,
+            bonus: 2000,
+            ..SectorSummary::default()
+        },
+    })
+}
 fn flag(name: &str) -> bool {
     std::env::args().any(|a| a == name)
 }
@@ -285,7 +297,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         let pad = pads.poll(
             frame_seconds,
             focused,
-            ui.paused || matches!(game.stage, Stage::GameOver | Stage::Victory),
+            ui.paused || matches!(game.stage(), Stage::GameOver | Stage::Victory),
             moved || input::pointer_pressed(),
         );
         ui.device = pads.device;
@@ -310,11 +322,11 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         if effects {
             smoke::effects(&mut game, frames);
         }
-        let terminal = matches!(game.stage, Stage::GameOver | Stage::Victory);
+        let terminal = matches!(game.stage(), Stage::GameOver | Stage::Victory);
         if (!smoke || flow)
             && ui.screen == Screen::Play
             && !terminal
-            && (focus.lost || (frame_seconds > 0.25 && game.stage == Stage::Playing && !held))
+            && (focus.lost || (frame_seconds > 0.25 && game.stage() == Stage::Playing && !held))
         {
             if !ui.paused {
                 diagnostics::info(format_args!(
@@ -348,7 +360,13 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     match ui.choice {
                         0 => {
                             if let Some(c) = profile.checkpoint {
-                                enter(c.game(), &mut game, &mut ui, &mut renderer, &mut clock);
+                                enter(
+                                    Game::resume(c),
+                                    &mut game,
+                                    &mut ui,
+                                    &mut renderer,
+                                    &mut clock,
+                                );
                                 changed = true;
                             }
                         }
@@ -437,16 +455,16 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                             }
                             0 => {
                                 ui.screen = Screen::Sectors;
-                                ui.sector = game.sector;
+                                ui.sector = game.sector();
                             }
                             1 => {
-                                let fresh = if game.mode == Mode::Journey {
+                                let fresh = if game.mode() == Mode::Journey {
                                     // Retrying restores the entry checkpoint; scores cannot be farmed.
-                                    profile.checkpoint.map_or_else(Game::new, |c| c.game())
+                                    profile.checkpoint.map_or_else(Game::new, Game::resume)
                                 } else {
-                                    Game::start(game.sector, Mode::Practice)
+                                    Game::start(game.sector(), Mode::Practice)
                                 };
-                                if fresh.mode == Mode::Journey {
+                                if fresh.mode() == Mode::Journey {
                                     profile.begin(&fresh);
                                     dirty = true;
                                 }
@@ -456,12 +474,12 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                         }
                         changed = true;
                     }
-                } else if !changed && game.stage == Stage::Cleared {
+                } else if !changed && game.stage() == Stage::Cleared {
                     let next = confirm || (click && ui::next_rect().contains(pointer));
-                    if next && game.stage_ticks >= ADVANCE_DELAY_TICKS {
-                        if game.mode == Mode::Practice {
+                    if next && game.stage_ticks() >= ADVANCE_DELAY_TICKS {
+                        if game.mode() == Mode::Practice {
                             ui.screen = Screen::Sectors;
-                            ui.sector = game.sector;
+                            ui.sector = game.sector();
                         } else {
                             pending_launch = true;
                         }
@@ -491,19 +509,19 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         }
         let mut input = Input {
             axis,
-            mouse_x: mouse_control.then_some(mouse.x),
+            target_x: mouse_control.then_some(mouse.x),
             launch: false,
         };
         if smoke && !flow {
-            input.mouse_x = Some(
-                game.balls
+            input.target_x = Some(
+                game.balls()
                     .iter()
                     .find(|b| b.active)
                     .map_or(FIELD.center().x, |b| b.pos.x)
                     + (now as f32 * 0.7).sin() * 32.0,
             );
-            pending_launch = matches!(game.stage, Stage::Ready | Stage::Cleared)
-                || game.balls.iter().any(|b| b.active && b.held);
+            pending_launch = matches!(game.stage(), Stage::Ready | Stage::Cleared)
+                || game.balls().iter().any(|b| b.active && b.held);
         }
         let mut alpha = 1.0;
         if ui.screen == Screen::Play && !ui.paused && !terminal && !changed && !held {
@@ -515,18 +533,18 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 input.launch = pending_launch;
                 pending_launch = false;
                 let tick_start = get_time();
-                game.step(&input);
+                let tick = game.step(input);
                 perf.simulation((get_time() - tick_start) * 1000.0);
-                renderer.record(&game);
-                events.merge(game.events);
-                if game.events.clear {
+                renderer.record(&game, tick);
+                events.merge(tick);
+                if tick.clear {
                     profile.finish(&game);
                     steam.cleared(&game, &profile);
                     dirty = true;
                     ui.choice = 0;
                 }
-                if game.stage == Stage::GameOver && game.mode == Mode::Journey {
-                    profile.best_score = profile.best_score.max(game.score);
+                if game.stage() == Stage::GameOver && game.mode() == Mode::Journey {
+                    profile.best_score = profile.best_score.max(game.score());
                     dirty = true;
                     ui.choice = 1;
                 }
@@ -535,16 +553,16 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         } else {
             clock.reset();
         }
-        if game.mode == Mode::Journey
+        if game.mode() == Mode::Journey
             && (ui.paused || ui.screen != Screen::Play)
-            && game.score > profile.best_score
+            && game.score() > profile.best_score
         {
-            profile.best_score = game.score;
+            profile.best_score = game.score();
             dirty = true;
         }
         if dirty
             && now - last_save_attempt >= 5.0
-            && (ui.screen != Screen::Play || ui.paused || game.stage != Stage::Playing)
+            && (ui.screen != Screen::Play || ui.paused || game.stage() != Stage::Playing)
         {
             last_save_attempt = now;
             match path.as_ref().map(|p| profile.save(p)).transpose() {
@@ -561,14 +579,13 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         }
         steam.presence(ui.screen == Screen::Play, &game);
         let show_cursor = ui.device == Device::KeyboardMouse
-            && (ui.screen != Screen::Play || ui.paused || game.stage != Stage::Playing);
+            && (ui.screen != Screen::Play || ui.paused || game.stage() != Stage::Playing);
         if cursor_visible != show_cursor {
             show_mouse(show_cursor);
             cursor_visible = show_cursor;
         }
-        perf.refresh(now, game.collision_caps);
+        perf.refresh(now, game.diagnostics().budget_exhausted);
         let draw_start = get_time();
-        let actual_stage = game.stage;
         let actual_screen = ui.screen;
         let actual_pause = ui.paused;
         let measured = if perf_test { 3899 } else { 660 };
@@ -582,13 +599,8 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             match frames {
                 30 => ui.screen = Screen::Title,
                 150 => ui.paused = true,
-                160 => game.stage = Stage::GameOver,
-                180 => {
-                    game.stage = Stage::Cleared;
-                    game.summary.medals = Medals::ALL;
-                    game.summary.ticks = 18240;
-                    game.summary.bonus = 2000;
-                }
+                160 => ui.preview = preview(Stage::GameOver),
+                180 => ui.preview = preview(Stage::Cleared),
                 190 => ui.screen = Screen::Sectors,
                 250 | 260 | 270 | 280 | 290 => {
                     ui.device = Device::Gamepad;
@@ -596,8 +608,8 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                         250 => ui.screen = Screen::Title,
                         260 => ui.paused = true,
                         270 => ui.screen = Screen::Sectors,
-                        280 => game.stage = Stage::Cleared,
-                        _ => game.stage = Stage::Ready,
+                        280 => ui.preview = preview(Stage::Cleared),
+                        _ => ui.preview = preview(Stage::Ready),
                     }
                 }
                 _ => {}
@@ -613,7 +625,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         if let Some((size, p)) = layout_capture {
             renderer.capture_at((&game, &ui, &profile), size, &p);
         }
-        game.stage = actual_stage;
+        ui.preview = None;
         ui.screen = actual_screen;
         ui.paused = actual_pause;
         perf.draw((get_time() - draw_start) * 1000.0);
@@ -651,8 +663,8 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             println!(
                 "Render smoke: {} frames, score {}, collision caps {}, sounds loaded {}/17",
                 frames + 1,
-                game.score,
-                game.collision_caps,
+                game.score(),
+                game.diagnostics().budget_exhausted,
                 audio.loaded()
             );
             for line in &perf.lines {
@@ -682,8 +694,8 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         trace.report();
     }
     if !smoke {
-        if game.mode == Mode::Journey {
-            profile.best_score = profile.best_score.max(game.score);
+        if game.mode() == Mode::Journey {
+            profile.best_score = profile.best_score.max(game.score());
         }
         if let Some(p) = &path
             && let Err(e) = profile.save(p)

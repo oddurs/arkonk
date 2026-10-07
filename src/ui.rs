@@ -1,5 +1,5 @@
 use crate::input::Device;
-use ark::sectors::SectorId;
+use ark::{SectorSummary, Stage, sectors::SectorId};
 use macroquad::prelude::{Rect, Vec2};
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
@@ -16,6 +16,17 @@ pub struct Ui {
     pub save_error: bool,
     /// What the player touched last; prompts and the cursor follow it.
     pub device: Device,
+    /// A stage to draw instead of the game's own, so the smoke test can
+    /// capture screens that play would take minutes to reach.
+    pub preview: Option<Preview>,
+}
+
+/// A stage, and the results card to show with it, drawn in place of the
+/// game's own.
+#[derive(Clone, Copy)]
+pub struct Preview {
+    pub stage: Stage,
+    pub summary: SectorSummary,
 }
 impl Default for Ui {
     fn default() -> Self {
@@ -26,6 +37,7 @@ impl Default for Ui {
             sector: SectorId::FIRST,
             save_error: false,
             device: Device::KeyboardMouse,
+            preview: None,
         }
     }
 }

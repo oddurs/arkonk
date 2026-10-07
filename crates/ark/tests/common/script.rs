@@ -42,7 +42,7 @@ impl Pilot {
         let launch = self.rng.below(24) == 0;
         match (self.style, ball_x) {
             (Style::Track(offset), Some(x)) => Input {
-                mouse_x: Some(x + offset),
+                target_x: Some(x + offset),
                 launch,
                 ..Input::default()
             },

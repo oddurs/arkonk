@@ -1,7 +1,7 @@
 //! Achievements derived from saved progress and sector results. The derivation is
 //! pure so it can be tested without a Steam client; `docs/steam/achievements.md`
 //! is the matching partner-site configuration.
-use ark::{Game, Medals, Mode, Stage, profile::Profile, sectors::SECTORS};
+use ark::{Game, Medals, Mode, SectorSummary, Stage, profile::Profile, sectors::SECTORS};
 
 /// The best chain, as shown on the results card, that earns `Chain`.
 pub const CHAIN_TARGET: u32 = 20;
@@ -94,11 +94,16 @@ pub fn from_profile(profile: &Profile) -> Vec<Achievement> {
 /// Feats only visible in the moment a sector is cleared; the profile does not
 /// record them.
 pub fn from_clear(game: &Game) -> Vec<Achievement> {
+    let journey_complete = game.mode() == Mode::Journey && game.stage() == Stage::Victory;
+    from_results(journey_complete, &game.summary())
+}
+
+fn from_results(journey_complete: bool, summary: &SectorSummary) -> Vec<Achievement> {
     let mut earned = Vec::new();
-    if game.mode == Mode::Journey && game.stage == Stage::Victory {
+    if journey_complete {
         earned.push(Achievement::Homecoming);
     }
-    if game.summary.best_combo >= CHAIN_TARGET {
+    if summary.best_combo >= CHAIN_TARGET {
         earned.push(Achievement::Chain);
     }
     earned
@@ -108,6 +113,8 @@ pub fn from_clear(game: &Game) -> Vec<Achievement> {
 mod tests {
     use super::*;
     use ark::{
+        Input,
+        clock::TICK_HZ,
         profile::Record,
         sectors::{SECTOR_COUNT, SectorId},
     };
@@ -168,8 +175,16 @@ mod tests {
     fn profile_finish_feeds_the_derivation() {
         let mut p = Profile::default();
         let mut g = Game::start(SectorId::FIRST, Mode::Practice);
-        g.stage = Stage::Cleared;
-        g.summary.medals = Medals::CLEAR | Medals::CLEAN;
+        g.step(Input {
+            launch: true,
+            ..Input::default()
+        });
+        // Too slow for Swift.
+        g.sandbox()
+            .elapse(SectorId::FIRST.sector().par_seconds * TICK_HZ);
+        g.sandbox().clear_board();
+        g.step(Input::default());
+        assert_eq!(g.summary().medals, Medals::CLEAR | Medals::CLEAN);
         p.finish(&g);
         assert_eq!(
             from_profile(&p),
@@ -179,19 +194,31 @@ mod tests {
 
     #[test]
     fn journey_victory_and_long_chains_come_from_the_clear() {
-        let mut g = Game::start(SectorId::clamped(SECTOR_COUNT - 1), Mode::Journey);
-        g.stage = Stage::Victory;
-        g.summary.best_combo = CHAIN_TARGET - 1;
-        assert_eq!(from_clear(&g), [Achievement::Homecoming]);
-        g.summary.best_combo = CHAIN_TARGET;
+        let short = SectorSummary {
+            best_combo: CHAIN_TARGET - 1,
+            ..SectorSummary::default()
+        };
+        let long = SectorSummary {
+            best_combo: CHAIN_TARGET,
+            ..short
+        };
+        assert_eq!(from_results(true, &short), [Achievement::Homecoming]);
         assert_eq!(
-            from_clear(&g),
+            from_results(true, &long),
             [Achievement::Homecoming, Achievement::Chain]
         );
+        assert_eq!(from_results(false, &long), [Achievement::Chain]);
         // Practice cannot finish the journey, however the sector ends.
-        let mut g = Game::start(SectorId::clamped(SECTOR_COUNT - 1), Mode::Practice);
-        g.stage = Stage::Cleared;
-        assert!(from_clear(&g).is_empty());
+        for mode in [Mode::Journey, Mode::Practice] {
+            let mut g = Game::start(SectorId::clamped(SECTOR_COUNT - 1), mode);
+            g.step(Input {
+                launch: true,
+                ..Input::default()
+            });
+            g.sandbox().clear_board();
+            g.step(Input::default());
+            assert_eq!(from_clear(&g).is_empty(), mode == Mode::Practice);
+        }
     }
 
     #[test]

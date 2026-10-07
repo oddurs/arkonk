@@ -20,15 +20,6 @@ pub struct Checkpoint {
     pub lives: u8,
     pub ticks: u32,
 }
-impl Checkpoint {
-    pub fn game(self) -> Game {
-        let mut game = Game::start(self.sector, Mode::Journey);
-        game.score = self.score;
-        game.lives = self.lives;
-        game.run_ticks = self.ticks;
-        game
-    }
-}
 #[derive(Clone, Debug, PartialEq)]
 pub struct Profile {
     pub best_score: u32,
@@ -58,30 +49,24 @@ impl Profile {
         self.records.iter().map(|r| r.medals.count()).sum()
     }
     pub fn begin(&mut self, game: &Game) {
-        self.checkpoint = Some(Checkpoint {
-            sector: game.sector,
-            score: game.score,
-            lives: game.lives,
-            ticks: game.run_ticks,
-        });
+        self.checkpoint = Some(game.checkpoint());
     }
     pub fn finish(&mut self, game: &Game) {
-        let record = &mut self.records[game.sector.index()];
-        record.medals |= game.summary.medals;
-        if record.best_ticks == 0 || game.summary.ticks < record.best_ticks {
-            record.best_ticks = game.summary.ticks;
+        let summary = game.summary();
+        let record = &mut self.records[game.sector().index()];
+        record.medals |= summary.medals;
+        if record.best_ticks == 0 || summary.ticks < record.best_ticks {
+            record.best_ticks = summary.ticks;
         }
         self.unlocked = self
             .unlocked
-            .max((game.sector.index() + 2).min(SECTOR_COUNT));
-        if game.mode == Mode::Journey {
-            self.best_score = self.best_score.max(game.score);
-            self.checkpoint = match game.sector.next() {
-                Some(next) if game.stage != Stage::Victory => Some(Checkpoint {
+            .max((game.sector().index() + 2).min(SECTOR_COUNT));
+        if game.mode() == Mode::Journey {
+            self.best_score = self.best_score.max(game.score());
+            self.checkpoint = match game.sector().next() {
+                Some(next) if game.stage() != Stage::Victory => Some(Checkpoint {
                     sector: next,
-                    score: game.score,
-                    lives: game.lives,
-                    ticks: game.run_ticks,
+                    ..game.checkpoint()
                 }),
                 _ => None,
             };
@@ -329,20 +314,29 @@ mod tests {
         assert!(p.muted);
         assert_eq!(p.volume, 4);
     }
+    /// `sector`, cleared after `ticks` of play.
+    fn cleared(sector: SectorId, mode: Mode, ticks: u32) -> Game {
+        let mut g = Game::start(sector, mode);
+        g.step(crate::Input {
+            launch: true,
+            ..crate::Input::default()
+        });
+        g.sandbox().elapse(ticks);
+        g.sandbox().clear_board();
+        g.step(crate::Input::default());
+        assert_eq!(g.stage(), Stage::Cleared);
+        g
+    }
     #[test]
     fn practice_records_do_not_replace_journey_checkpoint() {
         let mut p = Profile::default();
         p.begin(&Game::new());
         let saved = p.checkpoint;
-        let mut g = Game::start(SectorId::FIRST, Mode::Practice);
-        g.stage = Stage::Cleared;
-        g.summary.medals = Medals::ALL;
-        g.summary.ticks = 1200;
-        g.score = 5000;
-        p.finish(&g);
-        g.summary.ticks = 1500;
-        g.summary.medals = Medals::CLEAR;
-        p.finish(&g);
+        p.finish(&cleared(SectorId::FIRST, Mode::Practice, 1199));
+        let par = SectorId::FIRST.sector().par_seconds * crate::clock::TICK_HZ;
+        let slow = cleared(SectorId::FIRST, Mode::Practice, par + 300);
+        assert_eq!(slow.summary().medals, Medals::CLEAR | Medals::CLEAN);
+        p.finish(&slow);
         assert_eq!(p.checkpoint, saved);
         assert_eq!(p.best_score, 0);
         assert_eq!(

@@ -12,6 +12,11 @@ impl Rng {
         Self(RNG_SEED)
     }
 
+    /// Whether the state reached zero, which xorshift never leaves.
+    pub(crate) fn is_stuck(&self) -> bool {
+        self.0 == 0
+    }
+
     /// The next value, uniform in `[0, 1]`.
     pub(crate) fn next_f32(&mut self) -> f32 {
         self.0 ^= self.0 << 13;

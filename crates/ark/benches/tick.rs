@@ -5,10 +5,11 @@
 //! every sector covered. Under `cargo test` (no `--bench` argument) it runs a
 //! shorter workload with the same assertions.
 use ark::{
-    Ball, Capsule, Game, Input, Mode, Particle, Power, Stage,
-    field::{BALL_RADIUS, CELLS, CellSet, FIELD, PADDLE_Y},
+    Game, Input, Mode, Particle, Power, Stage,
+    field::{BALL_RADIUS, CellSet, FIELD, PADDLE_Y},
     geom::V2,
     sectors::{SECTOR_COUNT, SectorId},
+    tuning::{MAX_BALLS, MAX_CAPSULES},
 };
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -52,12 +53,13 @@ static ALLOCATOR: CountingAllocator = CountingAllocator;
 
 fn setup(stress: bool, relays: bool, sector: SectorId) -> Game {
     let mut g = Game::start(sector, Mode::Journey);
-    g.step(&Input {
+    g.step(Input {
         launch: true,
         ..Default::default()
     });
+    let mut sandbox = g.sandbox();
     if relays {
-        g.board.reset([1; CELLS], CellSet::ALL);
+        sandbox.fill_board(1, CellSet::ALL);
         for power in [
             Power::Anchor,
             Power::Phase,
@@ -65,35 +67,34 @@ fn setup(stress: bool, relays: bool, sector: SectorId) -> Game {
             Power::Slow,
             Power::Multi,
         ] {
-            g.apply_power(power);
+            sandbox.grant(power);
         }
     }
     if stress {
-        for (i, b) in g.balls.iter_mut().enumerate() {
-            b.active = true;
-            b.pos = V2::new(240.0 + i as f32 * 160.0, 460.0);
-            b.previous = b.pos;
-            b.velocity = V2::new(0.34 + i as f32 * 0.18, -0.8).normalized() * 12000.0;
+        for i in 0..MAX_BALLS {
+            sandbox.place_ball(
+                i,
+                V2::new(240.0 + i as f32 * 160.0, 460.0),
+                V2::new(0.34 + i as f32 * 0.18, -0.8).normalized() * 12000.0,
+            );
         }
         if relays {
             // Exercise an actual catch/release before the upward balls ignite
             // the board; this fast scenario clears before capsules can fall.
-            g.balls[0].pos = V2::new(FIELD.center().x, PADDLE_Y - BALL_RADIUS - 1.0);
-            g.balls[0].previous = g.balls[0].pos;
-            g.balls[0].velocity = V2::new(0.0, 12000.0);
+            sandbox.place_ball(
+                0,
+                V2::new(FIELD.center().x, PADDLE_Y - BALL_RADIUS - 1.0),
+                V2::new(0.0, 12000.0),
+            );
         }
-        g.effects.particles.fill(Particle {
+        sandbox.effects().particles.fill(Particle {
             pos: V2::new(400.0, 400.0),
             velocity: V2::new(100.0, 100.0),
             life: 10.0,
             hue: 0,
         });
-        for (i, d) in g.capsules.iter_mut().enumerate() {
-            *d = Capsule {
-                pos: V2::new(120.0 + i as f32 * 60.0, 300.0),
-                power: Power::Multi,
-                active: true,
-            };
+        for i in 0..MAX_CAPSULES {
+            sandbox.spawn_capsule(i, V2::new(120.0 + i as f32 * 60.0, 300.0), Power::Multi);
         }
     }
     g
@@ -132,67 +133,61 @@ fn run(load: &Load, stress: bool, relays: bool) {
         let start = Instant::now();
         for _ in 0..BATCH {
             if tick % load.sector_ticks == 0
-                || matches!(game.stage, Stage::GameOver | Stage::Victory)
-                || (stress && (tick % 240 == 0 || game.stage != Stage::Playing))
+                || matches!(game.stage(), Stage::GameOver | Stage::Victory)
+                || (stress && (tick % 240 == 0 || game.stage() != Stage::Playing))
             {
-                score += u64::from(game.score);
-                caps += game.collision_caps;
+                score += u64::from(game.score());
+                caps += game.diagnostics().budget_exhausted;
                 let next = SectorId::new((tick / load.sector_ticks) % SECTOR_COUNT);
                 game = setup(stress, relays, next.expect("taken modulo the sector count"));
             }
-            level_mask |= 1 << game.sector.index();
+            level_mask |= 1 << game.sector().index();
             if stress {
                 // Replenish depleted pools to keep the measured workload full.
-                for (i, ball) in game.balls.iter_mut().enumerate() {
+                for i in 0..MAX_BALLS {
+                    let ball = game.balls()[i];
                     if !ball.active {
                         let pos = V2::new(240.0 + i as f32 * 160.0, 460.0);
-                        *ball = Ball {
-                            pos,
-                            previous: pos,
-                            velocity: V2::new(0.4, -0.8),
-                            active: true,
-                            ..Ball::default()
-                        };
+                        game.sandbox().place_ball(i, pos, V2::new(0.4, -0.8));
                     }
-                    ball.velocity = ball.velocity.normalized() * 12000.0;
+                    let velocity = game.balls()[i].velocity.normalized() * 12000.0;
+                    game.sandbox().aim_ball(i, velocity);
                 }
-                for (i, drop) in game.capsules.iter_mut().enumerate() {
-                    if !drop.active {
-                        *drop = Capsule {
-                            pos: V2::new(120.0 + i as f32 * 60.0, 300.0),
-                            power: if relays {
-                                [
-                                    Power::Multi,
-                                    Power::Anchor,
-                                    Power::Phase,
-                                    Power::Wide,
-                                    Power::Slow,
-                                ][i % 5]
-                            } else {
-                                Power::Multi
-                            },
-                            active: true,
+                for i in 0..MAX_CAPSULES {
+                    if !game.capsules()[i].active {
+                        let power = if relays {
+                            [
+                                Power::Multi,
+                                Power::Anchor,
+                                Power::Phase,
+                                Power::Wide,
+                                Power::Slow,
+                            ][i % 5]
+                        } else {
+                            Power::Multi
                         };
+                        let pos = V2::new(120.0 + i as f32 * 60.0, 300.0);
+                        game.sandbox().spawn_capsule(i, pos, power);
                     }
                 }
             }
             let x = game
-                .balls
+                .balls()
                 .iter()
                 .find(|b| b.active)
                 .map_or(FIELD.center().x, |b| b.pos.x)
                 + (tick as f32 * 0.003).sin() * 36.0;
-            game.step(black_box(&Input {
-                mouse_x: Some(x),
+            let events = game.step(black_box(Input {
+                target_x: Some(x),
                 launch: true,
                 ..Default::default()
             }));
-            impacts += u64::from(game.events.brick);
-            chain_ticks += u64::from(game.events.relay);
-            phase_hits += u64::from(game.events.phase_hit);
-            catches += u64::from(game.events.caught);
+            impacts += u64::from(events.brick);
+            chain_ticks += u64::from(events.relay);
+            phase_hits += u64::from(events.phase_hit);
+            catches += u64::from(events.caught);
             if stress {
-                for p in &mut game.effects.particles {
+                for p in &mut game.sandbox().effects().particles {
                     p.life = 1.0;
                 }
             }
@@ -203,8 +198,8 @@ fn run(load: &Load, stress: bool, relays: bool) {
     }
     COUNTING.store(false, Ordering::Relaxed);
     let allocations = ALLOCATIONS.load(Ordering::Relaxed);
-    score += u64::from(game.score);
-    caps += game.collision_caps;
+    score += u64::from(game.score());
+    caps += game.diagnostics().budget_exhausted;
     samples.sort_unstable_by(f64::total_cmp);
     let mean = samples.iter().sum::<f64>() / samples.len() as f64;
     println!(

@@ -14,7 +14,7 @@ mod common;
 
 use ark::{
     Events, Game, Input, Mode, Power, Stage,
-    field::{CELLS, Cell, CellSet},
+    field::{Cell, CellSet},
     sectors::SectorId,
 };
 use common::script::Pilot;
@@ -51,22 +51,22 @@ impl Digest {
     }
 
     fn game(&mut self, g: &Game) {
-        self.u8(stage(g.stage));
-        self.u8(match g.mode {
+        self.u8(stage(g.stage()));
+        self.u8(match g.mode() {
             Mode::Journey => 0,
             Mode::Practice => 1,
         });
-        self.u8(g.sector.index() as u8);
-        self.u32(g.score);
-        self.u8(g.lives);
-        self.u32(g.board.remaining() as u32);
-        self.u32(g.board.initial() as u32);
+        self.u8(g.sector().index() as u8);
+        self.u32(g.score());
+        self.u8(g.lives());
+        self.u32(g.board().remaining() as u32);
+        self.u32(g.board().initial() as u32);
         for cell in Cell::all() {
-            self.u8(g.board.hp(cell));
-            self.bool(g.board.is_core(cell));
-            self.u8(g.board.relay_countdown(cell));
+            self.u8(g.board().hp(cell));
+            self.bool(g.board().is_core(cell));
+            self.u8(g.board().relay_countdown(cell));
         }
-        for b in &g.balls {
+        for b in g.balls() {
             for v in [b.pos, b.previous, b.velocity] {
                 self.f32(v.x);
                 self.f32(v.y);
@@ -81,30 +81,31 @@ impl Digest {
                 .fold(0_u128, |bits, c| bits | 1 << c.index());
             self.bytes(&phased.to_le_bytes());
         }
-        for d in &g.capsules {
+        for d in g.capsules() {
             self.f32(d.pos.x);
             self.f32(d.pos.y);
             self.u8(power(d.power));
             self.bool(d.active);
         }
-        self.f32(g.paddle.x);
-        self.f32(g.paddle.previous);
-        self.f32(g.paddle.width);
-        self.f32(g.powers.wide_seconds);
-        self.f32(g.powers.slow_seconds);
-        self.u8(g.powers.anchor_charges);
-        self.u32(g.sector_ticks);
-        self.u32(g.run_ticks);
-        self.u32(g.stage_ticks);
-        self.u32(g.combo);
-        self.u32(g.best_combo);
-        let s = g.summary;
+        let (paddle, powers) = (g.paddle(), g.powers());
+        self.f32(paddle.x);
+        self.f32(paddle.previous);
+        self.f32(paddle.width);
+        self.f32(powers.wide_seconds);
+        self.f32(powers.slow_seconds);
+        self.u8(powers.anchor_charges);
+        self.u32(g.sector_ticks());
+        self.u32(g.run_ticks());
+        self.u32(g.stage_ticks());
+        self.u32(g.combo());
+        self.u32(g.best_combo());
+        let s = g.summary();
         self.u32(s.ticks);
         self.u8(s.medals.bits());
         self.u32(s.bonus);
         self.u32(s.best_combo);
         self.bool(s.life_earned);
-        self.u64(g.collision_caps);
+        self.u64(g.diagnostics().budget_exhausted);
     }
 
     fn events(&mut self, e: &Events) {
@@ -151,7 +152,7 @@ fn power(p: Power) -> u8 {
 }
 
 fn ball_x(game: &Game) -> Option<f32> {
-    game.balls.iter().find(|b| b.active).map(|b| b.pos.x)
+    game.balls().iter().find(|b| b.active).map(|b| b.pos.x)
 }
 
 /// Records one session: a line per checkpoint with a readable summary and
@@ -180,20 +181,21 @@ impl Recorder {
     ) {
         for _ in 0..ticks {
             let input = script(self.tick, game);
-            game.step(&input);
+            let events = game.step(input);
+            assert_eq!(game.validate(), Ok(()), "tick {}", self.tick);
             self.digest.game(game);
-            self.digest.events(&game.events);
+            self.digest.events(&events);
             self.tick += 1;
             if self.tick.is_multiple_of(CHECKPOINT) {
                 let _ = writeln!(
                     self.out,
                     "{:>6}  sector {:02} {:<9} score {:>6}  lives {}  bricks {:>2}  {:016x}",
                     self.tick,
-                    game.sector.index() + 1,
-                    stage_name(game.stage),
-                    game.score,
-                    game.lives,
-                    game.board.remaining(),
+                    game.sector().index() + 1,
+                    stage_name(game.stage()),
+                    game.score(),
+                    game.lives(),
+                    game.board().remaining(),
                     self.digest.0,
                 );
             }
@@ -236,7 +238,7 @@ fn journey() {
         let mut r = Recorder::new(&format!("journey seed {seed}"));
         let mut pilot = pilot(seed);
         r.run(&mut game, 120 * CHECKPOINT, |tick, game| {
-            if matches!(game.stage, Stage::GameOver | Stage::Victory) {
+            if matches!(game.stage(), Stage::GameOver | Stage::Victory) {
                 *game = Game::new();
             }
             pilot(tick, game)
@@ -253,11 +255,11 @@ fn journey() {
 )]
 fn full_board_relay() {
     let mut game = Game::start(SectorId::new(0).unwrap(), Mode::Journey);
-    game.step(&Input {
+    game.step(Input {
         launch: true,
         ..Input::default()
     });
-    game.board.reset([1; CELLS], CellSet::ALL);
+    game.sandbox().fill_board(1, CellSet::ALL);
     let mut r = Recorder::new("full board of relay cores");
     r.run(&mut game, 4 * CHECKPOINT, pilot(11));
     insta::assert_snapshot!(r.out);
@@ -281,8 +283,8 @@ fn every_power() {
     let mut pilot = pilot(12);
     r.run(&mut game, 8 * CHECKPOINT, |tick, game| {
         let turn = (tick / 600) as usize;
-        if tick % 600 == 300 && turn < 2 * ORDER.len() && game.stage == Stage::Playing {
-            game.apply_power(ORDER[turn % ORDER.len()]);
+        if tick % 600 == 300 && turn < 2 * ORDER.len() && game.stage() == Stage::Playing {
+            game.sandbox().grant(ORDER[turn % ORDER.len()]);
         }
         pilot(tick, game)
     });
@@ -299,11 +301,11 @@ fn anchor_hold() {
     let mut r = Recorder::new("anchor catches held for seconds, then released");
     let mut pilot = pilot(13);
     r.run(&mut game, 6 * CHECKPOINT, |tick, game| {
-        if game.stage == Stage::Playing && game.powers.anchor_charges == 0 {
-            game.apply_power(Power::Anchor);
+        if game.stage() == Stage::Playing && game.powers().anchor_charges == 0 {
+            game.sandbox().grant(Power::Anchor);
         }
         let mut input = pilot(tick, game);
-        input.launch = game.stage != Stage::Playing || tick % 960 == 0;
+        input.launch = game.stage() != Stage::Playing || tick % 960 == 0;
         input
     });
     insta::assert_snapshot!(r.out);
@@ -322,11 +324,12 @@ fn sector_endings() {
         let mut game = Game::start(SectorId::new(sector).unwrap(), Mode::Journey);
         let mut kept = 0;
         for cell in Cell::all().rev() {
-            if game.board.hp(cell) > 0 {
+            if game.board().hp(cell) > 0 {
                 if kept < 3 {
                     kept += 1;
                 } else {
-                    game.board.set(cell, 0, game.board.is_core(cell));
+                    let core = game.board().is_core(cell);
+                    game.sandbox().set_brick(cell, 0, core);
                 }
             }
         }

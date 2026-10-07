@@ -5,12 +5,12 @@ use crate::{
     ui::{Controls, Screen, Ui},
 };
 use ark::{
-    Capsule, Game, Input, Medals, Mode, Particle, Power, Stage,
-    field::{BALL_RADIUS as RADIUS, CELLS, Cell, CellSet, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
+    Game, Input, Medals, Mode, Particle, Power, Stage,
+    field::{BALL_RADIUS as RADIUS, Cell, CellSet, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
     geom::V2,
     profile::Profile,
     sectors::SectorId,
-    tuning::ADVANCE_DELAY_TICKS,
+    tuning::{ADVANCE_DELAY_TICKS, MAX_BALLS, MAX_CAPSULES},
 };
 use macroquad::prelude::{request_new_screen_size, screen_dpi_scale, screen_height, screen_width};
 pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls {
@@ -36,35 +36,35 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
             keys.pause = true;
         }
         3 | 20 => {
-            assert_eq!(game.stage, Stage::Playing);
+            assert_eq!(game.stage(), Stage::Playing);
             assert!(
-                game.mode
+                game.mode()
                     == if frame == 3 {
                         Mode::Journey
                     } else {
                         Mode::Practice
                     }
             );
-            game.board.reset([0; CELLS], CellSet::EMPTY);
+            game.sandbox().clear_board();
         }
         4 | 21 => {
-            assert_eq!(game.stage, Stage::Cleared);
+            assert_eq!(game.stage(), Stage::Cleared);
             assert!(profile.unlocked >= 2);
             assert_eq!(profile.checkpoint.unwrap().sector.index(), 1);
-            game.stage_ticks = ADVANCE_DELAY_TICKS;
+            game.sandbox().elapse(ADVANCE_DELAY_TICKS);
         }
         26 => keys.focus_lost = true,
         27 => assert!(ui.paused),
         29 => {
             assert!(!ui.paused);
-            assert_eq!(game.stage, Stage::Playing);
+            assert_eq!(game.stage(), Stage::Playing);
         }
         31 => keys.restart = true,
         32 => {
             assert!(ui.screen == Screen::Play && !ui.paused);
-            assert_eq!(game.stage, Stage::Ready);
-            assert_eq!(game.sector.index(), 1);
-            assert_eq!(game.score, profile.checkpoint.unwrap().score);
+            assert_eq!(game.stage(), Stage::Ready);
+            assert_eq!(game.sector().index(), 1);
+            assert_eq!(game.score(), profile.checkpoint.unwrap().score);
             assert_eq!(profile.records[0].medals, Medals::ALL);
             assert_eq!(profile.records[1].medals, Medals::ALL);
             println!(
@@ -73,40 +73,46 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         }
         33 | 39 => keys.confirm = true,
         34 => {
-            game.apply_power(Power::Anchor);
-            game.apply_power(Power::Phase);
-            game.balls[0].pos = V2::new(game.paddle.x + 25.0, PADDLE_Y - RADIUS - 0.5);
-            game.balls[0].velocity = V2::new(0.0, 400.0);
+            let pos = V2::new(game.paddle().x + 25.0, PADDLE_Y - RADIUS - 0.5);
+            let mut sandbox = game.sandbox();
+            sandbox.grant(Power::Anchor);
+            sandbox.grant(Power::Phase);
+            sandbox.place_ball(0, pos, V2::new(0.0, 400.0));
         }
         35 => {
-            assert!(game.balls[0].held);
-            assert_eq!(game.powers.anchor_charges, 2);
-            game.apply_power(Power::Wide);
-            game.apply_power(Power::Slow);
-            game.apply_power(Power::Multi);
+            assert!(game.balls()[0].held);
+            assert_eq!(game.powers().anchor_charges, 2);
+            let mut sandbox = game.sandbox();
+            sandbox.grant(Power::Wide);
+            sandbox.grant(Power::Slow);
+            sandbox.grant(Power::Multi);
         }
         36 | 38 => keys.pause = true,
         37 => {
             assert!(ui.paused);
-            assert!(game.balls[0].held);
+            assert!(game.balls()[0].held);
         }
         40 => {
-            assert!(!game.balls[0].held);
-            assert_eq!(game.balls[0].phase_charges, 3);
+            assert!(!game.balls()[0].held);
+            assert_eq!(game.balls()[0].phase_charges, 3);
             *game = Game::start(SectorId::clamped(8), Mode::Practice);
-            game.step(&Input {
+            game.step(Input {
                 launch: true,
                 ..Input::default()
             });
-            game.apply_power(Power::Phase);
-            let core = Cell::all().find(|&c| game.board.is_core(c)).unwrap();
+            let core = Cell::all().find(|&c| game.board().is_core(c)).unwrap();
             let r = cell_rect(core);
-            game.balls[0].pos = V2::new(r.x - RADIUS - 1.0, r.y + r.h / 2.0);
-            game.balls[0].velocity = V2::new(500.0, 0.0);
+            let mut sandbox = game.sandbox();
+            sandbox.grant(Power::Phase);
+            sandbox.place_ball(
+                0,
+                V2::new(r.x - RADIUS - 1.0, r.y + r.h / 2.0),
+                V2::new(500.0, 0.0),
+            );
         }
         45 => {
-            assert!(game.effects.relay_flash.iter().any(|&f| f > 0));
-            assert_eq!(game.collision_caps, 0);
+            assert!(game.effects().relay_flash.iter().any(|&f| f > 0));
+            assert_eq!(game.diagnostics().budget_exhausted, 0);
         }
         50 => println!(
             "Mechanics flow passed: Anchor hold, combined powers, pause/resume, release, Phase, relay ignition"
@@ -131,8 +137,8 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         }
         56 | 58 => {
             assert!(ui.screen == Screen::Play && !ui.paused);
-            assert_eq!(game.stage, Stage::Ready);
-            assert!(game.sector.index() == 8 && game.mode == Mode::Practice);
+            assert_eq!(game.stage(), Stage::Ready);
+            assert!(game.sector().index() == 8 && game.mode() == Mode::Practice);
             if frame == 56 {
                 keys = pad_controls(start, None, false);
             } else {
@@ -153,11 +159,12 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
 pub fn effects(game: &mut Game, frame: u32) {
     if frame.is_multiple_of(90) {
         *game = Game::start(SectorId::clamped(10), Mode::Practice);
-        game.board.reset([1; CELLS], CellSet::ALL);
-        game.step(&Input {
+        game.sandbox().fill_board(1, CellSet::ALL);
+        game.step(Input {
             launch: true,
             ..Input::default()
         });
+        let mut sandbox = game.sandbox();
         for power in [
             Power::Multi,
             Power::Anchor,
@@ -165,15 +172,15 @@ pub fn effects(game: &mut Game, frame: u32) {
             Power::Slow,
             Power::Phase,
         ] {
-            game.apply_power(power);
+            sandbox.grant(power);
         }
-        for (i, ball) in game.balls.iter_mut().enumerate() {
-            ball.pos = V2::new(200.0 + i as f32 * 240.0, 445.0);
-            ball.previous = ball.pos;
-            ball.velocity = V2::new(80.0, -900.0);
+        for i in 0..MAX_BALLS {
+            let pos = V2::new(200.0 + i as f32 * 240.0, 445.0);
+            sandbox.place_ball(i, pos, V2::new(80.0, -900.0));
         }
     }
-    for (i, p) in game.effects.particles.iter_mut().enumerate() {
+    let mut sandbox = game.sandbox();
+    for (i, p) in sandbox.effects().particles.iter_mut().enumerate() {
         if p.life < 0.2 {
             *p = Particle {
                 pos: V2::new(
@@ -186,19 +193,17 @@ pub fn effects(game: &mut Game, frame: u32) {
             };
         }
     }
-    for (i, d) in game.capsules.iter_mut().enumerate() {
-        if !d.active {
-            *d = Capsule {
-                pos: V2::new(125.0 + i as f32 * 62.0, 470.0),
-                power: [
-                    Power::Wide,
-                    Power::Slow,
-                    Power::Multi,
-                    Power::Anchor,
-                    Power::Phase,
-                ][i % 5],
-                active: true,
-            };
+    for i in 0..MAX_CAPSULES {
+        if !game.capsules()[i].active {
+            let power = [
+                Power::Wide,
+                Power::Slow,
+                Power::Multi,
+                Power::Anchor,
+                Power::Phase,
+            ][i % 5];
+            game.sandbox()
+                .spawn_capsule(i, V2::new(125.0 + i as f32 * 62.0, 470.0), power);
         }
     }
 }

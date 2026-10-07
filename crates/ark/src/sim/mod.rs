@@ -16,7 +16,7 @@ pub use board::Board;
 pub use capsules::Capsule;
 pub use effects::{Effects, NOTICE_TICKS, PARTICLES, Particle, RELAY_FLASH_TICKS};
 pub use events::Events;
-pub use game::{Game, Input, Mode, Stage};
+pub use game::{Diagnostics, Game, Input, Mode, Sandbox, Stage, Violation};
 pub use paddle::Paddle;
 pub use power::{Power, PowerState};
 pub use summary::{Medals, SectorSummary};

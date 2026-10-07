@@ -10,10 +10,10 @@ pub enum Presence {
 }
 impl Presence {
     pub fn of(playing: bool, game: &Game) -> Self {
-        match (playing, game.mode) {
+        match (playing, game.mode()) {
             (false, _) => Self::Menus,
-            (true, Mode::Journey) => Self::Journey(game.sector),
-            (true, Mode::Practice) => Self::Practice(game.sector),
+            (true, Mode::Journey) => Self::Journey(game.sector()),
+            (true, Mode::Practice) => Self::Practice(game.sector()),
         }
     }
     /// The `steam_display` token.

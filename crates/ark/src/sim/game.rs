@@ -1,4 +1,10 @@
 //! The orchestrator: one tick of play, dispatched by stage.
+mod check;
+mod sandbox;
+
+pub use check::{Diagnostics, Violation};
+pub use sandbox::Sandbox;
+
 use super::{
     ball::{Ball, Contact, Sweep, steepen},
     board::{Board, Damage},
@@ -14,6 +20,7 @@ use crate::{
     clock::{DT, TICK_HZ},
     field::{BOTTOM, Cell, CellSet, FIELD, PADDLE_Y, cell_rect},
     geom::V2,
+    profile::Checkpoint,
     sectors::SectorId,
     tuning::*,
 };
@@ -56,33 +63,57 @@ pub struct Input {
     /// Keyboard or stick deflection, -1 (left) to 1 (right).
     pub axis: f32,
     /// Where the pointer wants the paddle's centre, overriding `axis`.
-    pub mouse_x: Option<f32>,
+    pub target_x: Option<f32>,
     /// Serve, release a held ball, or advance past the results.
     pub launch: bool,
 }
 
 /// A game in progress: one sector at a time, in Journey or Practice.
+///
+/// All state is private and changes only through [`Game::step`], so the
+/// rules' invariants hold however the game is driven. Tests, benchmarks and
+/// demos that need a particular situation set it up through
+/// [`Game::sandbox`].
 #[derive(Clone, Debug)]
 pub struct Game {
-    pub stage: Stage,
-    pub mode: Mode,
-    pub sector: SectorId,
-    pub summary: SectorSummary,
-    pub score: u32,
-    pub lives: u8,
-    pub sector_ticks: u32,
-    pub run_ticks: u32,
-    pub stage_ticks: u32,
-    pub combo: u32,
-    pub best_combo: u32,
-    pub board: Board,
-    pub balls: [Ball; MAX_BALLS],
-    pub capsules: [Capsule; MAX_CAPSULES],
-    pub paddle: Paddle,
-    pub powers: PowerState,
-    pub effects: Effects,
-    pub events: Events,
-    pub collision_caps: u64,
+    /// Where the sector run is.
+    stage: Stage,
+    /// Journey or Practice.
+    mode: Mode,
+    /// The sector being played.
+    sector: SectorId,
+    /// The last cleared sector's results.
+    summary: SectorSummary,
+    /// Points this run.
+    score: u32,
+    /// Lives left; zero only at game over.
+    lives: u8,
+    /// Ticks of active play in this sector.
+    sector_ticks: u32,
+    /// Ticks of active play in this run, from its checkpoint.
+    run_ticks: u32,
+    /// Ticks since the stage last changed.
+    stage_ticks: u32,
+    /// Breaks since the last paddle return.
+    combo: u32,
+    /// The longest chain in this sector.
+    best_combo: u32,
+    /// The bricks.
+    board: Board,
+    /// Ball slots.
+    balls: [Ball; MAX_BALLS],
+    /// Capsule slots.
+    capsules: [Capsule; MAX_CAPSULES],
+    /// The paddle.
+    paddle: Paddle,
+    /// Timers and charges.
+    powers: PowerState,
+    /// Cosmetic pools.
+    effects: Effects,
+    /// What has happened so far this tick.
+    events: Events,
+    /// Ticks in which a ball spent its whole collision budget.
+    budget_exhausted: u64,
     /// Decides when capsules drop and which.
     director: DropDirector,
     /// Drives capsules and particle bursts.
@@ -129,7 +160,7 @@ impl Game {
             powers: PowerState::default(),
             effects: Effects::new(),
             events: Events::default(),
-            collision_caps: 0,
+            budget_exhausted: 0,
             director: DropDirector::new(),
             rng: Rng::new(),
             lost_in_sector: false,
@@ -152,6 +183,106 @@ impl Game {
         game
     }
 
+    /// A journey resumed from a saved checkpoint: its sector, score, lives
+    /// and run time.
+    pub fn resume(checkpoint: Checkpoint) -> Self {
+        let mut game = Self::start(checkpoint.sector, Mode::Journey);
+        game.score = checkpoint.score;
+        game.lives = checkpoint.lives;
+        game.run_ticks = checkpoint.ticks;
+        game
+    }
+
+    /// Where the sector run is.
+    pub fn stage(&self) -> Stage {
+        self.stage
+    }
+    /// Ticks since the stage last changed.
+    pub fn stage_ticks(&self) -> u32 {
+        self.stage_ticks
+    }
+    /// Journey or Practice.
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+    /// The sector being played.
+    pub fn sector(&self) -> SectorId {
+        self.sector
+    }
+    /// Points this run.
+    pub fn score(&self) -> u32 {
+        self.score
+    }
+    /// Lives left; zero only at game over.
+    pub fn lives(&self) -> u8 {
+        self.lives
+    }
+    /// Ticks of active play in this sector; serving and results do not count.
+    pub fn sector_ticks(&self) -> u32 {
+        self.sector_ticks
+    }
+    /// Ticks of active play in this run, counted from its checkpoint.
+    pub fn run_ticks(&self) -> u32 {
+        self.run_ticks
+    }
+    /// Breaks since the last paddle return.
+    pub fn combo(&self) -> u32 {
+        self.combo
+    }
+    /// The longest chain in this sector.
+    pub fn best_combo(&self) -> u32 {
+        self.best_combo
+    }
+    /// The results of the most recent clear in this game; all zero before
+    /// the first. The results card shows them while the stage is
+    /// [`Stage::Cleared`] or [`Stage::Victory`].
+    pub fn summary(&self) -> SectorSummary {
+        self.summary
+    }
+    /// The bricks.
+    pub fn board(&self) -> &Board {
+        &self.board
+    }
+    /// Every ball slot; inactive slots are empty.
+    pub fn balls(&self) -> &[Ball; MAX_BALLS] {
+        &self.balls
+    }
+    /// Every capsule slot; inactive slots are empty.
+    pub fn capsules(&self) -> &[Capsule; MAX_CAPSULES] {
+        &self.capsules
+    }
+    /// The paddle.
+    pub fn paddle(&self) -> Paddle {
+        self.paddle
+    }
+    /// Timers and charges in effect.
+    pub fn powers(&self) -> PowerState {
+        self.powers
+    }
+    /// Cosmetic state for the renderer.
+    pub fn effects(&self) -> &Effects {
+        &self.effects
+    }
+    /// The run as a checkpoint: where a retry or a resumed journey starts.
+    pub fn checkpoint(&self) -> Checkpoint {
+        Checkpoint {
+            sector: self.sector,
+            score: self.score,
+            lives: self.lives,
+            ticks: self.run_ticks,
+        }
+    }
+    /// Counters for performance overlays and tests.
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            budget_exhausted: self.budget_exhausted,
+        }
+    }
+    /// Privileged access for setting up situations; see [`Sandbox`].
+    pub fn sandbox(&mut self) -> Sandbox<'_> {
+        Sandbox::new(self)
+    }
+
     /// Current ball speed: the sector's serve speed, raised by the rally and
     /// lowered by Slow.
     pub fn speed(&self) -> f32 {
@@ -169,8 +300,8 @@ impl Game {
         V2::new(LAUNCH_DIR.x * toward_center, LAUNCH_DIR.y).normalized() * self.speed()
     }
 
-    /// Advances the game by one tick.
-    pub fn step(&mut self, input: &Input) {
+    /// Advances the game by one tick and reports what happened.
+    pub fn step(&mut self, input: Input) -> Events {
         self.events = Events::default();
         self.effects.tick();
         self.stage_ticks = self.stage_ticks.saturating_add(1);
@@ -178,18 +309,19 @@ impl Game {
             Stage::GameOver | Stage::Victory => {}
             Stage::Cleared => self.step_cleared(input.launch),
             Stage::Ready => {
-                self.paddle.steer(input.mouse_x, input.axis);
+                self.paddle.steer(input.target_x, input.axis);
                 self.step_ready(input.launch);
             }
             Stage::Playing => {
-                self.paddle.steer(input.mouse_x, input.axis);
+                self.paddle.steer(input.target_x, input.axis);
                 self.step_playing(input.launch);
             }
         }
+        self.events
     }
 
     /// Grants `power` as if its capsule had been caught.
-    pub fn apply_power(&mut self, power: Power) {
+    fn apply_power(&mut self, power: Power) {
         self.events.pickup = true;
         self.effects.notice(power);
         self.director.collected(power, self.sector);
@@ -486,7 +618,7 @@ impl Game {
             ball.pos += normal * CONTACT_SKIN;
         }
         if !sweep.is_done() {
-            self.collision_caps += 1;
+            self.budget_exhausted += 1;
         }
         self.balls[index] = ball;
     }
@@ -639,7 +771,7 @@ mod tests {
     }
     fn playing() -> Game {
         let mut g = Game::new();
-        g.step(&Input {
+        g.step(Input {
             launch: true,
             ..Input::default()
         });
@@ -651,11 +783,11 @@ mod tests {
         board(&mut g, &[(0, 1, false), (COLS - 1, 1, false)]);
         g.balls[0].pos = V2::new(GRID_X + 29.0, GRID_Y + 80.0);
         g.balls[0].velocity = V2::new(0.0, -16000.0);
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(hp(&g, 0), 0);
         assert!(g.score > 0);
         assert!(g.balls[0].velocity.y > 0.0);
-        assert_eq!(g.collision_caps, 0);
+        assert_eq!(g.budget_exhausted, 0);
     }
     #[test]
     fn paddle_edges_steer_and_center_is_vertical() {
@@ -663,7 +795,7 @@ mod tests {
             let mut g = playing();
             g.balls[0].pos = V2::new(g.paddle.x + offset, PADDLE_Y - 8.0);
             g.balls[0].velocity = V2::new(0.0, 500.0);
-            g.step(&Input::default());
+            g.step(Input::default());
             assert!(g.balls[0].velocity.y < 0.0);
             assert!((g.balls[0].velocity.length() - g.speed()).abs() < 0.001);
             assert_eq!(g.balls[0].velocity.x.signum(), offset.signum());
@@ -674,22 +806,22 @@ mod tests {
         let mut g = playing();
         g.balls[0].pos = V2::new(g.paddle.x + 70.0, PADDLE_Y + 20.0);
         g.balls[0].velocity = V2::new(0.0, 600.0);
-        g.step(&Input {
-            mouse_x: Some(RIGHT),
+        let events = g.step(Input {
+            target_x: Some(RIGHT),
             ..Input::default()
         });
-        assert!(!g.events.paddle);
+        assert!(!events.paddle);
     }
     #[test]
     fn moving_paddle_catches_a_ball_in_its_actual_path() {
         let mut g = playing();
         g.balls[0].pos = V2::new(g.paddle.x + 70.0, PADDLE_Y - 7.5);
         g.balls[0].velocity = V2::new(0.0, 600.0);
-        g.step(&Input {
-            mouse_x: Some(RIGHT),
+        let events = g.step(Input {
+            target_x: Some(RIGHT),
             ..Input::default()
         });
-        assert!(g.events.paddle);
+        assert!(events.paddle);
         assert!(g.balls[0].velocity.y < 0.0);
     }
     #[test]
@@ -697,18 +829,18 @@ mod tests {
         let mut g = playing();
         g.balls[0].pos = V2::new(LEFT + RADIUS + 1.0, TOP + RADIUS + 1.0);
         g.balls[0].velocity = V2::new(-500.0, -500.0);
-        g.step(&Input::default());
+        g.step(Input::default());
         assert!(g.balls[0].velocity.x > 0.0 && g.balls[0].velocity.y > 0.0);
         assert!(g.balls[0].pos.x >= LEFT + RADIUS && g.balls[0].pos.y >= TOP + RADIUS);
-        assert_eq!(g.collision_caps, 0);
+        assert_eq!(g.budget_exhausted, 0);
     }
     #[test]
     fn exhausted_budget_keeps_last_safe_position() {
         let mut g = playing();
         g.balls[0].pos = V2::new(FIELD.center().x, 600.0);
         g.balls[0].velocity = V2::new(1_000_000_000.0, 0.0);
-        g.step(&Input::default());
-        assert_eq!(g.collision_caps, 1);
+        g.step(Input::default());
+        assert_eq!(g.budget_exhausted, 1);
         assert!(g.balls[0].pos.x >= LEFT + RADIUS && g.balls[0].pos.x <= RIGHT - RADIUS);
         assert_eq!(g.balls[0].pos.y, 600.0);
     }
@@ -718,11 +850,11 @@ mod tests {
         g.balls[1] = g.balls[0];
         g.balls[0].pos = V2::new(LEFT + 30.0, BOTTOM + RADIUS - 1.0);
         g.balls[0].velocity = V2::new(0.0, 500.0);
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.lives, 3);
         g.balls[1].pos = g.balls[0].pos;
         g.balls[1].velocity = V2::new(0.0, 500.0);
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.lives, 2);
         assert_eq!(g.stage, Stage::Ready);
     }
@@ -730,14 +862,14 @@ mod tests {
     fn next_level_and_victory() {
         let mut g = playing();
         board(&mut g, &[]);
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.sector, SectorId::FIRST);
         assert_eq!(g.stage, Stage::Cleared);
         for _ in 0..TICK_HZ {
-            g.step(&Input::default());
+            g.step(Input::default());
         }
         assert_eq!(g.stage, Stage::Cleared);
-        g.step(&Input {
+        g.step(Input {
             launch: true,
             ..Input::default()
         });
@@ -746,7 +878,7 @@ mod tests {
         g.sector = sector(SECTOR_COUNT - 1);
         g.stage = Stage::Playing;
         board(&mut g, &[]);
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.stage, Stage::Victory);
     }
     #[test]
@@ -760,20 +892,20 @@ mod tests {
         assert!((g.balls[0].velocity.length() - g.speed()).abs() < 0.001);
         g.powers.slow_seconds = DT / 2.0;
         g.powers.wide_seconds = DT / 2.0;
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.paddle.width, PADDLE_WIDTH);
         assert!((g.balls[0].velocity.length() - g.speed()).abs() < 0.001);
     }
     #[test]
     fn mouse_tracks_in_one_tick_and_keyboard_has_consistent_speed() {
         let mut g = Game::new();
-        g.step(&Input {
-            mouse_x: Some(700.0),
+        g.step(Input {
+            target_x: Some(700.0),
             ..Input::default()
         });
         assert_eq!(g.paddle.x, 700.0);
         assert_eq!(g.balls[0].pos.x, 700.0);
-        g.step(&Input {
+        g.step(Input {
             axis: -1.0,
             ..Input::default()
         });
@@ -784,14 +916,14 @@ mod tests {
         let mut g = Game::start(sector(3), Mode::Journey);
         g.stage = Stage::Playing;
         board(&mut g, &[]);
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.summary.medals, Medals::ALL);
         assert_eq!(g.summary.bonus, 2000);
         assert_eq!(g.lives, 4);
         assert!(g.summary.life_earned);
         let ticks = g.sector_ticks;
         for _ in 0..100 {
-            g.step(&Input::default());
+            g.step(Input::default());
         }
         assert_eq!(g.sector_ticks, ticks);
         assert_eq!(g.lives, 4);
@@ -800,11 +932,11 @@ mod tests {
         board(&mut g, &[]);
         g.lost_in_sector = true;
         g.sector_ticks = SectorId::FIRST.sector().par_seconds * TICK_HZ;
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.summary.medals, Medals::CLEAR);
         assert_eq!(g.summary.bonus, 1000);
         for _ in 0..TICK_HZ {
-            g.step(&Input {
+            g.step(Input {
                 launch: true,
                 ..Input::default()
             });
@@ -818,7 +950,7 @@ mod tests {
         g.balls[0].pos = V2::new(500.0, 600.0);
         g.balls[0].velocity = V2::new(0.0, -500.0);
         g.quiet_ticks = ANTI_STALL_TICKS;
-        g.step(&Input::default());
+        g.step(Input::default());
         assert!(g.balls[0].velocity.x < -50.0);
     }
     #[test]
@@ -840,8 +972,7 @@ mod tests {
     fn catch_at(g: &mut Game, offset: f32) {
         g.balls[0].pos = V2::new(g.paddle.x + offset, PADDLE_Y - RADIUS - 0.5);
         g.balls[0].velocity = V2::new(0.0, 500.0);
-        g.step(&Input::default());
-        assert!(g.events.caught);
+        assert!(g.step(Input::default()).caught);
         assert!(g.balls[0].held);
     }
     #[test]
@@ -852,8 +983,8 @@ mod tests {
         assert_eq!(g.powers.anchor_charges, 2);
         let direction = g.balls[0].velocity.normalized();
         for _ in 0..TICK_HZ * 15 {
-            g.step(&Input {
-                mouse_x: Some(650.0),
+            g.step(Input {
+                target_x: Some(650.0),
                 ..Input::default()
             });
         }
@@ -862,12 +993,12 @@ mod tests {
         assert!((g.balls[0].pos.x - 670.0).abs() < 0.01);
         assert_eq!(g.balls[0].previous, g.balls[0].pos);
         assert!(g.sector_ticks >= TICK_HZ * 15); // Thinking time counts for Swift.
-        g.step(&Input {
+        let events = g.step(Input {
             launch: true,
             ..Input::default()
         });
         assert!(!g.balls[0].held);
-        assert!(g.events.launch);
+        assert!(events.launch);
         assert!(g.balls[0].pos.y < PADDLE_Y - RADIUS - SERVE_GAP);
         assert!((g.balls[0].velocity.normalized().x - direction.x).abs() < 0.001);
     }
@@ -895,8 +1026,8 @@ mod tests {
         }
         g.powers.wide_seconds = DT / 2.0;
         g.powers.slow_seconds = DT / 2.0;
-        g.step(&Input {
-            mouse_x: Some(RIGHT),
+        g.step(Input {
+            target_x: Some(RIGHT),
             ..Input::default()
         });
         assert_eq!(g.lives, 3);
@@ -914,7 +1045,7 @@ mod tests {
             ball.pos = V2::new(g.paddle.x, PADDLE_Y - RADIUS - 0.5);
             ball.velocity = V2::new(0.0, 500.0);
         }
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.balls.iter().filter(|b| b.held).count(), 1);
         assert_eq!(g.powers.anchor_charges, 2);
         assert!(
@@ -940,7 +1071,7 @@ mod tests {
         g.balls[0].pos = V2::new(GRID_X + 5.0 * CELL_W + 29.0, GRID_Y + 4.0 * CELL_H + 15.0);
         g.balls[0].velocity = V2::new(0.0, -1000.0);
         for _ in 0..45 {
-            g.step(&Input::default());
+            g.step(Input::default());
             if g.balls[0].velocity.y > 0.0 {
                 break;
             }
@@ -950,7 +1081,7 @@ mod tests {
             assert_eq!(hp(&g, row * COLS + 5), 2, "row {row}");
         }
         assert!(g.balls[0].velocity.y > 0.0);
-        assert_eq!(g.collision_caps, 0);
+        assert_eq!(g.budget_exhausted, 0);
     }
     #[test]
     fn phase_can_trigger_a_core_without_reflecting() {
@@ -959,7 +1090,7 @@ mod tests {
         g.apply_power(Power::Phase);
         g.balls[0].pos = V2::new(GRID_X + 29.0, GRID_Y + 24.0 + RADIUS + 1.0);
         g.balls[0].velocity = V2::new(0.0, -500.0);
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(hp(&g, 0), 0);
         assert!(g.board.relay_countdown(cell(0)) > 0);
         assert_eq!(g.balls[0].phase_charges, 2);
@@ -1017,14 +1148,14 @@ mod tests {
         g.balls.fill(Ball::default());
         g.damage(cell(0), V2::default(), true);
         for _ in 0..TICK_HZ {
-            g.step(&Input::default());
+            g.step(Input::default());
         }
         assert_eq!(g.board.remaining(), 0);
         assert_eq!(g.stage, Stage::Cleared);
         assert_eq!(g.lives, 3);
         assert_eq!(g.score, 26500);
         assert!(!g.board.relays_pending());
-        assert_eq!(g.collision_caps, 0);
+        assert_eq!(g.budget_exhausted, 0);
         assert!(!g.capsules.iter().any(|d| d.active));
     }
     #[test]
@@ -1033,14 +1164,14 @@ mod tests {
         board(&mut g, &[(0, 1, false), (COLS - 1, 1, false)]);
         g.sector_ticks = ASSIST_STALL_TICKS - 2;
         g.balls[0].pos = V2::new(480.0, 600.0);
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.powers.anchor_charges, 0);
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.powers.anchor_charges, 1);
         assert!(g.finish_assist_used);
         g.powers.anchor_charges = 0;
         g.sector_ticks += ASSIST_STALL_TICKS;
-        g.step(&Input::default());
+        g.step(Input::default());
         assert_eq!(g.powers.anchor_charges, 0);
     }
     #[test]
@@ -1082,16 +1213,16 @@ mod tests {
                 .map_or(FIELD.center().x, |b| b.pos.x)
                 + (tick as f32 * 0.003).sin() * 36.0;
             let input = Input {
-                mouse_x: Some(x),
+                target_x: Some(x),
                 launch: true,
                 ..Input::default()
             };
-            a.step(&input);
-            b.step(&input);
-            impacts += u32::from(a.events.brick);
+            impacts += u32::from(a.step(input).brick);
+            b.step(input);
+            assert_eq!(a.validate(), Ok(()));
             assert_eq!(a.stage, b.stage);
             assert_eq!(a.score, b.score);
-            assert_eq!(a.collision_caps, 0);
+            assert_eq!(a.budget_exhausted, 0);
             for (ball, other) in a.balls.iter().zip(&b.balls) {
                 assert!(ball.pos.x.is_finite() && ball.pos.y.is_finite());
                 assert_eq!(ball.pos, other.pos);
@@ -1100,7 +1231,7 @@ mod tests {
         }
         assert_eq!(a.score, b.score);
         assert_eq!(a.board, b.board);
-        assert_eq!(a.collision_caps, 0);
+        assert_eq!(a.budget_exhausted, 0);
         assert!(impacts > 100);
     }
 }
