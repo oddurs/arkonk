@@ -231,25 +231,32 @@ fn timestamp(unix: u64) -> String {
     )
 }
 
+#[cfg(target_os = "macos")]
 fn os_version() -> String {
-    #[cfg(target_os = "macos")]
-    let version = fs::read_to_string("/System/Library/CoreServices/SystemVersion.plist")
+    fs::read_to_string("/System/Library/CoreServices/SystemVersion.plist")
         .ok()
         .and_then(|plist| {
             let after = plist.split("<key>ProductVersion</key>").nth(1)?;
             let value = after.split("<string>").nth(1)?.split("</string>").next()?;
             Some(format!("macOS {value}"))
-        });
-    // SteamOS and other distributions identify themselves here.
-    #[cfg(target_os = "linux")]
-    let version = fs::read_to_string("/etc/os-release").ok().and_then(|text| {
-        text.lines()
-            .find_map(|l| l.strip_prefix("PRETTY_NAME="))
-            .map(|v| v.trim_matches('"').to_string())
-    });
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-    let version: Option<String> = None;
-    version.unwrap_or_else(|| "version unknown".into())
+        })
+        .unwrap_or_else(|| "version unknown".into())
+}
+/// SteamOS and other distributions identify themselves here.
+#[cfg(target_os = "linux")]
+fn os_version() -> String {
+    fs::read_to_string("/etc/os-release")
+        .ok()
+        .and_then(|text| {
+            text.lines()
+                .find_map(|l| l.strip_prefix("PRETTY_NAME="))
+                .map(|v| v.trim_matches('"').to_string())
+        })
+        .unwrap_or_else(|| "version unknown".into())
+}
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn os_version() -> String {
+    "version unknown".into()
 }
 
 #[cfg(test)]
