@@ -17,7 +17,7 @@ on:
         type: boolean
         default: false
       steam_branch:
-        description: Steam branch to set it live on (default: the STEAM_BRANCH variable)
+        description: "Steam branch to set it live on (default: the STEAM_BRANCH variable)"
         type: string
         default: ""
 
