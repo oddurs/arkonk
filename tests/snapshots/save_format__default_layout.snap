@@ -1,0 +1,21 @@
+---
+source: tests/save_format.rs
+expression: "visible(&Profile::default().encode())"
+---
+ARKONK 1\n
+best 0\n
+unlocked 1\n
+settings 0 6\n
+display 0\n
+record 0 0 0\n
+record 1 0 0\n
+record 2 0 0\n
+record 3 0 0\n
+record 4 0 0\n
+record 5 0 0\n
+record 6 0 0\n
+record 7 0 0\n
+record 8 0 0\n
+record 9 0 0\n
+record 10 0 0\n
+record 11 0 0\n
