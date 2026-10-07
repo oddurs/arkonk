@@ -1,6 +1,7 @@
 name: Rust
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
@@ -9,6 +10,9 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -18,19 +22,7 @@ jobs:
       - name: Linux native libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libx11-dev libxi-dev libgl1-mesa-dev libudev-dev
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --locked --all-targets -- -D warnings
-      - run: cargo test --locked --all-targets
-      - run: cargo build --locked --release
-      - run: cargo run --locked --release --bin benchmark
-      - name: Package native Mac app
-        if: runner.os == 'macOS'
-        run: ./scripts/build-macos.sh
-      # Steamworks is opt-in; build it last so the steps above use default builds.
-      - name: Clippy with Steam
-        run: cargo clippy --locked --all-targets --all-features -- -D warnings
-      - name: Release build with Steam
-        run: cargo build --locked --release --features steam
-      - name: Steam library resolves beside the executable
-        if: runner.os == 'Linux'
-        run: readelf -d target/release/arkonk | grep -E '(RUNPATH|RPATH).*\$ORIGIN'
+      - run: scripts/task check
+
+  package:
+    uses: ./.github/workflows/package.yml
