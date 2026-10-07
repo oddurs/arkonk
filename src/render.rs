@@ -5,8 +5,12 @@ use crate::{
     ui::{self, Screen, Ui},
 };
 use arkonk::{game::*, levels::CHAPTERS, physics::V2, profile::Profile};
+use macroquad::models::Vertex;
 use macroquad::prelude::*;
-use std::{f32::consts::FRAC_PI_2, fmt::Write};
+use std::{
+    f32::consts::{FRAC_PI_2, TAU},
+    fmt::Write,
+};
 
 const BG: Color = Color::new(0.027, 0.033, 0.055, 1.0);
 const SURFACE: Color = Color::new(0.050, 0.060, 0.092, 1.0);
@@ -57,81 +61,147 @@ fn clock(out: &mut String, ticks: u32) {
     let _ = write!(out, "{:02}:{:02}", seconds / 60, seconds % 60);
 }
 
+/// Where the fixed scene sits in the window: uniform scale, centered.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct View {
     pub scale: f32,
     pub x: f32,
     pub y: f32,
-    font: Option<PixelFont>,
-    device: Device,
 }
 impl View {
-    pub fn new() -> Self {
-        let dpi = screen_dpi_scale();
-        let scale = (screen_width() / WIDTH).min(screen_height() / HEIGHT);
+    /// `None` while the window has no drawable area (minimized, or zero-sized
+    /// mid-transition): there is nothing to draw and no pointer to map.
+    pub fn fit(width: f32, height: f32, dpi: f32) -> Option<Self> {
+        // `f32::min` ignores NaN, so every input is checked, not just the scale.
+        let usable = |v: f32| v.is_finite() && v > 0.0;
+        if !(usable(width) && usable(height) && usable(dpi)) {
+            return None;
+        }
+        let scale = (width / WIDTH).min(height / HEIGHT);
         // A letterbox offset on whole physical pixels keeps pixel text even.
         let snap = |value: f32| (value * dpi).round() / dpi;
-        Self {
+        Some(Self {
             scale,
-            x: snap((screen_width() - WIDTH * scale) / 2.0),
-            y: snap((screen_height() - HEIGHT * scale) / 2.0),
-            font: None,
-            device: Device::KeyboardMouse,
-        }
+            x: snap((width - WIDTH * scale) / 2.0),
+            y: snap((height - HEIGHT * scale) / 2.0),
+        })
     }
-    pub fn mouse(&self) -> V2 {
-        let (x, y) = mouse_position();
+    pub fn current() -> Option<Self> {
+        Self::fit(screen_width(), screen_height(), screen_dpi_scale())
+    }
+    pub fn to_scene(self, x: f32, y: f32) -> V2 {
         V2::new((x - self.x) / self.scale, (y - self.y) / self.scale)
     }
     /// Maps the whole window onto scene units, centering the fixed scene.
-    fn camera(&self) -> Camera2D {
-        let w = screen_width() / self.scale;
-        let h = screen_height() / self.scale;
+    fn camera(&self, width: f32, height: f32) -> Camera2D {
+        let w = width / self.scale;
+        let h = height / self.scale;
         Camera2D {
             target: vec2(w / 2.0 - self.x / self.scale, h / 2.0 - self.y / self.scale),
             zoom: vec2(2.0 / w, 2.0 / h),
             ..Default::default()
         }
     }
-    fn scene(font: &PixelFont, device: Device) -> Self {
-        Self {
-            scale: 1.0,
-            x: 0.0,
-            y: 0.0,
-            font: Some(font.clone()),
-            device,
-        }
+}
+/// The pointer in scene units; `None` when the window cannot map it, so a
+/// minimized window can never feed a non-finite position to the paddle.
+pub fn mouse() -> Option<V2> {
+    let (x, y) = mouse_position();
+    let p = View::current()?.to_scene(x, y);
+    (p.x.is_finite() && p.y.is_finite()).then_some(p)
+}
+
+/// Scene-space drawing helpers. Shapes sample a white cell of the font atlas,
+/// so geometry and text share one texture and batch into a single draw call;
+/// on Metal every draw call is a full-framebuffer render pass. Meshes are built
+/// in fixed arrays: drawing allocates nothing.
+struct Scene {
+    font: PixelFont,
+    device: Device,
+}
+impl Scene {
+    fn mesh(&self, vertices: &[Vertex], indices: &[u16]) {
+        // SAFETY: main-thread draw recording between frames, as Macroquad's own
+        // shape functions do; no other borrow of the context is live.
+        let gl = unsafe { get_internal_gl() }.quad_gl;
+        gl.texture(Some(self.font.texture()));
+        gl.draw_mode(DrawMode::Triangles);
+        gl.geometry(vertices, indices);
     }
-    fn font(&self) -> &PixelFont {
-        self.font.as_ref().expect("scene font")
+    fn vertex(&self, p: Vec2, color: Color) -> Vertex {
+        let uv = PixelFont::WHITE_UV;
+        Vertex::new(p.x, p.y, 0.0, uv.x, uv.y, color)
+    }
+    fn quad(&self, corners: [Vec2; 4], color: Color) {
+        self.mesh(&corners.map(|p| self.vertex(p, color)), &[0, 1, 2, 0, 2, 3]);
     }
     fn rect(&self, x: f32, y: f32, w: f32, h: f32, color: Color) {
-        draw_rectangle(x, y, w, h, color);
+        self.quad(
+            [
+                vec2(x, y),
+                vec2(x + w, y),
+                vec2(x + w, y + h),
+                vec2(x, y + h),
+            ],
+            color,
+        );
     }
     /// Non-overlapping pieces, so translucent fills stay even at the corners.
     fn rounded(&self, x: f32, y: f32, w: f32, h: f32, r: f32, color: Color) {
         const STEPS: usize = 6;
         let r = r.min(w / 2.0).min(h / 2.0);
-        draw_rectangle(x + r, y, w - 2.0 * r, h, color);
-        draw_rectangle(x, y + r, r, h - 2.0 * r, color);
-        draw_rectangle(x + w - r, y + r, r, h - 2.0 * r, color);
-        for (cx, cy, start) in [
+        let zero = self.vertex(Vec2::ZERO, color);
+        let mut vertices = [zero; 12 + 4 * (STEPS + 2)];
+        let mut indices = [0_u16; 18 + 4 * STEPS * 3];
+        for (i, (rx, ry, rw, rh)) in [
+            (x + r, y, w - 2.0 * r, h),
+            (x, y + r, r, h - 2.0 * r),
+            (x + w - r, y + r, r, h - 2.0 * r),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            for (k, p) in [
+                vec2(rx, ry),
+                vec2(rx + rw, ry),
+                vec2(rx + rw, ry + rh),
+                vec2(rx, ry + rh),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                vertices[i * 4 + k] = self.vertex(p, color);
+            }
+            let base = (i * 4) as u16;
+            indices[i * 6..i * 6 + 6].copy_from_slice(&[0, 1, 2, 0, 2, 3].map(|k| base + k));
+        }
+        for (corner, (cx, cy, start)) in [
             (x + r, y + r, 2.0),
             (x + w - r, y + r, 3.0),
             (x + w - r, y + h - r, 0.0),
             (x + r, y + h - r, 1.0),
-        ] {
+        ]
+        .into_iter()
+        .enumerate()
+        {
             let center = vec2(cx, cy);
-            for i in 0..STEPS {
+            let first = 12 + corner * (STEPS + 2);
+            vertices[first] = self.vertex(center, color);
+            for i in 0..=STEPS {
                 let a = (start + i as f32 / STEPS as f32) * FRAC_PI_2;
-                let b = (start + (i + 1) as f32 / STEPS as f32) * FRAC_PI_2;
-                draw_triangle(
-                    center,
-                    center + vec2(a.cos(), a.sin()) * r,
-                    center + vec2(b.cos(), b.sin()) * r,
-                    color,
-                );
+                vertices[first + 1 + i] = self.vertex(center + vec2(a.cos(), a.sin()) * r, color);
+            }
+            for i in 0..STEPS {
+                let at = 18 + (corner * STEPS + i) * 3;
+                let base = first as u16;
+                indices[at..at + 3].copy_from_slice(&[
+                    base,
+                    base + 1 + i as u16,
+                    base + 2 + i as u16,
+                ]);
             }
         }
+        self.mesh(&vertices, &indices);
     }
     fn panel(&self, x: f32, y: f32, w: f32, h: f32) {
         self.rounded(x - 1.0, y - 1.0, w + 2.0, h + 2.0, 13.0, BORDER);
@@ -151,28 +221,76 @@ impl View {
         self.cover(opacity(BG, 0.78));
     }
     fn line(&self, a: V2, b: V2, thickness: f32, color: Color) {
-        draw_line(a.x, a.y, b.x, b.y, thickness, color);
+        let (a, b) = (vec2(a.x, a.y), vec2(b.x, b.y));
+        let normal = (b - a).perp();
+        let length = normal.length();
+        if length < f32::EPSILON {
+            return;
+        }
+        let t = normal * (thickness * 0.5 / length);
+        self.quad([a + t, a - t, b - t, b + t], color);
     }
+    /// A 20-sided fan, matching Macroquad's `draw_circle`.
     fn circle(&self, p: V2, r: f32, color: Color) {
-        draw_circle(p.x, p.y, r, color);
+        const SIDES: usize = 20;
+        let center = vec2(p.x, p.y);
+        let mut vertices = [self.vertex(center, color); SIDES + 2];
+        let mut indices = [0_u16; SIDES * 3];
+        for i in 0..=SIDES {
+            let a = i as f32 / SIDES as f32 * TAU;
+            vertices[i + 1] = self.vertex(center + vec2(a.cos(), a.sin()) * r, color);
+            if i < SIDES {
+                indices[i * 3..i * 3 + 3].copy_from_slice(&[0, i as u16 + 1, i as u16 + 2]);
+            }
+        }
+        self.mesh(&vertices, &indices);
     }
+    /// A ring from `r` outward by `thickness`, 30 segments.
+    fn ring(&self, p: V2, r: f32, thickness: f32, color: Color) {
+        const SIDES: usize = 30;
+        let center = vec2(p.x, p.y);
+        let mut vertices = [self.vertex(center, color); (SIDES + 1) * 2];
+        let mut indices = [0_u16; SIDES * 6];
+        for i in 0..=SIDES {
+            let direction = Vec2::from_angle(i as f32 / SIDES as f32 * TAU);
+            vertices[i * 2] = self.vertex(center + direction * r, color);
+            vertices[i * 2 + 1] = self.vertex(center + direction * (r + thickness), color);
+            if i < SIDES {
+                let k = (i * 2) as u16;
+                indices[i * 6..i * 6 + 6].copy_from_slice(&[k, k + 1, k + 2, k + 2, k + 1, k + 3]);
+            }
+        }
+        self.mesh(&vertices, &indices);
+    }
+    /// Macroquad's `draw_rectangle_lines` at thickness 1: a half-unit outline.
     fn frame(&self, x: f32, y: f32, w: f32, h: f32, color: Color) {
-        draw_rectangle_lines(x, y, w, h, 1.0, color);
+        let t = 0.5;
+        let vertices = [
+            vec2(x, y),
+            vec2(x + w, y),
+            vec2(x + w, y + h),
+            vec2(x, y + h),
+            vec2(x + t, y + t),
+            vec2(x + w - t, y + t),
+            vec2(x + w - t, y + h - t),
+            vec2(x + t, y + h - t),
+        ]
+        .map(|p| self.vertex(p, color));
+        self.mesh(
+            &vertices,
+            &[
+                0, 1, 4, 1, 4, 5, 1, 5, 6, 1, 2, 6, 3, 7, 2, 2, 7, 6, 0, 4, 3, 3, 4, 7,
+            ],
+        );
     }
     fn text(&self, text: &str, x: f32, y: f32, size: f32, color: Color) {
-        self.font().draw(text, x, y, size, color);
+        self.font.draw(text, x, y, size, color);
     }
     fn right(&self, text: &str, x: f32, y: f32, size: f32, color: Color) {
-        self.text(text, x - self.font().width(text, size), y, size, color);
+        self.text(text, x - self.font.width(text, size), y, size, color);
     }
     fn center_at(&self, text: &str, x: f32, y: f32, size: f32, color: Color) {
-        self.text(
-            text,
-            x - self.font().width(text, size) / 2.0,
-            y,
-            size,
-            color,
-        );
+        self.text(text, x - self.font.width(text, size) / 2.0, y, size, color);
     }
     fn centered(&self, text: &str, y: f32, size: f32, color: Color) {
         self.center_at(text, WIDTH / 2.0, y, size, color);
@@ -189,15 +307,15 @@ impl View {
         self.centered(label, r.y + r.h / 2.0 + 7.0, 14.0, color);
     }
     fn glyph_width(&self, glyph: Glyph, size: f32) -> f32 {
-        let pixel = self.font().pixel(size);
+        let pixel = self.font.pixel(size);
         match glyph {
-            Glyph::Start => self.font().width("START", size) + 6.0 * pixel,
+            Glyph::Start => self.font.width("START", size) + 6.0 * pixel,
             _ => 11.0 * pixel,
         }
     }
     /// A filled button cap, centered on the cap height of text at `baseline`.
     fn glyph(&self, glyph: Glyph, x: f32, baseline: f32, size: f32) {
-        let pixel = self.font().pixel(size);
+        let pixel = self.font.pixel(size);
         let (label, fill) = match glyph {
             Glyph::A => ("A", PALETTE[3]),
             Glyph::B => ("B", RED),
@@ -211,7 +329,7 @@ impl View {
     }
     fn prompt(&self, parts: &[Part], center: f32, baseline: f32, size: f32, color: Color) {
         let width = |part: &Part| match *part {
-            Part::Text(text) => self.font().width(text, size),
+            Part::Text(text) => self.font.width(text, size),
             Part::Pad(glyph) => self.glyph_width(glyph, size),
         };
         let mut x = center - parts.iter().map(width).sum::<f32>() / 2.0;
@@ -274,7 +392,8 @@ struct Popup {
 
 pub struct Renderer {
     font: PixelFont,
-    opaque: Material,
+    /// `None` if the driver rejected the shader; frames then keep blended alpha.
+    opaque: Option<Material>,
     metal: bool,
     scratch: String,
     trails: [[V2; 12]; MAX_BALLS],
@@ -294,6 +413,9 @@ impl Renderer {
     pub fn new() -> Self {
         let metal =
             unsafe { get_internal_gl().quad_context.info().backend == miniquad::Backend::Metal };
+        // Rounded shapes use about 2.5 indices per vertex; the default 5,000
+        // indices would split a dense frame long before its 10,000 vertices.
+        macroquad::window::gl_set_drawcall_buffer_capacity(10_000, 25_000);
         Self {
             font: PixelFont::new(),
             opaque: opaque_material(metal),
@@ -312,6 +434,9 @@ impl Renderer {
             wall_flash: 0.0,
             pickup_flash: 0.0,
         }
+    }
+    pub fn backend(&self) -> &'static str {
+        if self.metal { "Metal" } else { "OpenGL" }
     }
     pub fn capture(&self, path: &str) {
         // Miniquad's Metal backend has no framebuffer readback. Native Metal
@@ -399,21 +524,72 @@ impl Renderer {
         alpha: f32,
         perf: Option<&Perf>,
     ) {
-        let screen = View::new();
-        self.font.density = screen.scale * screen_dpi_scale();
-        set_camera(&screen.camera());
-        clear_background(BG);
-        let v = View::scene(&self.font, ui.device);
+        // Macroquad has already cleared the frame; there is nothing to fit.
+        let Some(view) = View::current() else {
+            return;
+        };
+        set_camera(&view.camera(screen_width(), screen_height()));
+        self.frame(view, screen_dpi_scale(), game, ui, profile, alpha, perf);
+    }
+    /// OpenGL only: renders one frame offscreen at an exact physical size, as
+    /// on a 1x display, and writes it as PNG. Layouts can then be checked at
+    /// resolutions larger than the screen running the test.
+    pub fn capture_at(
+        &mut self,
+        (game, ui, profile): (&Game, &Ui, &Profile),
+        (width, height): (u32, u32),
+        path: &str,
+    ) {
+        let Some(view) = View::fit(width as f32, height as f32, 1.0) else {
+            return;
+        };
+        if self.metal {
+            return;
+        }
+        let target = render_target(width, height);
+        let mut camera = view.camera(width as f32, height as f32);
+        camera.render_target = Some(target.clone());
+        // Texture readback is bottom-up; render flipped so the PNG is upright.
+        camera.zoom.y = -camera.zoom.y;
+        set_camera(&camera);
+        self.frame(view, 1.0, game, ui, profile, 1.0, None);
+        // SAFETY: main thread, between draw calls; executes the batched frame.
+        unsafe { get_internal_gl() }.flush();
+        target.texture.get_texture_data().export_png(path);
+        set_default_camera();
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn frame(
+        &mut self,
+        view: View,
+        dpi: f32,
+        game: &Game,
+        ui: &Ui,
+        profile: &Profile,
+        alpha: f32,
+        perf: Option<&Perf>,
+    ) {
+        self.font.density = view.scale * dpi;
+        let v = Scene {
+            font: self.font.clone(),
+            device: ui.device,
+        };
+        // Painting the background into the scene batch, rather than with
+        // `clear_background`, saves a full-framebuffer pass: Macroquad has
+        // already cleared once this frame.
+        v.cover(BG);
         self.scene(&v, game, ui, profile, alpha, perf);
         // Translucent shapes also blend into framebuffer alpha. Restore an
         // opaque frame so the compositor never shows anything through it.
-        gl_use_material(&self.opaque);
-        v.cover(WHITE);
-        gl_use_default_material();
+        if let Some(opaque) = &self.opaque {
+            gl_use_material(opaque);
+            v.cover(WHITE);
+            gl_use_default_material();
+        }
     }
     fn scene(
         &mut self,
-        v: &View,
+        v: &Scene,
         game: &Game,
         ui: &Ui,
         profile: &Profile,
@@ -561,7 +737,7 @@ impl Renderer {
         }
     }
 
-    fn playfield(&self, v: &View) {
+    fn playfield(&self, v: &Scene) {
         v.rect(LEFT, TOP, RIGHT - LEFT, BOTTOM - TOP, SURFACE);
         // Three walls; the open bottom edge is where a ball drains.
         let edge = mix(BORDER, CYAN, (self.wall_flash * 4.0).min(0.6));
@@ -569,7 +745,7 @@ impl Renderer {
         v.rect(LEFT, TOP, 1.0, BOTTOM - TOP, edge);
         v.rect(RIGHT - 1.0, TOP, 1.0, BOTTOM - TOP, edge);
     }
-    fn bricks(&self, v: &View, game: &Game) {
+    fn bricks(&self, v: &Scene, game: &Game) {
         // Quiet connections make the actual orthogonal blast routes readable.
         for (i, &core) in game.cores.iter().enumerate() {
             if !core || game.bricks[i] == 0 {
@@ -643,7 +819,7 @@ impl Renderer {
             }
         }
     }
-    fn effects(&self, v: &View, game: &Game) {
+    fn effects(&self, v: &Scene, game: &Game) {
         for (index, &flash) in game.relay_flash.iter().enumerate() {
             if flash == 0 {
                 continue;
@@ -691,16 +867,15 @@ impl Renderer {
         }
         if self.pickup_flash > 0.0 {
             let progress = 1.0 - self.pickup_flash / 0.65;
-            draw_circle_lines(
-                game.paddle_x,
-                PADDLE_Y,
+            v.ring(
+                V2::new(game.paddle_x, PADDLE_Y),
                 20.0 + progress * 90.0,
                 2.0,
                 opacity(CYAN, (1.0 - progress) * 0.6),
             );
         }
     }
-    fn paddle(&self, v: &View, game: &Game) {
+    fn paddle(&self, v: &Scene, game: &Game) {
         let paddle = game.paddle_x;
         let x = paddle - game.paddle_width / 2.0;
         let w = game.paddle_width;
@@ -746,7 +921,7 @@ impl Renderer {
             );
         }
     }
-    fn balls(&self, v: &View, game: &Game, alpha: f32) {
+    fn balls(&self, v: &Scene, game: &Game, alpha: f32) {
         for (i, ball) in game.balls.iter().enumerate() {
             if !ball.active {
                 continue;
@@ -795,7 +970,7 @@ impl Renderer {
             v.circle(pos, RADIUS, INK);
         }
     }
-    fn hud(&mut self, v: &View, game: &Game, profile: &Profile) {
+    fn hud(&mut self, v: &Scene, game: &Game, profile: &Profile) {
         v.text("SCORE", LEFT, 72.0, 11.0, DIM);
         self.scratch.clear();
         grouped(&mut self.scratch, game.score);
@@ -840,7 +1015,7 @@ impl Renderer {
             );
         }
     }
-    fn ready(&mut self, v: &View, game: &Game) {
+    fn ready(&mut self, v: &Scene, game: &Game) {
         let level = &LEVELS[game.level];
         self.scratch.clear();
         let _ = write!(
@@ -869,7 +1044,7 @@ impl Renderer {
             );
         }
     }
-    fn options(&mut self, v: &View, profile: &Profile, y: f32) {
+    fn options(&mut self, v: &Scene, profile: &Profile, y: f32) {
         self.scratch.clear();
         let sound = if profile.muted { "OFF" } else { "ON" };
         // The shortcuts are keyboard-only; a pad player still sees the levels.
@@ -883,12 +1058,12 @@ impl Renderer {
         };
         v.centered(&self.scratch, y, 11.0, MUTED);
     }
-    fn menu(&self, v: &View, selected: usize, labels: [&str; 3], disabled: Option<usize>) {
+    fn menu(&self, v: &Scene, selected: usize, labels: [&str; 3], disabled: Option<usize>) {
         for (i, label) in labels.iter().enumerate() {
             v.button(ui::menu_rect(i), label, i == selected, disabled != Some(i));
         }
     }
-    fn attract(&mut self, v: &View, ui: &Ui, profile: &Profile) {
+    fn attract(&mut self, v: &Scene, ui: &Ui, profile: &Profile) {
         v.logo(270.0, 170.0, 12.0);
         v.centered("BREAK THE COSMOS", 300.0, 11.0, DIM);
         self.menu(
@@ -942,7 +1117,7 @@ impl Renderer {
         );
         self.options(v, profile, 858.0);
     }
-    fn sectors(&mut self, v: &View, ui: &Ui, profile: &Profile) {
+    fn sectors(&mut self, v: &Scene, ui: &Ui, profile: &Profile) {
         let back = ui::back_rect();
         v.rounded(back.x, back.y, back.w, back.h, 8.0, RAISED);
         let (center, baseline) = (back.x + back.w / 2.0, back.y + back.h / 2.0 + 4.0);
@@ -1083,7 +1258,7 @@ impl Renderer {
             MUTED,
         );
     }
-    fn cleared(&mut self, v: &View, game: &Game) {
+    fn cleared(&mut self, v: &Scene, game: &Game) {
         v.scrim();
         v.panel(280.0, 296.0, 400.0, 340.0);
         v.centered("SECTOR CLEAR", 346.0, 22.0, INK);
@@ -1140,7 +1315,7 @@ impl Renderer {
 }
 
 /// Writes alpha 1 everywhere and leaves color untouched.
-fn opaque_material(metal: bool) -> Material {
+fn opaque_material(metal: bool) -> Option<Material> {
     use miniquad::{BlendFactor, BlendState, Equation, PipelineParams};
     load_material(
         if metal {
@@ -1170,7 +1345,12 @@ fn opaque_material(metal: bool) -> Material {
             ..Default::default()
         },
     )
-    .expect("opaque frame shader compilation failed")
+    .inspect_err(|e| {
+        crate::diagnostics::error(format_args!(
+            "Opaque frame shader rejected; skipping the alpha pass: {e:?}"
+        ))
+    })
+    .ok()
 }
 const VERTEX: &str = r#"#version 100
 attribute vec3 position;
@@ -1215,7 +1395,47 @@ fn power_color(power: Power) -> Color {
 
 #[cfg(test)]
 mod tests {
-    use super::grouped;
+    use super::*;
+    #[test]
+    fn empty_or_invalid_windows_have_no_view() {
+        for (w, h, dpi) in [
+            (0.0, 0.0, 2.0),
+            (1280.0, 0.0, 1.0),
+            (f32::NAN, 800.0, 1.0),
+            (1280.0, 800.0, 0.0),
+            (f32::INFINITY, f32::INFINITY, 1.0),
+        ] {
+            assert_eq!(View::fit(w, h, dpi), None, "{w}x{h} @{dpi}");
+        }
+    }
+    #[test]
+    fn scene_fits_every_target_display_and_maps_the_pointer_back() {
+        // Steam Deck, 1080p, 1440p, ultrawide, 4:3, and the minimum window.
+        for (w, h) in [
+            (1280.0, 800.0),
+            (1920.0, 1080.0),
+            (2560.0, 1440.0),
+            (3440.0, 1440.0),
+            (1024.0, 768.0),
+            (480.0, 450.0),
+        ] {
+            for dpi in [1.0, 2.0] {
+                let (w, h) = (w / dpi, h / dpi);
+                let v = View::fit(w, h, dpi).unwrap();
+                let (right, bottom) = (v.x + WIDTH * v.scale, v.y + HEIGHT * v.scale);
+                let pixel = 1.0 / dpi;
+                assert!(v.x >= 0.0 && v.y >= 0.0, "{w}x{h}: scene clipped");
+                assert!(right <= w + pixel && bottom <= h + pixel, "{w}x{h}");
+                // One axis fills the window; letterbox bars are even.
+                assert!(v.x.min(v.y) <= pixel / 2.0);
+                assert!((v.x - (w - right)).abs() <= pixel && (v.y - (h - bottom)).abs() <= pixel);
+                let top_left = v.to_scene(v.x, v.y);
+                let far = v.to_scene(right, bottom);
+                assert!(top_left.x.abs() < 1e-3 && top_left.y.abs() < 1e-3);
+                assert!((far.x - WIDTH).abs() < 1e-2 && (far.y - HEIGHT).abs() < 1e-2);
+            }
+        }
+    }
     #[test]
     fn scores_group_thousands() {
         for (value, text) in [

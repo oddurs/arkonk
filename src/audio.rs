@@ -43,14 +43,17 @@ impl Audio {
                 .await
                 .ok();
         }
-        Self {
+        let audio = Self {
             clips,
             muted: false,
             volume: 0.6,
-        }
+        };
+        crate::diagnostics::info(format_args!("Sounds loaded: {}/17", audio.loaded()));
+        audio
     }
     pub fn play(&self, e: Events) {
-        if self.muted {
+        // Without a mixer thread every play would only print "Audio thread died".
+        if self.muted || crate::diagnostics::worker_panicked() {
             return;
         }
         for (i, enabled) in [
@@ -129,4 +132,32 @@ fn tone(start: f32, end: f32, seconds: f32, arpeggio: bool) -> Vec<u8> {
         wav.extend_from_slice(&(value as i16).to_le_bytes());
     }
     wav
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tone;
+    /// The mixer decodes clips on the main thread and panics on a malformed
+    /// file, so every synthesized clip must be a well-formed PCM WAV.
+    #[test]
+    fn synthesized_clips_are_well_formed_wav() {
+        for (start, end, seconds, arpeggio) in [
+            (640.0, 330.0, 0.07, false),
+            (440.0, 1320.0, 0.3, true),
+            (1080.0, 810.0, 0.06, false),
+            (640.0 * 2.0_f32.powf(7.0 / 12.0), 330.0, 0.07, false),
+        ] {
+            let wav = tone(start, end, seconds, arpeggio);
+            let u32_at = |i: usize| u32::from_le_bytes(wav[i..i + 4].try_into().unwrap());
+            let u16_at = |i: usize| u16::from_le_bytes(wav[i..i + 2].try_into().unwrap());
+            assert_eq!(&wav[0..4], b"RIFF");
+            assert_eq!(u32_at(4) as usize, wav.len() - 8);
+            assert_eq!(&wav[8..16], b"WAVEfmt ");
+            assert_eq!((u16_at(20), u16_at(22)), (1, 1), "mono PCM");
+            assert_eq!(u32_at(28), u32_at(24) * u32::from(u16_at(32)));
+            assert_eq!(&wav[36..40], b"data");
+            assert_eq!(u32_at(40) as usize, wav.len() - 44);
+            assert!(u32_at(40) > 0 && u32_at(40) % 2 == 0);
+        }
+    }
 }

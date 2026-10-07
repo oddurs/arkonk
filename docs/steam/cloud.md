@@ -39,7 +39,9 @@ rule the game uses.
 
 The pattern is the exact file name on purpose: `progress.tmp` exists only during a
 save and must never sync, and the legacy `best.txt` is only read once to import a
-score. If a later change adds more save files, add them as further patterns rather
+score. The last-known-good `progress.bak`, any `unreadable-*` file set aside after
+a failed read, and `logs/` are local recovery and diagnostics, not progress, and
+stay out of the cloud. If a later change adds more save files, add them as further patterns rather
 than widening this one to `*`.
 
 ## Checking it

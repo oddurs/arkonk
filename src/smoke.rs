@@ -1,9 +1,11 @@
 //! Graphical integration driver: inputs go through the real application handlers.
 use crate::{
+    display::MIN_PHYSICAL,
     input::{Dir, Presses, pad_controls},
     ui::{Controls, Screen, Ui},
 };
 use arkonk::{game::*, physics::V2, profile::Profile};
+use macroquad::prelude::{request_new_screen_size, screen_dpi_scale, screen_height, screen_width};
 pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls {
     let mut keys = Controls::default();
     let none = Presses::default();
@@ -195,4 +197,46 @@ pub fn effects(game: &mut Game, frame: u32) {
             };
         }
     }
+}
+
+/// Physical sizes rendered offscreen after the main smoke run: Steam Deck,
+/// 1080p, 1440p, ultrawide, and 4:3.
+pub const LAYOUTS: [(&str, u32, u32); 5] = [
+    ("deck", 1280, 800),
+    ("1080p", 1920, 1080),
+    ("1440p", 2560, 1440),
+    ("ultrawide", 3440, 1440),
+    ("4x3", 1024, 768),
+];
+/// Frames after the main run: one per layout and screen, then a too-small
+/// window request that the minimum size must refuse.
+pub const LAYOUT_FRAMES: u32 = LAYOUTS.len() as u32 * 3 + 40;
+
+/// Shows play, title, and sector screens in turn; returns the layout and
+/// capture path for this frame.
+pub fn layout(frame: u32, ui: &mut Ui) -> Option<((u32, u32), String)> {
+    let index = (frame / 3) as usize;
+    let Some(&(name, w, h)) = LAYOUTS.get(index) else {
+        let step = frame - LAYOUTS.len() as u32 * 3;
+        if step == 0 {
+            request_new_screen_size(10.0, 10.0);
+        }
+        if step == 39 {
+            let dpi = screen_dpi_scale();
+            let (pw, ph) = (screen_width() * dpi, screen_height() * dpi);
+            println!("Minimum window: requested 10x10, got {pw}x{ph} physical");
+            assert!(
+                pw >= MIN_PHYSICAL.0 - 1.0 && ph >= MIN_PHYSICAL.1 - 1.0,
+                "window shrank below its minimum: {pw}x{ph}"
+            );
+        }
+        return None;
+    };
+    let (screen, suffix) = [
+        (Screen::Play, ""),
+        (Screen::Title, "-title"),
+        (Screen::Sectors, "-sectors"),
+    ][(frame % 3) as usize];
+    ui.screen = screen;
+    Some(((w, h), format!("target/layout-{name}{suffix}.png")))
 }

@@ -61,7 +61,9 @@ mod imp {
                     let (SteamAPIInitError::FailedGeneric(detail)
                     | SteamAPIInitError::NoSteamClient(detail)
                     | SteamAPIInitError::VersionMismatch(detail)) = &e;
-                    eprintln!("Steam unavailable, continuing without it: {e} ({detail})");
+                    crate::diagnostics::error(format_args!(
+                        "Steam unavailable, continuing without it: {e} ({detail})"
+                    ));
                     Self(None)
                 }
             }
@@ -76,7 +78,9 @@ mod imp {
                 CallbackResult::GameOverlayActivated(o) => overlay |= o.active,
                 CallbackResult::UserStatsReceived(r) if r.steam_id == me => match r.result {
                     Ok(()) => ready = true,
-                    Err(e) => eprintln!("Steam could not load achievements: {e}"),
+                    Err(e) => crate::diagnostics::error(format_args!(
+                        "Steam could not load achievements: {e}"
+                    )),
                 },
                 _ => {}
             });
@@ -113,7 +117,9 @@ mod imp {
             }
             accepted &= friends.set_rich_presence("steam_display", Some(presence.token()));
             if !accepted {
-                eprintln!("Steam rejected rich presence {presence:?}");
+                crate::diagnostics::error(format_args!(
+                    "Steam rejected rich presence {presence:?}"
+                ));
             }
         }
     }
@@ -152,13 +158,15 @@ mod imp {
             }
             if !missing.is_empty() && !self.warned_missing {
                 self.warned_missing = true;
-                eprintln!(
+                crate::diagnostics::error(format_args!(
                     "Steam app {APP_ID} does not define {}; see docs/steam/achievements.md",
                     missing.join(", ")
-                );
+                ));
             }
             if changed && stats.store_stats().is_err() {
-                eprintln!("Steam did not accept the achievement update");
+                crate::diagnostics::error(format_args!(
+                    "Steam did not accept the achievement update"
+                ));
             }
         }
     }

@@ -2,6 +2,8 @@
 // beside the game. Debug builds keep the console for development output.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 mod audio;
+mod diagnostics;
+mod display;
 mod input;
 mod perf;
 mod pixel_font;
@@ -10,28 +12,37 @@ mod smoke;
 mod steam;
 mod ui;
 
-use arkonk::{game::*, presence::Presence, profile::Profile, timing::FixedClock};
+use arkonk::{
+    game::*,
+    physics::V2,
+    presence::Presence,
+    profile::{Origin, Profile},
+    timing::FixedClock,
+};
 use audio::Audio;
 use input::{Device, Gamepads};
 use macroquad::prelude::*;
 use perf::Perf;
-use render::{Renderer, View};
+use render::Renderer;
 use std::{path::PathBuf, time::Instant};
 use steam::Steam;
 use ui::{Controls, Screen, Ui};
 
-fn config() -> Conf {
+fn flag(name: &str) -> bool {
+    std::env::args().any(|a| a == name)
+}
+fn config(fullscreen: bool) -> Conf {
     Conf {
         window_title: "ARKONK".into(),
         window_width: 960,
         window_height: 900,
         high_dpi: true,
-        fullscreen: std::env::args().any(|a| a == "--fullscreen"),
+        fullscreen,
         sample_count: 1,
         platform: miniquad::conf::Platform {
             swap_interval: Some(1),
             #[cfg(target_os = "macos")]
-            apple_gfx_api: if std::env::args().any(|a| a == "--opengl") {
+            apple_gfx_api: if flag("--opengl") {
                 miniquad::conf::AppleGfxApi::OpenGl
             } else {
                 miniquad::conf::AppleGfxApi::Metal
@@ -41,17 +52,32 @@ fn config() -> Conf {
         ..Default::default()
     }
 }
-fn profile_path() -> Option<PathBuf> {
-    #[cfg(target_os = "macos")]
-    let base =
-        std::env::var_os("HOME").map(|p| PathBuf::from(p).join("Library/Application Support"));
-    #[cfg(target_os = "windows")]
-    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".local/share")));
-    base.map(|p| p.join("arkonk/progress.txt"))
+/// Loads progress and returns where to save it. `None` disables saving: test
+/// modes leave real progress alone, and an unreadable file must not be replaced.
+fn load_progress(path: Option<PathBuf>) -> (Profile, Option<PathBuf>, bool) {
+    let Some(path) = path else {
+        return (Profile::default(), None, false);
+    };
+    let loaded = Profile::load(&path);
+    for (file, why) in &loaded.set_aside {
+        diagnostics::error(format_args!(
+            "Unreadable progress kept as {} ({why})",
+            file.display()
+        ));
+    }
+    if loaded.origin == Origin::Backup {
+        diagnostics::error("Progress restored from the last-known-good backup");
+    }
+    diagnostics::info(format_args!(
+        "Progress: {:?} from {}",
+        loaded.origin,
+        path.display()
+    ));
+    if let Some(why) = &loaded.blocked {
+        diagnostics::error(format_args!("Saving disabled this session: {why}"));
+        return (loaded.profile, None, true);
+    }
+    (loaded.profile, Some(path), false)
 }
 struct Focus {
     lost: bool,
@@ -126,22 +152,30 @@ fn main() {
         println!("arkonk {}", env!("CARGO_PKG_VERSION"));
         return;
     }
+    let smoke = [
+        "--smoke-test",
+        "--flow-test",
+        "--perf-test",
+        "--effects-test",
+    ]
+    .into_iter()
+    .any(flag);
+    let data = (!smoke).then(diagnostics::data_dir).flatten();
+    diagnostics::init(data.as_ref().map(|d| d.join("logs")));
     // Before any window exists: Steam is launching another copy of the game.
     if steam::restart_through_steam() {
         return;
     }
-    macroquad::Window::from_config(config(), run());
+    let (mut profile, path, save_blocked) = load_progress(data.map(|d| d.join("progress.txt")));
+    profile.fullscreen |= flag("--fullscreen");
+    macroquad::Window::from_config(config(profile.fullscreen), run(profile, path, save_blocked));
 }
-async fn run() {
+async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
     prevent_quit();
-    let flow = std::env::args().any(|a| a == "--flow-test");
-    let perf_test = std::env::args().any(|a| a == "--perf-test");
-    let effects = std::env::args().any(|a| a == "--effects-test");
-    let smoke = perf_test || effects || flow || std::env::args().any(|a| a == "--smoke-test");
-    let path = if smoke { None } else { profile_path() };
-    let mut profile = path
-        .as_ref()
-        .map_or_else(Profile::default, |p| Profile::load(p));
+    let flow = flag("--flow-test");
+    let perf_test = flag("--perf-test");
+    let effects = flag("--effects-test");
+    let smoke = perf_test || effects || flow || flag("--smoke-test");
     // Test runs must not unlock achievements or show presence.
     let mut steam = if smoke {
         Steam::off()
@@ -152,19 +186,33 @@ async fn run() {
     let mut last_save_attempt = -5.0;
     let mut game = Game::new();
     let mut renderer = Renderer::new();
+    diagnostics::set_backend(renderer.backend());
+    diagnostics::info(format_args!(
+        "Started: {}, window {}x{} at {}x scale, {}",
+        renderer.backend(),
+        screen_width(),
+        screen_height(),
+        screen_dpi_scale(),
+        if profile.fullscreen {
+            "fullscreen"
+        } else {
+            "windowed"
+        }
+    ));
     let mut audio = Audio::new().await;
     let mut perf = Perf::new();
     let mut trace = perf::FrameTrace::new(perf_test);
     let mut ui = Ui::default();
     home(&mut ui, &profile);
+    ui.save_error = save_blocked;
     if smoke && !flow {
         ui.screen = Screen::Play;
     }
     let mut clock = FixedClock::default();
     let mut stats = false;
-    let mut fullscreen = std::env::args().any(|a| a == "--fullscreen");
+    let mut display = display::Display::new(profile.fullscreen, (960.0, 900.0));
     let mut last_frame = Instant::now();
-    let mut last_mouse = View::new().mouse();
+    let mut last_mouse = render::mouse().unwrap_or(V2::new(WIDTH / 2.0, HEIGHT / 2.0));
     let mut mouse_control = false;
     let mut pending_launch = false;
     let mut cursor_visible = true;
@@ -206,12 +254,14 @@ async fn run() {
             stats = !stats;
         }
         if is_key_pressed(KeyCode::F) {
-            fullscreen = !fullscreen;
-            set_fullscreen(fullscreen);
+            profile.fullscreen = !profile.fullscreen;
+            dirty = true;
         }
+        // A settings screen changes `profile.fullscreen`; this applies it.
+        let held = display.update(profile.fullscreen, frame_seconds);
         audio.muted = profile.muted;
         audio.volume = f32::from(profile.volume) / 10.0;
-        let mouse = View::new().mouse();
+        let mouse = render::mouse().unwrap_or(last_mouse);
         let moved =
             !flow && ((mouse.x - last_mouse.x).abs() > 0.5 || (mouse.y - last_mouse.y).abs() > 0.5);
         if moved {
@@ -256,8 +306,18 @@ async fn run() {
         if (!smoke || flow)
             && ui.screen == Screen::Play
             && !terminal
-            && (focus.lost || (frame_seconds > 0.25 && game.phase == Phase::Playing))
+            && (focus.lost || (frame_seconds > 0.25 && game.phase == Phase::Playing && !held))
         {
+            if !ui.paused {
+                diagnostics::info(format_args!(
+                    "Paused automatically: {}",
+                    if focus.lost {
+                        "focus lost"
+                    } else {
+                        "frame stall"
+                    }
+                ));
+            }
             ui.paused = true;
             ui.choice = 0;
             pending_launch = false;
@@ -435,7 +495,7 @@ async fn run() {
                 || game.balls.iter().any(|b| b.active && b.held);
         }
         let mut alpha = 1.0;
-        if ui.screen == Screen::Play && !ui.paused && !terminal && !changed {
+        if ui.screen == Screen::Play && !ui.paused && !terminal && !changed && !held {
             let frame = clock.advance(frame_seconds);
             alpha = frame.alpha;
             perf.dropped_ticks += frame.dropped;
@@ -477,13 +537,14 @@ async fn run() {
         {
             last_save_attempt = now;
             match path.as_ref().map(|p| profile.save(p)).transpose() {
-                Ok(_) => {
+                Ok(saved) => {
                     dirty = false;
-                    ui.save_error = false;
+                    // Without a path the notice reflects why saving is off.
+                    ui.save_error &= saved.is_none();
                 }
                 Err(e) => {
                     ui.save_error = true;
-                    eprintln!("Could not save progress: {e}");
+                    diagnostics::error(format_args!("Could not save progress: {e}"));
                 }
             }
         }
@@ -499,6 +560,13 @@ async fn run() {
         let actual_phase = game.phase;
         let actual_screen = ui.screen;
         let actual_pause = ui.paused;
+        let measured = if perf_test { 3899 } else { 660 };
+        let layouts = smoke && !flow && !perf_test && !effects;
+        let layout_capture = if layouts && frames >= measured {
+            smoke::layout(frames - measured, &mut ui)
+        } else {
+            None
+        };
         if smoke && !flow && !perf_test {
             match frames {
                 30 => ui.screen = Screen::Title,
@@ -531,6 +599,9 @@ async fn run() {
             alpha,
             (stats || (smoke && frames == 170)).then_some(&perf),
         );
+        if let Some((size, p)) = layout_capture {
+            renderer.capture_at((&game, &ui, &profile), size, &p);
+        }
         game.phase = actual_phase;
         ui.screen = actual_screen;
         ui.paused = actual_pause;
@@ -565,7 +636,7 @@ async fn run() {
         if perf_test && frames >= 300 {
             trace.push(frame_seconds, focus.focused);
         }
-        if smoke && !flow && frames >= if perf_test { 3899 } else { 660 } {
+        if smoke && !flow && frames == measured {
             println!(
                 "Render smoke: {} frames, score {}, collision caps {}, sounds loaded {}/17",
                 frames + 1,
@@ -576,6 +647,8 @@ async fn run() {
             for line in &perf.lines {
                 println!("{line}");
             }
+        }
+        if smoke && !flow && frames >= measured + if layouts { smoke::LAYOUT_FRAMES } else { 0 } {
             break;
         }
         if effects && !perf_test && frames == 330 {
@@ -604,7 +677,8 @@ async fn run() {
         if let Some(p) = &path
             && let Err(e) = profile.save(p)
         {
-            eprintln!("Could not save progress: {e}");
+            diagnostics::error(format_args!("Could not save progress: {e}"));
         }
+        diagnostics::info("Quit");
     }
 }

@@ -10,6 +10,9 @@ pub struct PixelFont {
     pub density: f32,
 }
 impl PixelFont {
+    /// The DEL cell (code 127, never drawn as text) is solid white, so shapes
+    /// can sample the atlas and batch with text.
+    pub const WHITE_UV: Vec2 = vec2(124.5 / 128.0, 44.5 / 48.0);
     pub fn new() -> Self {
         let mut image = Image::gen_image_color(128, 48, Color::new(0.0, 0.0, 0.0, 0.0));
         for code in 32..128 {
@@ -24,12 +27,20 @@ impl PixelFont {
                 }
             }
         }
+        for y in 40..48 {
+            for x in 120..128 {
+                image.set_pixel(x, y, WHITE);
+            }
+        }
         let texture = Texture2D::from_image(&image);
         texture.set_filter(FilterMode::Nearest);
         Self {
             texture,
             density: 1.0,
         }
+    }
+    pub fn texture(&self) -> &Texture2D {
+        &self.texture
     }
     pub fn pixel(&self, size: f32) -> f32 {
         let cell = if size >= 28.0 {
