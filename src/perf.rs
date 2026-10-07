@@ -87,3 +87,59 @@ impl Perf {
         self.lines[5].push_str("F3 close / draw time excludes GPU & present");
     }
 }
+
+/// An entire steady-state run, without screenshot or resize stalls. Storage is
+/// reserved before play and written to disk only after the run finishes.
+pub struct FrameTrace {
+    values: Vec<f64>,
+    unfocused: usize,
+}
+impl FrameTrace {
+    pub fn new(enabled: bool) -> Self {
+        Self {
+            values: Vec::with_capacity(if enabled { 3600 } else { 0 }),
+            unfocused: 0,
+        }
+    }
+    pub fn push(&mut self, seconds: f64, focused: bool) {
+        if self.values.len() < self.values.capacity() {
+            self.values.push(seconds * 1000.0);
+            self.unfocused += usize::from(!focused);
+        }
+    }
+    pub fn report(&mut self) {
+        if self.values.is_empty() {
+            return;
+        }
+        let mut csv = String::from("frame,milliseconds\n");
+        for (i, ms) in self.values.iter().enumerate() {
+            let _ = writeln!(csv, "{i},{ms:.4}");
+        }
+        let output = if std::path::Path::new("target").is_dir() {
+            std::path::PathBuf::from("target/frame-times.csv")
+        } else {
+            std::env::temp_dir().join("arkonk-frame-times.csv")
+        };
+        match std::fs::write(&output, csv) {
+            Ok(()) => println!("Frame trace: {}", output.display()),
+            Err(e) => eprintln!("Could not write frame trace: {e}"),
+        }
+        println!(
+            "Foreground check: {} unfocused frames (all retained in results)",
+            self.unfocused
+        );
+        self.values.sort_unstable_by(f64::total_cmp);
+        let n = self.values.len();
+        let sum: f64 = self.values.iter().sum();
+        println!(
+            "Whole-run pacing: {n} frames, {:.1} FPS, p95 {:.2}, p99 {:.2}, worst {:.2} ms; >16.7ms {}, >25ms {}, >50ms {}",
+            n as f64 * 1000.0 / sum,
+            self.values[(n - 1) * 95 / 100],
+            self.values[(n - 1) * 99 / 100],
+            self.values[n - 1],
+            self.values.iter().filter(|&&v| v > 16.7).count(),
+            self.values.iter().filter(|&&v| v > 25.0).count(),
+            self.values.iter().filter(|&&v| v > 50.0).count()
+        );
+    }
+}

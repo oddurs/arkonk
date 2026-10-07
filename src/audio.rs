@@ -2,7 +2,7 @@ use arkonk::game::Events;
 use macroquad::audio::{PlaySoundParams, Sound, load_sound_from_bytes, play_sound};
 
 pub struct Audio {
-    clips: [Option<Sound>; 14],
+    clips: [Option<Sound>; 17],
     pub muted: bool,
     pub volume: f32,
 }
@@ -25,9 +25,21 @@ impl Audio {
             let wave = tone(start, end, seconds, i == 4);
             clips[i] = load_sound_from_bytes(&wave).await.ok();
         }
-        for (i, slot) in clips.iter_mut().enumerate().skip(7) {
+        for (i, slot) in clips.iter_mut().enumerate().take(14).skip(7) {
             let pitch = 2.0_f32.powf((i - 6) as f32 / 12.0);
             *slot = load_sound_from_bytes(&tone(640.0 * pitch, 330.0 * pitch, 0.07, false))
+                .await
+                .ok();
+        }
+        for (index, (start, end, duration)) in [
+            (360.0, 140.0, 0.11),
+            (920.0, 460.0, 0.10),
+            (1080.0, 810.0, 0.06),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            clips[14 + index] = load_sound_from_bytes(&tone(start, end, duration, false))
                 .await
                 .ok();
         }
@@ -42,19 +54,24 @@ impl Audio {
             return;
         }
         for (i, enabled) in [
-            e.brick,
-            e.paddle,
+            e.brick && !e.phase_hit && !e.relay,
+            e.paddle && !e.caught,
             e.wall && !e.brick && !e.paddle,
             e.lost,
             e.clear,
             e.pickup,
             e.launch,
+            e.relay,
+            e.caught,
+            e.phase_hit,
         ]
         .into_iter()
         .enumerate()
         {
             let clip = if i == 0 && e.combo > 1 {
                 5 + e.combo.min(8) as usize
+            } else if i >= 7 {
+                i + 7
             } else {
                 i
             };
@@ -63,7 +80,14 @@ impl Audio {
                     sound,
                     PlaySoundParams {
                         looped: false,
-                        volume: self.volume * if i == 2 { 0.10 } else { 0.32 },
+                        volume: self.volume
+                            * if i == 2 {
+                                0.10
+                            } else if i >= 7 {
+                                0.24
+                            } else {
+                                0.32
+                            },
                     },
                 );
             }

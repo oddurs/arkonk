@@ -11,7 +11,7 @@ use audio::Audio;
 use macroquad::prelude::*;
 use perf::Perf;
 use render::{Renderer, View};
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Instant};
 use ui::{Controls, Screen, Ui};
 
 fn config() -> Conf {
@@ -20,9 +20,16 @@ fn config() -> Conf {
         window_width: 960,
         window_height: 900,
         high_dpi: true,
+        fullscreen: std::env::args().any(|a| a == "--fullscreen"),
         sample_count: 1,
         platform: miniquad::conf::Platform {
             swap_interval: Some(1),
+            #[cfg(target_os = "macos")]
+            apple_gfx_api: if std::env::args().any(|a| a == "--opengl") {
+                miniquad::conf::AppleGfxApi::OpenGl
+            } else {
+                miniquad::conf::AppleGfxApi::Metal
+            },
             ..Default::default()
         },
         ..Default::default()
@@ -40,15 +47,27 @@ fn profile_path() -> Option<PathBuf> {
         .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".local/share")));
     base.map(|p| p.join("arkonk/progress.txt"))
 }
-#[derive(Default)]
 struct Focus {
     lost: bool,
+    focused: bool,
+}
+impl Default for Focus {
+    fn default() -> Self {
+        Self {
+            lost: false,
+            focused: true,
+        }
+    }
 }
 impl miniquad::EventHandler for Focus {
     fn update(&mut self) {}
     fn draw(&mut self) {}
     fn window_minimized_event(&mut self) {
         self.lost = true;
+        self.focused = false;
+    }
+    fn window_restored_event(&mut self) {
+        self.focused = true;
     }
 }
 fn enter(
@@ -73,7 +92,9 @@ fn home(ui: &mut Ui, profile: &Profile) {
 async fn main() {
     prevent_quit();
     let flow = std::env::args().any(|a| a == "--flow-test");
-    let smoke = flow || std::env::args().any(|a| a == "--smoke-test");
+    let perf_test = std::env::args().any(|a| a == "--perf-test");
+    let effects = std::env::args().any(|a| a == "--effects-test");
+    let smoke = perf_test || effects || flow || std::env::args().any(|a| a == "--smoke-test");
     let path = if smoke { None } else { profile_path() };
     let mut profile = path
         .as_ref()
@@ -87,6 +108,7 @@ async fn main() {
     let mut renderer = Renderer::new();
     let mut audio = Audio::new().await;
     let mut perf = Perf::new();
+    let mut trace = perf::FrameTrace::new(perf_test);
     let mut ui = Ui::default();
     home(&mut ui, &profile);
     if smoke && !flow {
@@ -94,22 +116,27 @@ async fn main() {
     }
     let mut clock = FixedClock::default();
     let mut stats = false;
-    let mut fullscreen = false;
-    let mut last_frame = get_time();
+    let mut fullscreen = std::env::args().any(|a| a == "--fullscreen");
+    let mut last_frame = Instant::now();
     let mut last_mouse = View::new().mouse(profile.crt);
     let mut mouse_control = false;
     let mut pending_launch = false;
+    let mut cursor_visible = true;
     let mut frames = 0;
     let subscriber = macroquad::input::utils::register_input_subscriber();
     let mut focus = Focus::default();
     loop {
         let now = get_time();
+        let frame_time = Instant::now();
         let frame_seconds = if flow {
             1.0 / 60.0
         } else {
-            (now - last_frame).max(0.0)
+            frame_time.duration_since(last_frame).as_secs_f64()
         };
-        last_frame = now;
+        last_frame = frame_time;
+        if smoke && frames == if effects && !perf_test { 350 } else { 300 } {
+            perf = Perf::new();
+        }
         perf.frame(frame_seconds * 1000.0);
         macroquad::input::utils::repeat_all_miniquad_input(&mut focus, subscriber);
         if is_key_pressed(KeyCode::Q) || is_quit_requested() {
@@ -166,6 +193,9 @@ async fn main() {
             Controls::read()
         };
         focus.lost |= focus_lost;
+        if effects {
+            smoke::effects(&mut game, frames);
+        }
         let terminal = matches!(game.phase, Phase::GameOver | Phase::Victory);
         if (!smoke || flow)
             && ui.screen == Screen::Play
@@ -350,7 +380,8 @@ async fn main() {
                     .map_or(WIDTH / 2.0, |b| b.pos.x)
                     + (now as f32 * 0.7).sin() * 32.0,
             );
-            pending_launch = matches!(game.phase, Phase::Ready | Phase::Cleared);
+            pending_launch = matches!(game.phase, Phase::Ready | Phase::Cleared)
+                || game.balls.iter().any(|b| b.active && b.held);
         }
         let mut alpha = 1.0;
         if ui.screen == Screen::Play && !ui.paused && !terminal && !changed {
@@ -404,13 +435,17 @@ async fn main() {
                 }
             }
         }
-        show_mouse(ui.screen != Screen::Play || ui.paused || game.phase != Phase::Playing);
+        let show_cursor = ui.screen != Screen::Play || ui.paused || game.phase != Phase::Playing;
+        if cursor_visible != show_cursor {
+            show_mouse(show_cursor);
+            cursor_visible = show_cursor;
+        }
         perf.refresh(now, game.collision_caps);
         let draw_start = get_time();
         let actual_phase = game.phase;
         let actual_screen = ui.screen;
         let actual_pause = ui.paused;
-        if smoke && !flow && profile.crt {
+        if smoke && !flow && !perf_test && profile.crt {
             match frames {
                 30 => ui.screen = Screen::Title,
                 150 => ui.paused = true,
@@ -436,7 +471,7 @@ async fn main() {
         ui.screen = actual_screen;
         ui.paused = actual_pause;
         perf.draw((get_time() - draw_start) * 1000.0);
-        if smoke && !flow {
+        if smoke && !flow && !perf_test {
             let capture = match frames {
                 30 if profile.crt => Some("target/attract.png"),
                 120 => Some(if profile.crt {
@@ -453,7 +488,7 @@ async fn main() {
                 _ => None,
             };
             if let Some(p) = capture {
-                get_screen_data().export_png(p);
+                renderer.capture(p);
             }
             if profile.crt && frames == 200 {
                 request_new_screen_size(800.0, 600.0);
@@ -461,28 +496,42 @@ async fn main() {
             if profile.crt && frames == 240 {
                 request_new_screen_size(960.0, 900.0);
             }
-            if frames >= 660 {
-                println!(
-                    "Render smoke: 661 frames, CRT {}, score {}, collision caps {}, sounds loaded {}/14",
-                    profile.crt,
-                    game.score,
-                    game.collision_caps,
-                    audio.loaded()
-                );
-                for line in &perf.lines {
-                    println!("{line}");
-                }
-                break;
-            }
         }
-        if flow && frames >= 32 {
+        if perf_test && frames >= 300 {
+            trace.push(frame_seconds, focus.focused);
+        }
+        if smoke && !flow && frames >= if perf_test { 3899 } else { 660 } {
+            println!(
+                "Render smoke: {} frames, CRT {}, score {}, collision caps {}, sounds loaded {}/17",
+                frames + 1,
+                profile.crt,
+                game.score,
+                game.collision_caps,
+                audio.loaded()
+            );
+            for line in &perf.lines {
+                println!("{line}");
+            }
             break;
         }
-        if smoke && frames == 300 {
-            perf = Perf::new();
+        if effects && !perf_test && frames == 330 {
+            renderer.capture("target/effects.png");
+        }
+        if flow && matches!(frames, 35 | 45) {
+            renderer.capture(if frames == 35 {
+                "target/anchor.png"
+            } else {
+                "target/relay.png"
+            });
+        }
+        if flow && frames >= 50 {
+            break;
         }
         frames += 1;
         next_frame().await;
+    }
+    if perf_test {
+        trace.report();
     }
     if !smoke {
         if game.mode == Mode::Journey {

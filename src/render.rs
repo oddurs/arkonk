@@ -206,6 +206,7 @@ pub struct Renderer {
     popups: [Popup; 16],
     popup_cursor: usize,
     previous_score: u32,
+    previous_level: usize,
     paddle_flash: f32,
     wall_flash: f32,
     pickup_flash: f32,
@@ -237,24 +238,36 @@ impl Renderer {
             popups: [Popup::default(); 16],
             popup_cursor: 0,
             previous_score: 0,
+            previous_level: usize::MAX,
             paddle_flash: 0.0,
             wall_flash: 0.0,
             pickup_flash: 0.0,
         }
     }
+    pub fn capture(&self, path: &str) {
+        self.crt.capture(path);
+    }
+
     pub fn reset(&mut self) {
         self.trail_len.fill(0);
         self.brick_flash.fill(0.0);
         self.previous_bricks.fill(0);
         self.popups.fill(Popup::default());
         self.previous_score = 0;
+        self.previous_level = usize::MAX;
         self.paddle_flash = 0.0;
         self.wall_flash = 0.0;
         self.pickup_flash = 0.0;
     }
     pub fn record(&mut self, game: &Game) {
+        if self.previous_level != game.level {
+            self.reset();
+            self.previous_level = game.level;
+            self.previous_bricks = game.bricks;
+            self.previous_score = game.score;
+        }
         for (i, ball) in game.balls.iter().enumerate() {
-            if !ball.active || game.phase != Phase::Playing {
+            if !ball.active || ball.held || game.phase != Phase::Playing {
                 self.trail_len[i] = 0;
                 continue;
             }
@@ -288,7 +301,13 @@ impl Renderer {
                     self.popups[self.popup_cursor] = Popup {
                         pos: V2::new(r.x + r.w / 2.0, r.y),
                         life: 0.65,
-                        value: game.score - self.previous_score,
+                        value: (game.score - self.previous_score).saturating_sub(
+                            if game.events.clear {
+                                game.summary.bonus
+                            } else {
+                                0
+                            },
+                        ),
                     };
                     self.popup_cursor = (self.popup_cursor + 1) % self.popups.len();
                     popup_spawned = true;
@@ -330,7 +349,6 @@ impl Renderer {
         self.bricks(&v, game);
         self.effects(&v, game);
         self.paddle(&v, game);
-        self.balls(&v, game, alpha);
         for drop in &game.drops {
             if drop.active {
                 let c = power_color(drop.power);
@@ -353,6 +371,7 @@ impl Renderer {
                 v.rect(drop.pos.x - 7.0, drop.pos.y - 5.0, 14.0, 13.0, BG);
             }
         }
+        self.balls(&v, game, alpha);
         // Keep font-atlas work together after the geometry batches.
         self.hud(&v, game, profile.best_score);
         for drop in &game.drops {
@@ -379,14 +398,22 @@ impl Renderer {
                 );
             }
         }
-        self.scratch.clear();
-        if game.wide_time > 0.0 {
-            let _ = write!(self.scratch, "WIDE {:02.0}   ", game.wide_time.ceil());
+        if !ui.paused && game.phase == Phase::Playing {
+            if game.balls.iter().any(|b| b.active && b.held) {
+                v.centered(
+                    "ANCHOR / REPOSITION, THEN CLICK OR SPACE",
+                    720.0,
+                    11.0,
+                    CYAN,
+                );
+            }
+            if game.notice_ticks > 0
+                && let Some(power) = game.notice
+            {
+                let fade = (game.notice_ticks as f32 / 60.0).min(1.0);
+                v.centered(power.name(), 687.0, 13.0, opacity(power_color(power), fade));
+            }
         }
-        if game.slow_time > 0.0 {
-            let _ = write!(self.scratch, "SLOW {:02.0}", game.slow_time.ceil());
-        }
-        v.centered(&self.scratch, 739.0, 12.0, CYAN);
         if ui.paused {
             v.rect(160.0, 344.0, 640.0, 385.0, opacity(BG, 0.98));
             v.centered("TAKE YOUR TIME", 403.0, 22.0, INK);
@@ -406,9 +433,7 @@ impl Renderer {
                     v.centered(&self.scratch, 560.0, 22.0, INK);
                     v.centered(CHAPTERS[LEVELS[game.level].chapter], 593.0, 11.0, AMBER);
                     v.centered("SPACE / CLICK TO SERVE", 646.0, 13.0, CYAN);
-                    if game.level == 0 {
-                        v.centered("W WIDE / S SLOW / M MULTIBALL", 680.0, 11.0, DIM);
-                    }
+                    v.centered(LEVELS[game.level].tip, 680.0, 11.0, DIM);
                     let start = game.balls[0].pos;
                     let direction = game.launch_velocity().normalized();
                     for i in 1..=5 {
@@ -526,9 +551,35 @@ impl Renderer {
         }
     }
     fn bricks(&self, v: &View, game: &Game) {
+        // Quiet connections make the actual orthogonal blast routes readable.
+        for (i, &core) in game.cores.iter().enumerate() {
+            if !core || game.bricks[i] == 0 {
+                continue;
+            }
+            let r = Game::brick_rect(i);
+            for (valid, other) in [
+                (i % COLS + 1 < COLS, i + 1),
+                (i / COLS + 1 < ROWS, i + COLS),
+            ] {
+                if valid && game.cores[other] && game.bricks[other] > 0 {
+                    let next = Game::brick_rect(other);
+                    v.line(
+                        V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0),
+                        V2::new(next.x + next.w / 2.0, next.y + next.h / 2.0),
+                        1.0,
+                        opacity(AMBER, 0.32),
+                    );
+                }
+            }
+        }
+        let pulse = 0.7 + 0.15 * (game.phase_ticks as f32 * DT * 2.0).sin();
         for (i, &hp) in game.bricks.iter().enumerate() {
             let r = Game::brick_rect(i);
-            let c = sector_color(i / COLS, LEVELS[game.level].chapter);
+            let c = if game.cores[i] {
+                AMBER
+            } else {
+                sector_color(i / COLS, LEVELS[game.level].chapter)
+            };
             let flash = self.brick_flash[i] / 0.18;
             if hp == 0 {
                 if flash > 0.0 {
@@ -559,7 +610,25 @@ impl Renderer {
             for x in [r.x + 5.0, r.x + r.w - 6.0] {
                 v.rect(x, r.y + 9.0, 2.0, 2.0, opacity(INK, 0.5));
             }
-            if hp > 1 {
+            if game.cores[i] {
+                v.rect(
+                    r.x + 3.0,
+                    r.y + 4.0,
+                    r.w - 6.0,
+                    r.h - 9.0,
+                    shade(AMBER, 0.13),
+                );
+                let center = V2::new(r.x + r.w / 2.0, r.y + 11.0);
+                for (from, to) in [
+                    (V2::new(-6.0, 0.0), V2::new(0.0, -5.0)),
+                    (V2::new(0.0, -5.0), V2::new(6.0, 0.0)),
+                    (V2::new(6.0, 0.0), V2::new(0.0, 5.0)),
+                    (V2::new(0.0, 5.0), V2::new(-6.0, 0.0)),
+                ] {
+                    v.line(center + from, center + to, 1.0, opacity(AMBER, pulse));
+                }
+                v.rect(center.x - 1.0, center.y - 1.0, 2.0, 2.0, INK);
+            } else if hp > 1 {
                 for j in 0..hp {
                     let x =
                         r.x + r.w / 2.0 - (f32::from(hp) * 12.0 - 6.0) / 2.0 + f32::from(j) * 12.0;
@@ -574,6 +643,35 @@ impl Renderer {
         }
     }
     fn effects(&self, v: &View, game: &Game) {
+        for (index, &flash) in game.relay_flash.iter().enumerate() {
+            if flash == 0 {
+                continue;
+            }
+            let r = Game::brick_rect(index);
+            let progress = 1.0 - f32::from(flash) / 36.0;
+            let center = V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
+            let color = opacity(AMBER, (1.0 - progress) * 0.75);
+            v.frame(
+                r.x - progress * 8.0,
+                r.y - progress * 5.0,
+                r.w + progress * 16.0,
+                r.h + progress * 10.0,
+                color,
+            );
+            for direction in [
+                V2::new(CELL_W, 0.0),
+                V2::new(-CELL_W, 0.0),
+                V2::new(0.0, CELL_H),
+                V2::new(0.0, -CELL_H),
+            ] {
+                v.line(
+                    center + direction * progress * 0.6,
+                    center + direction * progress,
+                    1.0,
+                    color,
+                );
+            }
+        }
         for p in &game.particles {
             if p.life <= 0.0 {
                 continue;
@@ -624,6 +722,40 @@ impl Renderer {
             v.rect(end + 3.0, PADDLE_Y + 2.0, 6.0, 2.0, opacity(INK, 0.5));
             v.rect(end + 4.0, PADDLE_Y + 15.0, 4.0, 4.0, opacity(CYAN, 0.35));
         }
+        if game.anchor_charges > 0 || game.balls.iter().any(|b| b.active && b.held) {
+            v.rect(x + 15.0, PADDLE_Y - 2.0, w - 30.0, 1.0, CYAN);
+            for i in 0..3 {
+                v.rect(
+                    paddle - 8.0 + i as f32 * 7.0,
+                    PADDLE_Y + 21.0,
+                    3.0,
+                    2.0,
+                    if i < game.anchor_charges {
+                        CYAN
+                    } else {
+                        shade(CYAN, 0.18)
+                    },
+                );
+            }
+        }
+        if game.wide_time > 0.0 {
+            v.rect(
+                x,
+                PADDLE_Y + 27.0,
+                w * (game.wide_time / 14.0).min(1.0),
+                1.0,
+                power_color(Power::Wide),
+            );
+        }
+        if game.slow_time > 0.0 {
+            v.rect(
+                x,
+                PADDLE_Y + 30.0,
+                w * (game.slow_time / 12.0).min(1.0),
+                1.0,
+                AMBER,
+            );
+        }
         if self.paddle_flash > 0.0 {
             v.rect(x, PADDLE_Y, w, 14.0, opacity(INK, self.paddle_flash * 4.0));
         }
@@ -633,14 +765,48 @@ impl Renderer {
             if !ball.active {
                 continue;
             }
-            for n in (0..self.trail_len[i]).rev() {
+            if ball.held {
+                let mut point = ball.pos;
+                let mut direction = ball.velocity.normalized();
+                for n in 1..=10 {
+                    point += direction * 12.0;
+                    if point.x < LEFT + RADIUS {
+                        point.x = 2.0 * (LEFT + RADIUS) - point.x;
+                        direction.x = -direction.x;
+                    }
+                    if point.x > RIGHT - RADIUS {
+                        point.x = 2.0 * (RIGHT - RADIUS) - point.x;
+                        direction.x = -direction.x;
+                    }
+                    v.circle(point, 1.0, opacity(CYAN, 0.55 - n as f32 * 0.035));
+                }
+            }
+            let color = if ball.phase_hits > 0 {
+                PALETTE[5]
+            } else {
+                CYAN
+            };
+            for n in (0..if ball.held { 0 } else { self.trail_len[i] }).rev() {
                 let index = (self.cursor + 12 - 1 - n) % 12;
-                let c = opacity(CYAN, 0.28 * (1.0 - n as f32 / 12.0));
+                let c = opacity(color, 0.28 * (1.0 - n as f32 / 12.0));
                 v.circle(self.trails[i][index], RADIUS * (1.0 - n as f32 / 15.0), c);
             }
-            let pos = ball.previous.lerp(ball.pos, alpha);
-            v.circle(pos, 15.0, opacity(CYAN, 0.035));
-            v.circle(pos, 10.0, opacity(CYAN, 0.12));
+            let pos = if ball.held {
+                ball.pos
+            } else {
+                ball.previous.lerp(ball.pos, alpha)
+            };
+            v.circle(pos, 15.0, opacity(color, 0.035));
+            v.circle(pos, 10.0, opacity(color, 0.20));
+            for n in 0..ball.phase_hits {
+                v.rect(
+                    pos.x - (f32::from(ball.phase_hits) * 4.0 - 2.0) / 2.0 + f32::from(n) * 4.0,
+                    pos.y + 13.0,
+                    2.0,
+                    2.0,
+                    color,
+                );
+            }
             v.circle(pos, RADIUS, INK);
             v.rect(pos.x - 3.0, pos.y - 3.0, 3.0, 3.0, WHITE);
         }
@@ -786,7 +952,11 @@ impl Renderer {
                             7.0,
                             4.0,
                             if unlocked {
-                                shade(sector_color(row, level.chapter), 0.8)
+                                if hp == b'R' {
+                                    AMBER
+                                } else {
+                                    shade(sector_color(row, level.chapter), 0.8)
+                                }
                             } else {
                                 shade(DIM, 0.16)
                             },
@@ -923,5 +1093,7 @@ fn power_color(power: Power) -> Color {
         Power::Wide => PALETTE[3],
         Power::Slow => AMBER,
         Power::Multi => PALETTE[6],
+        Power::Anchor => CYAN,
+        Power::Phase => PALETTE[5],
     }
 }

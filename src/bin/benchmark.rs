@@ -40,18 +40,40 @@ unsafe impl GlobalAlloc for CountingAllocator {
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
-fn setup(stress: bool, level: usize) -> Game {
+fn setup(stress: bool, relays: bool, level: usize) -> Game {
     let mut g = Game::at(level, Mode::Journey);
     g.step(&Input {
         launch: true,
         ..Default::default()
     });
+    if relays {
+        g.bricks.fill(1);
+        g.cores.fill(true);
+        g.remaining = ROWS * COLS;
+        g.initial_bricks = g.remaining;
+        for power in [
+            Power::Anchor,
+            Power::Phase,
+            Power::Wide,
+            Power::Slow,
+            Power::Multi,
+        ] {
+            g.apply_power(power);
+        }
+    }
     if stress {
         for (i, b) in g.balls.iter_mut().enumerate() {
             b.active = true;
             b.pos = V2::new(240.0 + i as f32 * 160.0, 460.0);
             b.previous = b.pos;
             b.velocity = V2::new(0.34 + i as f32 * 0.18, -0.8).normalized() * 12000.0;
+        }
+        if relays {
+            // Exercise an actual catch/release before the upward balls ignite
+            // the board; this fast scenario clears before capsules can fall.
+            g.balls[0].pos = V2::new(WIDTH / 2.0, PADDLE_Y - RADIUS - 1.0);
+            g.balls[0].previous = g.balls[0].pos;
+            g.balls[0].velocity = V2::new(0.0, 12000.0);
         }
         g.particles.fill(Particle {
             pos: V2::new(400.0, 400.0),
@@ -70,14 +92,17 @@ fn setup(stress: bool, level: usize) -> Game {
     g
 }
 
-fn run(stress: bool) {
+fn run(stress: bool, relays: bool) {
     const BATCH: usize = 64;
     const BATCHES: usize = 4096;
-    let mut game = setup(stress, 0);
+    let mut game = setup(stress, relays, 0);
     let mut samples = Vec::with_capacity(BATCHES);
     let mut score = 0_u64;
     let mut caps = 0_u64;
     let mut impacts = 0_u64;
+    let mut chain_ticks = 0_u64;
+    let mut phase_hits = 0_u64;
+    let mut catches = 0_u64;
     let mut level_mask = 0_u16;
     let mut tick = 0;
     ALLOCATIONS.store(0, Ordering::Relaxed);
@@ -91,7 +116,7 @@ fn run(stress: bool) {
             {
                 score += u64::from(game.score);
                 caps += game.collision_caps;
-                game = setup(stress, (tick / 20000) % LEVEL_COUNT);
+                game = setup(stress, relays, (tick / 20000) % LEVEL_COUNT);
             }
             level_mask |= 1 << game.level;
             if stress {
@@ -104,6 +129,7 @@ fn run(stress: bool) {
                             previous: pos,
                             velocity: V2::new(0.4, -0.8),
                             active: true,
+                            ..Ball::default()
                         };
                     }
                     ball.velocity = ball.velocity.normalized() * 12000.0;
@@ -112,7 +138,17 @@ fn run(stress: bool) {
                     if !drop.active {
                         *drop = Drop {
                             pos: V2::new(120.0 + i as f32 * 60.0, 300.0),
-                            power: Power::Multi,
+                            power: if relays {
+                                [
+                                    Power::Multi,
+                                    Power::Anchor,
+                                    Power::Phase,
+                                    Power::Wide,
+                                    Power::Slow,
+                                ][i % 5]
+                            } else {
+                                Power::Multi
+                            },
                             active: true,
                         };
                     }
@@ -130,6 +166,9 @@ fn run(stress: bool) {
                 ..Default::default()
             }));
             impacts += u64::from(game.events.brick);
+            chain_ticks += u64::from(game.events.relay);
+            phase_hits += u64::from(game.events.phase_hit);
+            catches += u64::from(game.events.caught);
             if stress {
                 for p in &mut game.particles {
                     p.life = 1.0;
@@ -148,7 +187,9 @@ fn run(stress: bool) {
     let mean = samples.iter().sum::<f64>() / samples.len() as f64;
     println!(
         "{}: {} ticks, mean {:.3} us/tick, batch p95 {:.3}, p99 {:.3} us/tick",
-        if stress {
+        if relays {
+            "Relay stress (84 cores, 3 fast balls, all five powers, full pools)"
+        } else if stress {
             "Stress (3 balls @ 12k px/s, 384 particles, 12 drops)"
         } else {
             "Gameplay (autopaddle, all levels)"
@@ -161,6 +202,13 @@ fn run(stress: bool) {
     println!(
         "  allocations {allocations}, collision caps {caps}, brick impact ticks {impacts}, score checksum {score}, level mask {level_mask:012b}"
     );
+    println!("  relay ticks {chain_ticks}, phase hits {phase_hits}, anchor catches {catches}");
+    if relays {
+        assert!(
+            chain_ticks > 100 && phase_hits > 100 && catches > 0,
+            "Exercise every new mechanic"
+        );
+    }
     assert_eq!(allocations, 0, "Simulation allocated on the heap");
     assert_eq!(caps, 0, "Collision budget exhausted");
     assert!(impacts > 100, "Benchmark must exercise real collisions");
@@ -175,6 +223,7 @@ fn run(stress: bool) {
 
 fn main() {
     println!("ARKONK headless simulation benchmark (batch percentiles; excludes graphics/audio)");
-    run(false);
-    run(true);
+    run(false, false);
+    run(true, false);
+    run(true, true);
 }

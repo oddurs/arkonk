@@ -23,3 +23,6 @@ jobs:
       - run: cargo test --locked --all-targets
       - run: cargo build --locked --release
       - run: cargo run --locked --release --bin benchmark
+      - name: Package native Mac app
+        if: runner.os == 'macOS'
+        run: ./scripts/build-macos.sh

@@ -22,6 +22,18 @@ cd arkonk
 cargo run --locked --release
 ```
 
+For a native macOS app launch:
+
+```sh
+./scripts/build-macos.sh
+open target/ARKONK.app
+```
+
+This builds a local app bundle with a development signature and
+[Game Mode support](https://developer.apple.com/documentation/bundleresources/information-property-list/lssupportsgamemode)
+metadata. Distribution signing/notarization remains release work. The bundle is
+built for the current Mac architecture.
+
 No downloaded assets or working-directory-dependent resource files are needed.
 The original 5×7 pixel alphabet is packed into an atlas at startup; artwork is
 drawn with native geometry, and sounds are synthesized and decoded once.
@@ -49,11 +61,37 @@ sudo apt-get install libasound2-dev libx11-dev libxi-dev libgl1-mesa-dev
 
 Keyboard input takes control until the mouse moves again. Hit the ball with the
 paddle's edges to steer it; a centered hit sends it straight up. Catch falling
-capsules: **W** widens the paddle for 14 seconds, **S** slows all balls for 12
-seconds, and **M** splits the ball up to a maximum of three. A life is lost only
-when the last active ball drains. Power-up drops have a bounded dry spell, ball
-speed rises gently through a rally, and rare angle corrections prevent long,
-flat or perfectly vertical stalls. Leaving the window pauses play automatically.
+capsules:
+
+| Capsule | Effect |
+| --- | --- |
+| **W — Wide** | A wider paddle for 14 seconds. |
+| **S — Slow** | Slower balls for 12 seconds. |
+| **M — Multi** | Split into up to three balls. |
+| **A — Anchor** | Three sticky catches. Reposition, then click or press Space to release. |
+| **P — Phase** | Each ball passes through its next three brick contacts, damaging each. |
+
+Anchor holds one ball at a time while the others keep moving. It has no release
+timer; the sector clock keeps running. Powers combine: a held ball keeps its
+Phase contacts, and Multi can launch two balls while the original stays held.
+Wide/Slow have small timer lines under the paddle, Anchor has three charge pips,
+and Phase has three marks beneath each ball. A life is lost only when the last
+active ball drains.
+
+Amber diamond **relay cores** damage their four adjacent bricks when destroyed.
+Connected cores chain in short, staggered pulses; armored bricks absorb one hit
+per pulse. Committed chains finish even if the last ball drains, so a final
+explosion can still clear the sector. Chain damage cannot spawn a shower of capsules.
+
+Each sector introduces a chosen opening capsule after two direct brick breaks;
+later drops have a bounded dry spell and unlock gradually across the journey.
+The layouts progress from isolated cores to branching chains and armored pockets.
+If the last two bricks have stalled a single-ball rally for twelve seconds, one
+Anchor catch becomes available to aim the finish. Ball speed rises gently through
+a rally, and rare angle corrections prevent flat or perfectly vertical stalls.
+Leaving the window pauses play automatically.
+
+[Anchor with combined powers](docs/anchor.png) · [Relay ignition](docs/relay.png)
 
 ## Your journey
 
@@ -85,7 +123,8 @@ No account, network connection, or asset download is used during play.
 
 ## CRT presentation
 
-The scene renders into one fixed 960×900 buffer. A single five-tap shader adds
+macOS uses native Metal; Windows and Linux use OpenGL. The scene renders into
+one fixed 960×900 buffer. A single five-tap shader adds
 restrained phosphor bloom, scanlines, an RGB grille, curved glass, edge shading,
 and faint grain. Scanlines fade at smaller window sizes. Mouse coordinates use
 the same curvature mapping as the screen, keeping paddle control aligned.
@@ -100,7 +139,9 @@ cargo run --locked --release -- --no-crt
 
 ## Performance
 
-- Fixed 240 Hz simulation, interpolated balls, and VSync requested.
+- Fixed 240 Hz simulation driven by a monotonic clock, interpolated balls, and
+  display-paced presentation. macOS uses one display-link cadence rather than
+  combining it with another Metal swap wait.
 - Direct mouse tracking; the paddle renders at its latest position for lower latency.
 - At most sixteen catch-up ticks per frame; discarded ticks appear in the overlay.
 - Large stalls pause play instead of fast-forwarding into a lost life.
@@ -111,6 +152,11 @@ cargo run --locked --release -- --no-crt
 - Eight collision resolutions per ball per tick. If exhausted, the ball stays
   at its last safe position; it never advances unchecked through bricks.
 - Single-threaded simulation and batched geometry through Macroquad.
+- macOS Metal uses two fenced frame slots instead of waiting for GPU completion
+  after every submission; vertex, index, and uniform storage are safe to reuse.
+- Foreground macOS input/render work uses interactive thread priority; background
+  windows use utility priority and normal play pauses on focus loss.
+- Relay propagation, sticky catches, Phase contacts, and effects use fixed arrays.
 - Reused text buffers; no heap allocation in simulation updates.
 
 Run the headless benchmark:
@@ -123,8 +169,9 @@ Measured on an **Apple M4 Pro, arm64, Rust 1.98.1**, release profile:
 
 | Scenario | Mean / tick | Batch p95 / tick | Batch p99 / tick | Heap allocations |
 | --- | ---: | ---: | ---: | ---: |
-| Autopaddle gameplay across all twelve sectors | 0.141 µs | 0.174 µs | 0.196 µs | 0 |
-| Three balls at 12,000 px/s, full particle/drop pools | 0.367 µs | 0.449 µs | 0.581 µs | 0 |
+| Autopaddle gameplay across all twelve sectors | 0.207 µs | 0.254 µs | 0.298 µs | 0 |
+| Three balls at 12,000 px/s, full particle/drop pools | 0.446 µs | 0.517 µs | 0.586 µs | 0 |
+| 84 connected cores, all five powers, full effects pools | 0.507 µs | 0.585 µs | 0.651 µs | 0 |
 
 Each scenario measures 262,144 ticks in batches of 64. Times include benchmark
 control and pool replenishment, but exclude graphics and audio. Percentiles are
@@ -136,15 +183,48 @@ by hardware and load.
 
 F3 shows recent frame-time p95/p99, simulation time, CPU draw preparation time,
 discarded ticks, and collision-budget counts. Draw timing excludes GPU execution
-and presentation; it is not a GPU benchmark. The locally verified windowed
-smoke test completes 661 frames, checking CRT rendering, title/pause/results/sector
-screens, the stats overlay, and resizing. Statistics reset after frame 300 so PNG
-captures and window resizing are excluded from the final steady-state sample.
-Local repeat runs on a 120 Hz display delivered 116–118 FPS, about 0.15–0.23 ms
-CPU draw preparation, and zero steady-state dropped ticks, with CRT on and off.
-An earlier run had substantial display pacing spikes that did not reproduce in
-the baseline comparison and repeat runs; these figures are observations, not a
-universal frame-rate guarantee. The screenshots come from the actual game.
+and presentation. Headless tick timings cannot establish smooth frame pacing.
+
+Use the separate whole-run test for that:
+
+```sh
+cargo run --locked --release -- --perf-test --effects-test
+```
+
+It warms up for 300 frames and records the next 3,600 frame intervals in a
+preallocated buffer. After exiting, it writes `target/frame-times.csv` (or
+`arkonk-frame-times.csv` in the system temporary directory for app-bundle launches)
+and reports
+p95, p99, worst frame, and counts above 16.7, 25, and 50 ms. The stress scene
+repeatedly ignites 84 connected cores with all powers and full effect pools.
+There are no screenshot writes or window resizes in this measurement. Run with
+`--no-crt` to compare the shader cost or `--opengl` on macOS to compare backends.
+Add `--fullscreen` to measure fullscreen presentation. Keep the window visible
+and focused; run graphics comparisons sequentially.
+The report counts unfocused frames and retains them in its timings so background
+throttling cannot silently produce a misleading foreground comparison.
+
+Local native-app stress results on the same M4 Pro / 120 Hz display, CRT enabled,
+3,600 measured frames per run, **zero unfocused frames**:
+
+| Presentation | Average FPS | Frame p95 | Frame p99 | Worst frame | Frames >25 ms | Dropped ticks |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Windowed | 119.7 | 9.92 ms | 12.89 ms | 19.26 ms | 0 | 0 |
+| Fullscreen | 111.4 | 13.54 ms | 16.69 ms | 23.60 ms | 0 | 0 |
+
+[Windowed trace](docs/frame-times-macos-windowed-repeat.csv) ·
+[Fullscreen trace](docs/frame-times-macos-fullscreen.csv).
+An earlier native-app windowed repeat also had no frames above 25 ms (worst 23.25
+ms). These are measured runs, not a guarantee under every system load. Fullscreen
+still has more refresh misses than windowed on this Mac; that remains a useful
+optimization target. Earlier shell-launched OpenGL traces included 50–73 ms stalls.
+
+The released Miniquad Metal path needed fixes for offscreen attachment formats,
+Retina clipping, resizing, and GPU buffer reuse. The narrow, vendored patch and its
+limits are documented in [vendor/miniquad/ARKONK.md](vendor/miniquad/ARKONK.md).
+Native desktop runtime testing on Windows/Linux, controller support, Steam
+integration, and packaging remain release work; CI build coverage is not runtime
+or Steam Deck certification.
 
 ## Development
 
@@ -158,13 +238,18 @@ cargo run --locked --release --bin arkonk -- --flow-test
 ```
 
 The smoke test opens a window, launches a ball, follows it with the paddle,
-writes `target/smoke-test.png` and presentation captures, reports frame statistics,
-and exits automatically. To compare the renderer without CRT effects, add
-`--no-crt` (that capture is written to `target/smoke-plain.png`).
+reports frame statistics,
+and exits automatically. On OpenGL it also writes `target/smoke-test.png` and
+presentation captures. Metal texture readback is not implemented by Miniquad;
+use macOS window capture for Metal screenshots. To compare without CRT effects,
+add `--no-crt`. To check Metal correctness, run the smoke/effects and flow tests
+with `MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1`; disable validation for timings.
 Both graphical checks need a desktop session and leave your saved progress alone.
 `--flow-test` drives the real menu input handlers through new journey, sector clear,
 checkpoint restore, practice, focus pause, resume, and retry, with assertions at
-transition boundaries.
+transition boundaries. It also checks sticky catches with combined powers,
+pause/resume while holding, explicit release, Phase contacts, and relay ignition.
+`--effects-test` exercises repeated full-board cascades, full pools, and resizing.
 
 `src/physics.rs` contains context-free geometry; `src/game.rs` contains the pure
 fixed-step simulation. `src/levels.rs` authors the journey, `src/profile.rs` persists it, and

@@ -18,6 +18,7 @@ pub const GRID_Y: f32 = 190.0;
 pub const CELL_W: f32 = 64.0;
 pub const CELL_H: f32 = 32.0;
 pub const MAX_BALLS: usize = 3;
+pub const RELAY_TICKS: u8 = 10; // 42 ms per hop, independent of display refresh.
 pub use crate::levels::{LEVEL_COUNT, LEVELS};
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
@@ -51,6 +52,10 @@ pub struct Ball {
     pub previous: V2,
     pub velocity: V2,
     pub active: bool,
+    pub held: bool,
+    pub held_offset: f32,
+    pub phase_hits: u8,
+    pub phase_ignore: u128,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -67,13 +72,26 @@ pub enum Power {
     Wide,
     Slow,
     Multi,
+    Anchor,
+    Phase,
 }
 impl Power {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Wide => "WIDE",
+            Self::Slow => "SLOW",
+            Self::Multi => "MULTIBALL",
+            Self::Anchor => "ANCHOR",
+            Self::Phase => "PHASE",
+        }
+    }
     pub fn label(self) -> &'static str {
         match self {
             Self::Wide => "W",
             Self::Slow => "S",
             Self::Multi => "M",
+            Self::Anchor => "A",
+            Self::Phase => "P",
         }
     }
 }
@@ -101,6 +119,9 @@ pub struct Events {
     pub pickup: bool,
     pub launch: bool,
     pub combo: u32,
+    pub caught: bool,
+    pub relay: bool,
+    pub phase_hit: bool,
 }
 
 impl Events {
@@ -113,6 +134,9 @@ impl Events {
         self.pickup |= other.pickup;
         self.launch |= other.launch;
         self.combo = self.combo.max(other.combo);
+        self.caught |= other.caught;
+        self.relay |= other.relay;
+        self.phase_hit |= other.phase_hit;
     }
 }
 
@@ -131,6 +155,16 @@ pub struct Game {
     quiet_ticks: u32,
     since_drop: u32,
     advance_requested: bool,
+    opening_collected: bool,
+    direct_breaks: u32,
+    last_brick_tick: u32,
+    finish_assist_used: bool,
+    pub anchor_charges: u8,
+    pub notice: Option<Power>,
+    pub notice_ticks: u32,
+    pub cores: [bool; ROWS * COLS],
+    pub relay_delay: [u8; ROWS * COLS],
+    pub relay_flash: [u8; ROWS * COLS],
     pub balls: [Ball; MAX_BALLS],
     pub bricks: [u8; ROWS * COLS],
     pub particles: [Particle; 384],
@@ -171,6 +205,16 @@ impl Game {
             quiet_ticks: 0,
             since_drop: 0,
             advance_requested: false,
+            opening_collected: false,
+            direct_breaks: 0,
+            last_brick_tick: 0,
+            finish_assist_used: false,
+            anchor_charges: 0,
+            notice: None,
+            notice_ticks: 0,
+            cores: [false; ROWS * COLS],
+            relay_delay: [0; ROWS * COLS],
+            relay_flash: [0; ROWS * COLS],
             balls: [Ball::default(); MAX_BALLS],
             bricks: [0; ROWS * COLS],
             particles: [Particle::default(); 384],
@@ -220,6 +264,13 @@ impl Game {
 
     fn load_level(&mut self) {
         self.bricks = crate::levels::layout(self.level);
+        self.cores = crate::levels::cores(self.level);
+        self.relay_delay.fill(0);
+        self.relay_flash.fill(0);
+        self.opening_collected = false;
+        self.direct_breaks = 0;
+        self.last_brick_tick = 0;
+        self.finish_assist_used = false;
         self.remaining = self.bricks.iter().filter(|&&hp| hp > 0).count();
         self.initial_bricks = self.remaining;
         self.sector_ticks = 0;
@@ -265,6 +316,9 @@ impl Game {
         self.quiet_ticks = 0;
         self.balls = [Ball::default(); MAX_BALLS];
         self.drops = [Drop::default(); 12];
+        self.anchor_charges = 0;
+        self.notice = None;
+        self.notice_ticks = 0;
         self.wide_time = 0.0;
         self.slow_time = 0.0;
         self.paddle_width = PADDLE_WIDTH;
@@ -311,6 +365,10 @@ impl Game {
 
     pub fn step(&mut self, input: &Input) {
         self.events = Events::default();
+        self.notice_ticks = self.notice_ticks.saturating_sub(1);
+        for flash in &mut self.relay_flash {
+            *flash = flash.saturating_sub(1);
+        }
         self.phase_ticks = self.phase_ticks.saturating_add(1);
         for p in &mut self.particles {
             if p.life > 0.0 {
@@ -356,11 +414,28 @@ impl Game {
         self.sector_ticks += 1;
         self.run_ticks += 1;
         self.quiet_ticks += 1;
+        if self.remaining <= 2
+            && self.remaining > 0
+            && !self.finish_assist_used
+            && self.sector_ticks.saturating_sub(self.last_brick_tick) >= TICK_HZ * 12
+            && self.anchor_charges == 0
+            && self.balls.iter().filter(|b| b.active).count() == 1
+            && !self.balls.iter().any(|b| b.held)
+        {
+            self.anchor_charges = 1;
+            self.finish_assist_used = true;
+            self.notice = Some(Power::Anchor);
+            self.notice_ticks = TICK_HZ * 2;
+            self.events.pickup = true;
+        }
         // A gentle, infrequent correction breaks exact vertical repeats after
         // several empty rallies, without changing normal player-directed shots.
         if self.quiet_ticks > TICK_HZ * 8 {
             for ball in &mut self.balls {
-                if ball.active && ball.velocity.x.abs() < ball.velocity.length() * 0.08 {
+                if ball.active
+                    && !ball.held
+                    && ball.velocity.x.abs() < ball.velocity.length() * 0.08
+                {
                     let speed = ball.velocity.length();
                     let sign = if ball.pos.x > WIDTH / 2.0 { -1.0 } else { 1.0 };
                     ball.velocity =
@@ -383,16 +458,27 @@ impl Game {
                 ball.velocity = ball.velocity.normalized() * speed;
             }
         }
+        self.sync_held_balls();
         for index in 0..MAX_BALLS {
-            if self.balls[index].active {
-                self.move_ball(index);
+            if !self.balls[index].active {
+                continue;
             }
+            if self.balls[index].held {
+                if !input.launch {
+                    continue;
+                }
+                self.balls[index].held = false;
+                self.events.launch = true;
+            }
+            self.move_ball(index);
         }
-        if self.remaining == 0 {
+        self.advance_relays();
+        let pending_relay = self.relay_delay.iter().any(|&delay| delay > 0);
+        if self.remaining == 0 && !pending_relay {
             self.finish_sector();
             return;
         }
-        if !self.balls.iter().any(|b| b.active) {
+        if !self.balls.iter().any(|b| b.active) && !pending_relay {
             self.lives -= 1;
             self.lost_in_sector = true;
             self.events.lost = true;
@@ -404,10 +490,24 @@ impl Game {
             return;
         }
         self.update_drops();
+        self.sync_held_balls();
     }
 
     fn move_ball(&mut self, index: usize) {
         let mut ball = self.balls[index];
+        let mut ignored = ball.phase_ignore;
+        while ignored != 0 {
+            let i = ignored.trailing_zeros() as usize;
+            ignored &= ignored - 1;
+            let r = Self::brick_rect(i);
+            if ball.pos.x < r.x - RADIUS
+                || ball.pos.x > r.x + r.w + RADIUS
+                || ball.pos.y < r.y - RADIUS
+                || ball.pos.y > r.y + r.h + RADIUS
+            {
+                ball.phase_ignore &= !(1_u128 << i);
+            }
+        }
         ball.previous = ball.pos;
         let mut remaining = DT;
         let mut elapsed = 0.0;
@@ -499,6 +599,7 @@ impl Game {
                 for col in c0..=c1 {
                     let i = row as usize * COLS + col as usize;
                     if self.bricks[i] > 0
+                        && ball.phase_ignore & (1_u128 << i) == 0
                         && let Some(hit) =
                             sweep_circle(ball.pos, delta, RADIUS, Self::brick_rect(i))
                         && hit.t <= hit_t
@@ -532,6 +633,30 @@ impl Game {
                 ball.velocity = V2::new(angle.sin(), -angle.cos()) * self.speed();
                 self.combo = 0;
                 self.events.paddle = true;
+                if self.anchor_charges > 0 && !self.balls.iter().any(|b| b.active && b.held) {
+                    self.anchor_charges -= 1;
+                    ball.held = true;
+                    ball.held_offset = offset.clamp(-0.85, 0.85);
+                    let angle = ball.held_offset * 1.12;
+                    ball.velocity = V2::new(angle.sin(), -angle.cos()) * self.speed();
+                    ball.pos = V2::new(
+                        self.paddle_x + ball.held_offset * self.paddle_width / 2.0,
+                        PADDLE_Y - RADIUS - 2.0,
+                    );
+                    ball.previous = ball.pos;
+                    ball.phase_ignore = 0;
+                    self.events.caught = true;
+                    remaining = 0.0;
+                    break;
+                }
+            } else if kind == 3 && ball.phase_hits > 0 {
+                ball.phase_hits -= 1;
+                ball.phase_ignore |= 1_u128 << brick_index;
+                self.hit_brick(brick_index, ball.pos);
+                self.events.phase_hit = true;
+                // Ignore this brick until fully outside it, including when the
+                // third charge is spent inside reinforced material.
+                continue;
             } else {
                 ball.velocity = ball.velocity - normal * (2.0 * ball.velocity.dot(normal));
                 // Preserve deliberately extreme velocities used by stress tests.
@@ -552,35 +677,113 @@ impl Game {
         self.balls[index] = ball;
     }
 
+    fn sync_held_balls(&mut self) {
+        for ball in &mut self.balls {
+            if ball.active && ball.held {
+                ball.pos = V2::new(
+                    self.paddle_x + ball.held_offset * self.paddle_width / 2.0,
+                    PADDLE_Y - RADIUS - 2.0,
+                );
+                ball.previous = ball.pos;
+            }
+        }
+    }
+
     fn hit_brick(&mut self, index: usize, pos: V2) {
+        self.damage_brick(index, pos, true);
+    }
+
+    fn damage_brick(&mut self, index: usize, pos: V2, direct: bool) {
+        if self.bricks[index] == 0 {
+            return;
+        }
         self.bricks[index] -= 1;
         self.events.brick = true;
         self.quiet_ticks = 0;
-        self.burst(pos, index / COLS, 10);
+        self.last_brick_tick = self.sector_ticks;
+        self.burst(pos, index / COLS, if direct { 10 } else { 4 });
         if self.bricks[index] == 0 {
             self.remaining -= 1;
             self.combo += 1;
             self.best_combo = self.best_combo.max(self.combo);
             self.events.combo = self.combo;
             self.score += 100 + 25 * self.combo.min(8);
-            self.since_drop += 1;
-            if self.since_drop >= 7 || (self.since_drop >= 3 && self.random() < 0.18) {
-                self.since_drop = 0;
-                let power = match (self.random() * 3.0) as u32 {
-                    0 => Power::Wide,
-                    1 => Power::Slow,
-                    _ => Power::Multi,
-                };
-                if let Some(drop) = self.drops.iter_mut().find(|d| !d.active) {
-                    *drop = Drop {
-                        pos,
-                        power,
-                        active: true,
-                    };
-                }
+            if self.cores[index] {
+                self.relay_delay[index] = RELAY_TICKS;
+            }
+            // Relay damage rewards the shot without generating capsule storms.
+            if direct {
+                self.drop_from_hit(pos);
             }
         } else {
             self.score += 25;
+        }
+    }
+
+    fn drop_from_hit(&mut self, pos: V2) {
+        self.direct_breaks += 1;
+        self.since_drop += 1;
+        if self.direct_breaks == 2
+            || self.since_drop >= 7
+            || (self.since_drop >= 3 && self.random() < 0.18)
+        {
+            let power = if !self.opening_collected {
+                LEVELS[self.level].opening
+            } else {
+                let count = match self.level {
+                    0 => 2,
+                    1..=3 => 3,
+                    4..=7 => 4,
+                    _ => 5,
+                };
+                [
+                    Power::Wide,
+                    Power::Slow,
+                    Power::Anchor,
+                    Power::Multi,
+                    Power::Phase,
+                ][((self.random() * count as f32) as usize).min(count - 1)]
+            };
+            if let Some(drop) = self.drops.iter_mut().find(|d| !d.active) {
+                *drop = Drop {
+                    pos,
+                    power,
+                    active: true,
+                };
+                self.since_drop = 0;
+            }
+        }
+    }
+
+    fn advance_relays(&mut self) {
+        // Snapshot the due cells before propagation: traversal order cannot
+        // change timing, and even a full board fits this fixed queue.
+        let mut due = [false; ROWS * COLS];
+        for (index, delay) in self.relay_delay.iter_mut().enumerate() {
+            if *delay > 0 {
+                *delay -= 1;
+                due[index] = *delay == 0;
+            }
+        }
+        for (index, ready) in due.into_iter().enumerate() {
+            if !ready {
+                continue;
+            }
+            self.events.relay = true;
+            self.relay_flash[index] = 36;
+            let row = index / COLS;
+            let col = index % COLS;
+            for (valid, neighbor) in [
+                (col > 0, index.wrapping_sub(1)),
+                (col + 1 < COLS, index + 1),
+                (row > 0, index.wrapping_sub(COLS)),
+                (row + 1 < ROWS, index + COLS),
+            ] {
+                if valid {
+                    let r = Self::brick_rect(neighbor);
+                    self.damage_brick(neighbor, V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0), false);
+                }
+            }
         }
     }
 
@@ -619,10 +822,23 @@ impl Game {
         }
     }
 
-    fn apply_power(&mut self, power: Power) {
+    pub fn apply_power(&mut self, power: Power) {
         self.events.pickup = true;
+        self.notice = Some(power);
+        self.notice_ticks = TICK_HZ * 2;
+        if power == LEVELS[self.level].opening {
+            self.opening_collected = true;
+        }
         self.burst(V2::new(self.paddle_x, PADDLE_Y), 2, 24);
         match power {
+            Power::Anchor => self.anchor_charges = 3,
+            Power::Phase => {
+                for ball in &mut self.balls {
+                    if ball.active {
+                        ball.phase_hits = 3;
+                    }
+                }
+            }
             Power::Wide => {
                 self.wide_time = 14.0;
                 self.paddle_width = 174.0;
@@ -636,7 +852,13 @@ impl Game {
                 }
             }
             Power::Multi => {
-                if let Some(source) = self.balls.iter().copied().find(|b| b.active) {
+                if let Some(source) = self
+                    .balls
+                    .iter()
+                    .copied()
+                    .find(|b| b.active && !b.held)
+                    .or_else(|| self.balls.iter().copied().find(|b| b.active))
+                {
                     let mut n = 0;
                     for b in &mut self.balls {
                         if !b.active {
@@ -644,6 +866,7 @@ impl Game {
                             let (s, c) = angle.sin_cos();
                             let v = source.velocity;
                             *b = Ball {
+                                held: false,
                                 velocity: Self::keep_ball_moving(V2::new(
                                     v.x * c - v.y * s,
                                     v.x * s + v.y * c,
@@ -871,6 +1094,246 @@ mod tests {
                 dry = 0;
             }
             assert!(dry < 7);
+        }
+    }
+    fn catch_at(g: &mut Game, offset: f32) {
+        g.balls[0].pos = V2::new(g.paddle_x + offset, PADDLE_Y - RADIUS - 0.5);
+        g.balls[0].velocity = V2::new(0.0, 500.0);
+        g.step(&Input::default());
+        assert!(g.events.caught);
+        assert!(g.balls[0].held);
+    }
+    #[test]
+    fn anchor_holds_without_timeout_and_releases_from_new_position() {
+        let mut g = playing();
+        g.apply_power(Power::Anchor);
+        catch_at(&mut g, 20.0);
+        assert_eq!(g.anchor_charges, 2);
+        let direction = g.balls[0].velocity.normalized();
+        for _ in 0..TICK_HZ * 15 {
+            g.step(&Input {
+                mouse_x: Some(650.0),
+                ..Input::default()
+            });
+        }
+        assert!(g.balls[0].held);
+        assert_eq!(g.anchor_charges, 2);
+        assert!((g.balls[0].pos.x - 670.0).abs() < 0.01);
+        assert_eq!(g.balls[0].previous, g.balls[0].pos);
+        assert!(g.sector_ticks >= TICK_HZ * 15); // Thinking time counts for Swift.
+        g.step(&Input {
+            launch: true,
+            ..Input::default()
+        });
+        assert!(!g.balls[0].held);
+        assert!(g.events.launch);
+        assert!(g.balls[0].pos.y < PADDLE_Y - RADIUS - 2.0);
+        assert!((g.balls[0].velocity.normalized().x - direction.x).abs() < 0.001);
+    }
+    #[test]
+    fn power_combinations_preserve_the_held_ball_and_its_life() {
+        let mut g = playing();
+        g.apply_power(Power::Anchor);
+        catch_at(&mut g, 30.0);
+        g.apply_power(Power::Phase);
+        g.apply_power(Power::Wide);
+        g.apply_power(Power::Slow);
+        g.apply_power(Power::Multi);
+        g.apply_power(Power::Anchor);
+        assert_eq!(g.anchor_charges, 3);
+        assert_eq!(g.balls.iter().filter(|b| b.active).count(), 3);
+        assert_eq!(g.balls.iter().filter(|b| b.held).count(), 1);
+        for b in &g.balls {
+            assert_eq!(b.phase_hits, 3);
+            assert!(b.velocity.y < 0.0);
+        }
+        // Two draining balls must not consume a life while one is held.
+        for ball in &mut g.balls[1..] {
+            ball.pos = V2::new(LEFT + 20.0, BOTTOM + RADIUS - 1.0);
+            ball.velocity = V2::new(0.0, 500.0);
+        }
+        g.wide_time = DT / 2.0;
+        g.slow_time = DT / 2.0;
+        g.step(&Input {
+            mouse_x: Some(RIGHT),
+            ..Input::default()
+        });
+        assert_eq!(g.lives, 3);
+        assert!(g.balls[0].held);
+        assert!(g.balls[0].pos.x <= RIGHT - RADIUS);
+        assert_eq!(g.paddle_width, PADDLE_WIDTH);
+        assert!((g.balls[0].velocity.length() - g.speed()).abs() < 0.001);
+    }
+    #[test]
+    fn anchor_catches_only_one_ball_at_a_time() {
+        let mut g = playing();
+        g.apply_power(Power::Multi);
+        g.apply_power(Power::Anchor);
+        for ball in &mut g.balls {
+            ball.pos = V2::new(g.paddle_x, PADDLE_Y - RADIUS - 0.5);
+            ball.velocity = V2::new(0.0, 500.0);
+        }
+        g.step(&Input::default());
+        assert_eq!(g.balls.iter().filter(|b| b.held).count(), 1);
+        assert_eq!(g.anchor_charges, 2);
+        assert!(
+            g.balls
+                .iter()
+                .filter(|b| !b.held)
+                .all(|b| b.velocity.y < 0.0)
+        );
+    }
+    #[test]
+    fn phase_hits_three_layers_once_each_then_normal_bounces_resume() {
+        let mut g = playing();
+        g.bricks.fill(0);
+        g.cores.fill(false);
+        for row in 0..4 {
+            g.bricks[row * COLS + 5] = 3;
+        }
+        g.remaining = 4;
+        g.apply_power(Power::Phase);
+        g.balls[0].pos = V2::new(GRID_X + 5.0 * CELL_W + 29.0, GRID_Y + 4.0 * CELL_H + 15.0);
+        g.balls[0].velocity = V2::new(0.0, -1000.0);
+        for _ in 0..45 {
+            g.step(&Input::default());
+            if g.balls[0].velocity.y > 0.0 {
+                break;
+            }
+        }
+        assert_eq!(g.balls[0].phase_hits, 0);
+        for row in 0..4 {
+            assert_eq!(g.bricks[row * COLS + 5], 2, "row {row}");
+        }
+        assert!(g.balls[0].velocity.y > 0.0);
+        assert_eq!(g.collision_caps, 0);
+    }
+    #[test]
+    fn phase_can_trigger_a_core_without_reflecting() {
+        let mut g = playing();
+        g.bricks.fill(0);
+        g.cores.fill(false);
+        g.bricks[0] = 1;
+        g.cores[0] = true;
+        g.bricks[1] = 2;
+        g.remaining = 2;
+        g.apply_power(Power::Phase);
+        g.balls[0].pos = V2::new(GRID_X + 29.0, GRID_Y + 24.0 + RADIUS + 1.0);
+        g.balls[0].velocity = V2::new(0.0, -500.0);
+        g.step(&Input::default());
+        assert_eq!(g.bricks[0], 0);
+        assert!(g.relay_delay[0] > 0);
+        assert_eq!(g.balls[0].phase_hits, 2);
+        assert!(g.balls[0].velocity.y < 0.0);
+    }
+    #[test]
+    fn relays_damage_four_neighbors_with_staggered_propagation() {
+        let mut g = playing();
+        g.bricks.fill(0);
+        g.cores.fill(false);
+        let c = 3 * COLS + 5;
+        for i in [c, c + 1, c - 1, c - COLS, c - COLS + 1] {
+            g.bricks[i] = 1;
+        }
+        g.bricks[c - 1] = 2;
+        g.remaining = 5;
+        g.cores[c] = true;
+        g.cores[c + 1] = true;
+        g.hit_brick(c, V2::default());
+        for _ in 1..RELAY_TICKS {
+            g.advance_relays();
+        }
+        assert_eq!(g.bricks[c + 1], 1);
+        g.advance_relays();
+        assert_eq!(g.bricks[c - 1], 1);
+        assert_eq!(g.bricks[c - COLS], 0);
+        assert_eq!(g.bricks[c - COLS + 1], 1); // Diagonal survives the first core.
+        assert_eq!(g.relay_delay[c + 1], RELAY_TICKS);
+        for _ in 0..RELAY_TICKS {
+            g.advance_relays();
+        }
+        assert_eq!(g.bricks[c - COLS + 1], 0);
+        assert_eq!(g.remaining, 1);
+        assert!(!g.drops.iter().any(|d| d.active));
+    }
+    #[test]
+    fn relay_neighbors_do_not_wrap_between_rows() {
+        let mut g = playing();
+        g.bricks.fill(0);
+        g.cores.fill(false);
+        g.bricks[COLS - 1] = 1;
+        g.cores[COLS - 1] = true;
+        g.bricks[COLS] = 1;
+        g.remaining = 2;
+        g.hit_brick(COLS - 1, V2::default());
+        for _ in 0..RELAY_TICKS {
+            g.advance_relays();
+        }
+        assert_eq!(g.bricks[COLS], 1);
+    }
+    #[test]
+    fn full_board_chain_finishes_even_after_last_ball_drains() {
+        let mut g = playing();
+        g.bricks.fill(1);
+        g.cores.fill(true);
+        g.remaining = ROWS * COLS;
+        g.particles.fill(Particle {
+            life: 1.0,
+            ..Particle::default()
+        });
+        g.balls.fill(Ball::default());
+        g.hit_brick(0, V2::default());
+        for _ in 0..TICK_HZ {
+            g.step(&Input::default());
+        }
+        assert_eq!(g.remaining, 0);
+        assert_eq!(g.phase, Phase::Cleared);
+        assert_eq!(g.lives, 3);
+        assert_eq!(g.score, 26500);
+        assert!(g.relay_delay.iter().all(|&d| d == 0));
+        assert_eq!(g.collision_caps, 0);
+        assert!(!g.drops.iter().any(|d| d.active));
+    }
+    #[test]
+    fn ending_assist_is_a_single_charge_and_requires_a_stalled_rally() {
+        let mut g = playing();
+        g.remaining = 2;
+        g.bricks.fill(0);
+        g.bricks[0] = 1;
+        g.bricks[COLS - 1] = 1;
+        g.sector_ticks = TICK_HZ * 12 - 2;
+        g.balls[0].pos = V2::new(480.0, 600.0);
+        g.step(&Input::default());
+        assert_eq!(g.anchor_charges, 0);
+        g.step(&Input::default());
+        assert_eq!(g.anchor_charges, 1);
+        assert!(g.finish_assist_used);
+        g.anchor_charges = 0;
+        g.sector_ticks += TICK_HZ * 12;
+        g.step(&Input::default());
+        assert_eq!(g.anchor_charges, 0);
+    }
+    #[test]
+    fn opening_drops_teach_the_sector_and_random_drops_follow_unlocks() {
+        for (level, definition) in LEVELS.iter().enumerate() {
+            let mut g = Game::at(level, Mode::Practice);
+            g.cores.fill(false);
+            g.bricks.fill(1);
+            g.remaining = ROWS * COLS;
+            g.hit_brick(0, V2::default());
+            assert!(!g.drops.iter().any(|d| d.active));
+            g.hit_brick(1, V2::default());
+            assert_eq!(g.drops[0].power, definition.opening);
+            g.apply_power(definition.opening);
+            for i in 2..ROWS * COLS {
+                g.drops.fill(Drop::default());
+                g.hit_brick(i, V2::default());
+                for d in g.drops.iter().filter(|d| d.active) {
+                    assert!(d.power != Power::Anchor || level >= 1);
+                    assert!(d.power != Power::Multi || level >= 4);
+                    assert!(d.power != Power::Phase || level >= 8);
+                }
+            }
         }
     }
     #[test]
