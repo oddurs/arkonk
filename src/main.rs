@@ -55,6 +55,9 @@ impl Default for Focus {
     fn default() -> Self {
         Self {
             lost: false,
+            #[cfg(target_os = "macos")]
+            focused: miniquad::native::macos::window_has_focus(),
+            #[cfg(not(target_os = "macos"))]
             focused: true,
         }
     }

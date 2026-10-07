@@ -140,8 +140,8 @@ cargo run --locked --release -- --no-crt
 ## Performance
 
 - Fixed 240 Hz simulation driven by a monotonic clock, interpolated balls, and
-  display-paced presentation. macOS uses one display-link cadence rather than
-  combining it with another Metal swap wait.
+  display-paced presentation. macOS schedules work with CVDisplayLink and keeps
+  Metal display synchronization enabled.
 - Direct mouse tracking; the paddle renders at its latest position for lower latency.
 - At most sixteen catch-up ticks per frame; discarded ticks appear in the overlay.
 - Large stalls pause play instead of fast-forwarding into a lost life.
@@ -204,20 +204,11 @@ and focused; run graphics comparisons sequentially.
 The report counts unfocused frames and retains them in its timings so background
 throttling cannot silently produce a misleading foreground comparison.
 
-Local native-app stress results on the same M4 Pro / 120 Hz display, CRT enabled,
-3,600 measured frames per run, **zero unfocused frames**:
-
-| Presentation | Average FPS | Frame p95 | Frame p99 | Worst frame | Frames >25 ms | Dropped ticks |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Windowed | 119.7 | 9.92 ms | 12.89 ms | 19.26 ms | 0 | 0 |
-| Fullscreen | 111.4 | 13.54 ms | 16.69 ms | 23.60 ms | 0 | 0 |
-
-[Windowed trace](docs/frame-times-macos-windowed-repeat.csv) ·
-[Fullscreen trace](docs/frame-times-macos-fullscreen.csv).
-An earlier native-app windowed repeat also had no frames above 25 ms (worst 23.25
-ms). These are measured runs, not a guarantee under every system load. Fullscreen
-still has more refresh misses than windowed on this Mac; that remains a useful
-optimization target. Earlier shell-launched OpenGL traces included 50–73 ms stalls.
+Use a focused run to assess foreground pacing. Background/space-transition
+frames are retained in the trace and flagged; those runs are diagnostic data,
+not a foreground performance acceptance result. Metal display synchronization
+stays enabled to preserve presentation quality. Validate the feel on the actual
+window/fullscreen setup before treating frame pacing as finished.
 
 The released Miniquad Metal path needed fixes for offscreen attachment formats,
 Retina clipping, resizing, and GPU buffer reuse. The narrow, vendored patch and its

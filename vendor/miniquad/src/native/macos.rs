@@ -977,6 +977,19 @@ pub fn define_metal_view_class() -> *const Class {
     decl.register()
 }
 
+/// Initial focus state for diagnostics registered after window creation.
+/// Call on the window thread, like other AppKit window operations.
+pub fn window_has_focus() -> bool {
+    let view = native_display().lock().unwrap().view;
+    if view.is_null() {
+        return false;
+    }
+    unsafe {
+        let window: ObjcId = msg_send![view, window];
+        msg_send![window, isKeyWindow]
+    }
+}
+
 fn get_window_payload(this: &Object) -> &mut MacosDisplay {
     unsafe {
         let ptr: *mut c_void = *this.get_ivar("display_ptr");
@@ -1467,13 +1480,8 @@ where
     } else {
         FramePacer::new()
     };
-    // CVDisplayLink already paces submissions. A second display wait in
-    // CAMetalLayer can turn a late frame into another missed refresh.
-    // Preserve layer VSync as the fallback if the display link is unavailable.
-    if conf.platform.apple_gfx_api == AppleGfxApi::Metal {
-        let layer: ObjcId = msg_send![view, layer];
-        let () = msg_send![layer, setDisplaySyncEnabled: frame_pacer.is_none()];
-    }
+    // CVDisplayLink paces CPU submissions; keep CAMetalLayer's default display
+    // synchronization enabled so presentation cannot tear between refreshes.
     let mut done = false;
     while !(done || crate::native_display().lock().unwrap().quit_ordered) {
 

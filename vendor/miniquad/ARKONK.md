@@ -1,6 +1,7 @@
 # ARKONK macOS backend patch
 
-Base: crates.io `miniquad` **0.4.11**, unchanged public API. Upstream:
+Base: crates.io `miniquad` **0.4.11**, unchanged rendering API.
+One macOS focus-query helper initializes diagnostics accurately after startup. Upstream:
 https://github.com/not-fl3/miniquad . Both original licenses are included.
 Only the Apple graphics backend and one unused-function annotation differ;
 Windows/Linux retain the released backend implementation.
@@ -27,9 +28,10 @@ command buffer guards each slot; its completion is awaited only before reuse.
 The frame index advances once per submission, not once per uniform upload.
 This removes the unconditional GPU completion wait at the end of every frame
 without racing CPU writes against GPU reads or adding an unbounded frame queue.
-CVDisplayLink provides the display cadence. The redundant CAMetalLayer display
-wait is disabled when that link is available, with layer VSync retained as a
-fallback if display-link creation fails. There is no free-running render loop.
+CVDisplayLink provides the CPU cadence. CAMetalLayer retains its default display
+synchronization: disabling that property can introduce tearing even with a paced
+CPU loop ([Apple documentation](https://developer.apple.com/documentation/quartzcore/cametallayer/displaysyncenabled)).
+There is no free-running render loop.
 
 The total vertex/index buffer allocation is unchanged; uniform storage is reduced
 from three buffers to two. A guard catches exhausting a slot's rotation budget.
