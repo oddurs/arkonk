@@ -6,11 +6,21 @@ use crate::{
     },
     geom::{Rect, V2, sweep_circle_rect},
     sectors::SectorId,
+    tuning::*,
 };
 
-pub const PADDLE_WIDTH: f32 = 118.0;
-pub const MAX_BALLS: usize = 3;
-pub const RELAY_TICKS: u8 = 10; // 42 ms per hop, independent of display refresh.
+/// Particles alive at once; the oldest is overwritten first.
+const PARTICLES: usize = 384;
+/// Particles from a direct brick hit.
+const BURST_DIRECT: usize = 10;
+/// Particles from a relay blast.
+const BURST_RELAY: usize = 4;
+/// Particles from a capsule pickup.
+const BURST_PICKUP: usize = 24;
+/// How long a picked-up power's name stays on screen.
+const NOTICE_TICKS: u32 = TICK_HZ * 2;
+/// How long a relay blast's ring is drawn.
+const RELAY_FLASH_TICKS: u8 = 36;
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum Mode {
@@ -158,8 +168,8 @@ pub struct Game {
     pub relay_flash: [u8; CELLS],
     pub balls: [Ball; MAX_BALLS],
     pub bricks: [u8; CELLS],
-    pub particles: [Particle; 384],
-    pub drops: [Drop; 12],
+    pub particles: [Particle; PARTICLES],
+    pub drops: [Drop; MAX_DROPS],
     pub paddle_x: f32,
     pub paddle_previous: f32,
     pub paddle_width: f32,
@@ -208,20 +218,20 @@ impl Game {
             relay_flash: [0; CELLS],
             balls: [Ball::default(); MAX_BALLS],
             bricks: [0; CELLS],
-            particles: [Particle::default(); 384],
-            drops: [Drop::default(); 12],
+            particles: [Particle::default(); PARTICLES],
+            drops: [Drop::default(); MAX_DROPS],
             paddle_x: FIELD.center().x,
             paddle_previous: FIELD.center().x,
             paddle_width: PADDLE_WIDTH,
             score: 0,
-            lives: 3,
+            lives: START_LIVES,
             sector: SectorId::FIRST,
             remaining: 0,
             wide_time: 0.0,
             slow_time: 0.0,
             events: Events::default(),
             collision_caps: 0,
-            random: 0x51f15e77,
+            random: RNG_SEED,
             particle_cursor: 0,
             combo: 0,
         };
@@ -269,10 +279,10 @@ impl Game {
     fn finish_sector(&mut self) {
         let clean = !self.lost_in_sector;
         let swift = self.sector_ticks <= self.sector.sector().par_seconds * TICK_HZ;
-        let bonus = 1000 + u32::from(clean) * 500 + u32::from(swift) * 500;
+        let bonus = CLEAR_BONUS + u32::from(clean) * MEDAL_BONUS + u32::from(swift) * MEDAL_BONUS;
         let life_earned = self.mode == Mode::Journey
             && (self.sector.index() + 1).is_multiple_of(4)
-            && self.lives < 5;
+            && self.lives < MAX_LIVES;
         if life_earned {
             self.lives += 1;
         }
@@ -301,7 +311,7 @@ impl Game {
         self.rally_hits = 0;
         self.quiet_ticks = 0;
         self.balls = [Ball::default(); MAX_BALLS];
-        self.drops = [Drop::default(); 12];
+        self.drops = [Drop::default(); MAX_DROPS];
         self.anchor_charges = 0;
         self.notice = None;
         self.notice_ticks = 0;
@@ -313,7 +323,7 @@ impl Game {
             .clamp(LEFT + PADDLE_WIDTH / 2.0, RIGHT - PADDLE_WIDTH / 2.0);
         self.paddle_previous = self.paddle_x;
         self.combo = 0;
-        let pos = V2::new(self.paddle_x, PADDLE_Y - RADIUS - 2.0);
+        let pos = V2::new(self.paddle_x, PADDLE_Y - RADIUS - SERVE_GAP);
         self.balls[0] = Ball {
             pos,
             previous: pos,
@@ -323,17 +333,21 @@ impl Game {
     }
 
     pub fn speed(&self) -> f32 {
-        (self.sector.sector().speed + self.rally_hits.min(20) as f32 * 4.0)
-            * if self.slow_time > 0.0 { 0.74 } else { 1.0 }
+        (self.sector.sector().speed + self.rally_hits.min(RALLY_CAP) as f32 * RALLY_SPEEDUP)
+            * if self.slow_time > 0.0 {
+                SLOW_FACTOR
+            } else {
+                1.0
+            }
     }
 
     pub fn launch_velocity(&self) -> V2 {
-        let toward_center = if self.paddle_x > FIELD.center().x + 40.0 {
+        let toward_center = if self.paddle_x > FIELD.center().x + LAUNCH_CENTER_BIAS {
             -1.0
         } else {
             1.0
         };
-        V2::new(0.30 * toward_center, -0.954).normalized() * self.speed()
+        V2::new(LAUNCH_DIR.x * toward_center, LAUNCH_DIR.y).normalized() * self.speed()
     }
 
     fn keep_ball_moving(velocity: V2) -> V2 {
@@ -342,8 +356,8 @@ impl Game {
             return velocity;
         }
         let mut direction = velocity * (1.0 / speed);
-        if direction.y.abs() < 0.24 {
-            direction.y = 0.24 * if direction.y < 0.0 { -1.0 } else { 1.0 };
+        if direction.y.abs() < MIN_VERTICAL {
+            direction.y = MIN_VERTICAL * if direction.y < 0.0 { -1.0 } else { 1.0 };
             direction.x = (1.0 - direction.y * direction.y).sqrt() * direction.x.signum();
         }
         direction * speed
@@ -370,7 +384,7 @@ impl Game {
             self.advance_requested |= input.launch;
             if self.mode == Mode::Journey
                 && self.advance_requested
-                && self.phase_ticks >= TICK_HZ / 2
+                && self.phase_ticks >= ADVANCE_DELAY_TICKS
                 && let Some(next) = self.sector.next()
             {
                 self.sector = next;
@@ -381,14 +395,14 @@ impl Game {
         self.paddle_previous = self.paddle_x;
         let target = input
             .mouse_x
-            .unwrap_or(self.paddle_x + input.axis * 980.0 * DT);
+            .unwrap_or(self.paddle_x + input.axis * KEYBOARD_SPEED * DT);
         self.paddle_x = target;
         self.paddle_x = self.paddle_x.clamp(
             LEFT + self.paddle_width / 2.0,
             RIGHT - self.paddle_width / 2.0,
         );
         if self.phase == Phase::Ready {
-            let pos = V2::new(self.paddle_x, PADDLE_Y - RADIUS - 2.0);
+            let pos = V2::new(self.paddle_x, PADDLE_Y - RADIUS - SERVE_GAP);
             self.balls[0].pos = pos;
             self.balls[0].previous = pos;
             if input.launch {
@@ -401,10 +415,10 @@ impl Game {
         self.sector_ticks += 1;
         self.run_ticks += 1;
         self.quiet_ticks += 1;
-        if self.remaining <= 2
+        if self.remaining <= ASSIST_BRICKS
             && self.remaining > 0
             && !self.finish_assist_used
-            && self.sector_ticks.saturating_sub(self.last_brick_tick) >= TICK_HZ * 12
+            && self.sector_ticks.saturating_sub(self.last_brick_tick) >= ASSIST_STALL_TICKS
             && self.anchor_charges == 0
             && self.balls.iter().filter(|b| b.active).count() == 1
             && !self.balls.iter().any(|b| b.held)
@@ -412,16 +426,16 @@ impl Game {
             self.anchor_charges = 1;
             self.finish_assist_used = true;
             self.notice = Some(Power::Anchor);
-            self.notice_ticks = TICK_HZ * 2;
+            self.notice_ticks = NOTICE_TICKS;
             self.events.pickup = true;
         }
         // A gentle, infrequent correction breaks exact vertical repeats after
         // several empty rallies, without changing normal player-directed shots.
-        if self.quiet_ticks > TICK_HZ * 8 {
+        if self.quiet_ticks > ANTI_STALL_TICKS {
             for ball in &mut self.balls {
                 if ball.active
                     && !ball.held
-                    && ball.velocity.x.abs() < ball.velocity.length() * 0.08
+                    && ball.velocity.x.abs() < ball.velocity.length() * ANTI_STALL_NEAR_VERTICAL
                 {
                     let speed = ball.velocity.length();
                     let sign = if ball.pos.x > FIELD.center().x {
@@ -429,8 +443,9 @@ impl Game {
                     } else {
                         1.0
                     };
-                    ball.velocity =
-                        V2::new(speed * 0.16 * sign, ball.velocity.y).normalized() * speed;
+                    ball.velocity = V2::new(speed * ANTI_STALL_STEER * sign, ball.velocity.y)
+                        .normalized()
+                        * speed;
                 }
             }
             self.quiet_ticks = 0;
@@ -439,7 +454,7 @@ impl Game {
         let was_slow = self.slow_time > 0.0;
         self.slow_time = (self.slow_time - DT).max(0.0);
         self.paddle_width = if self.wide_time > 0.0 {
-            174.0
+            WIDE_PADDLE_WIDTH
         } else {
             PADDLE_WIDTH
         };
@@ -505,7 +520,7 @@ impl Game {
         let mut elapsed = 0.0;
         // If a pathological tick uses the budget, keep the ball at its last safe
         // position. Never advance unchecked through geometry.
-        for _ in 0..8 {
+        for _ in 0..COLLISION_BUDGET {
             if remaining < 0.000001 {
                 break;
             }
@@ -566,7 +581,7 @@ impl Game {
                     x: self.paddle_previous + paddle_speed * elapsed - self.paddle_width / 2.0,
                     y: PADDLE_Y,
                     w: self.paddle_width,
-                    h: 14.0,
+                    h: PADDLE_HEIGHT,
                 };
                 if let Some(hit) = sweep_circle_rect(
                     ball.pos,
@@ -610,7 +625,7 @@ impl Game {
                     self.paddle_previous + (self.paddle_x - self.paddle_previous) * (elapsed / DT);
                 let offset =
                     ((ball.pos.x - paddle_at_hit) / (self.paddle_width / 2.0)).clamp(-1.0, 1.0);
-                let angle = offset * 1.12;
+                let angle = offset * MAX_BOUNCE_ANGLE;
                 self.rally_hits += 1;
                 ball.velocity = V2::new(angle.sin(), -angle.cos()) * self.speed();
                 self.combo = 0;
@@ -618,12 +633,12 @@ impl Game {
                 if self.anchor_charges > 0 && !self.balls.iter().any(|b| b.active && b.held) {
                     self.anchor_charges -= 1;
                     ball.held = true;
-                    ball.held_offset = offset.clamp(-0.85, 0.85);
-                    let angle = ball.held_offset * 1.12;
+                    ball.held_offset = offset.clamp(-HOLD_OFFSET_LIMIT, HOLD_OFFSET_LIMIT);
+                    let angle = ball.held_offset * MAX_BOUNCE_ANGLE;
                     ball.velocity = V2::new(angle.sin(), -angle.cos()) * self.speed();
                     ball.pos = V2::new(
                         self.paddle_x + ball.held_offset * self.paddle_width / 2.0,
-                        PADDLE_Y - RADIUS - 2.0,
+                        PADDLE_Y - RADIUS - SERVE_GAP,
                     );
                     ball.previous = ball.pos;
                     ball.phase_ignore = 0;
@@ -642,7 +657,7 @@ impl Game {
             } else {
                 ball.velocity = ball.velocity - normal * (2.0 * ball.velocity.dot(normal));
                 // Preserve deliberately extreme velocities used by stress tests.
-                if ball.velocity.length() < 2000.0 {
+                if ball.velocity.length() < STEEPEN_BELOW_SPEED {
                     ball.velocity = Self::keep_ball_moving(ball.velocity);
                 }
                 if kind == 3 {
@@ -651,7 +666,7 @@ impl Game {
                     self.events.wall = true;
                 }
             }
-            ball.pos += normal * 0.01;
+            ball.pos += normal * CONTACT_SKIN;
         }
         if remaining >= 0.000001 {
             self.collision_caps += 1;
@@ -664,7 +679,7 @@ impl Game {
             if ball.active && ball.held {
                 ball.pos = V2::new(
                     self.paddle_x + ball.held_offset * self.paddle_width / 2.0,
-                    PADDLE_Y - RADIUS - 2.0,
+                    PADDLE_Y - RADIUS - SERVE_GAP,
                 );
                 ball.previous = ball.pos;
             }
@@ -683,13 +698,17 @@ impl Game {
         self.events.brick = true;
         self.quiet_ticks = 0;
         self.last_brick_tick = self.sector_ticks;
-        self.burst(pos, index / COLS, if direct { 10 } else { 4 });
+        self.burst(
+            pos,
+            index / COLS,
+            if direct { BURST_DIRECT } else { BURST_RELAY },
+        );
         if self.bricks[index] == 0 {
             self.remaining -= 1;
             self.combo += 1;
             self.best_combo = self.best_combo.max(self.combo);
             self.events.combo = self.combo;
-            self.score += 100 + 25 * self.combo.min(8);
+            self.score += SCORE_BREAK + SCORE_COMBO_STEP * self.combo.min(COMBO_CAP);
             if self.cores[index] {
                 self.relay_delay[index] = RELAY_TICKS;
             }
@@ -698,33 +717,22 @@ impl Game {
                 self.drop_from_hit(pos);
             }
         } else {
-            self.score += 25;
+            self.score += SCORE_CHIP;
         }
     }
 
     fn drop_from_hit(&mut self, pos: V2) {
         self.direct_breaks += 1;
         self.since_drop += 1;
-        if self.direct_breaks == 2
-            || self.since_drop >= 7
-            || (self.since_drop >= 3 && self.random() < 0.18)
+        if self.direct_breaks == OPENING_BREAK
+            || self.since_drop >= DROP_DRY_SPELL
+            || (self.since_drop >= DROP_MIN_GAP && self.random() < DROP_CHANCE)
         {
             let power = if !self.opening_collected {
                 self.sector.sector().opening
             } else {
-                let count = match self.sector.index() {
-                    0 => 2,
-                    1..=3 => 3,
-                    4..=7 => 4,
-                    _ => 5,
-                };
-                [
-                    Power::Wide,
-                    Power::Slow,
-                    Power::Anchor,
-                    Power::Multi,
-                    Power::Phase,
-                ][((self.random() * count as f32) as usize).min(count - 1)]
+                let count = POWER_UNLOCKS[self.sector.index()];
+                DROP_ORDER[((self.random() * count as f32) as usize).min(count - 1)]
             };
             if let Some(drop) = self.drops.iter_mut().find(|d| !d.active) {
                 *drop = Drop {
@@ -752,7 +760,7 @@ impl Game {
                 continue;
             }
             self.events.relay = true;
-            self.relay_flash[index] = 36;
+            self.relay_flash[index] = RELAY_FLASH_TICKS;
             let Some(cell) = Cell::new(index) else {
                 continue;
             };
@@ -782,11 +790,11 @@ impl Game {
             if !self.drops[i].active {
                 continue;
             }
-            self.drops[i].pos.y += 155.0 * DT;
+            self.drops[i].pos.y += DROP_SPEED * DT;
             let pos = self.drops[i].pos;
-            if pos.y >= PADDLE_Y - 10.0
-                && pos.y <= PADDLE_Y + 24.0
-                && (pos.x - self.paddle_x).abs() < self.paddle_width / 2.0 + 12.0
+            if pos.y >= PADDLE_Y - CATCH_ABOVE
+                && pos.y <= PADDLE_Y + CATCH_BELOW
+                && (pos.x - self.paddle_x).abs() < self.paddle_width / 2.0 + CATCH_MARGIN
             {
                 let power = self.drops[i].power;
                 self.drops[i].active = false;
@@ -800,27 +808,30 @@ impl Game {
     pub fn apply_power(&mut self, power: Power) {
         self.events.pickup = true;
         self.notice = Some(power);
-        self.notice_ticks = TICK_HZ * 2;
+        self.notice_ticks = NOTICE_TICKS;
         if power == self.sector.sector().opening {
             self.opening_collected = true;
         }
-        self.burst(V2::new(self.paddle_x, PADDLE_Y), 2, 24);
+        self.burst(V2::new(self.paddle_x, PADDLE_Y), 2, BURST_PICKUP);
         match power {
-            Power::Anchor => self.anchor_charges = 3,
+            Power::Anchor => self.anchor_charges = ANCHOR_CHARGES,
             Power::Phase => {
                 for ball in &mut self.balls {
                     if ball.active {
-                        ball.phase_hits = 3;
+                        ball.phase_hits = PHASE_CONTACTS;
                     }
                 }
             }
             Power::Wide => {
-                self.wide_time = 14.0;
-                self.paddle_width = 174.0;
-                self.paddle_x = self.paddle_x.clamp(LEFT + 87.0, RIGHT - 87.0);
+                self.wide_time = WIDE_SECONDS;
+                self.paddle_width = WIDE_PADDLE_WIDTH;
+                self.paddle_x = self.paddle_x.clamp(
+                    LEFT + WIDE_PADDLE_WIDTH / 2.0,
+                    RIGHT - WIDE_PADDLE_WIDTH / 2.0,
+                );
             }
             Power::Slow => {
-                self.slow_time = 12.0;
+                self.slow_time = SLOW_SECONDS;
                 let speed = self.speed();
                 for b in &mut self.balls {
                     b.velocity = b.velocity.normalized() * speed;
@@ -837,7 +848,11 @@ impl Game {
                     let mut n = 0;
                     for b in &mut self.balls {
                         if !b.active {
-                            let angle: f32 = if n == 0 { -0.38 } else { 0.38 };
+                            let angle = if n == 0 {
+                                -MULTI_SPLIT_ANGLE
+                            } else {
+                                MULTI_SPLIT_ANGLE
+                            };
                             let (s, c) = angle.sin_cos();
                             let v = source.velocity;
                             *b = Ball {
@@ -1109,7 +1124,7 @@ mod tests {
         });
         assert!(!g.balls[0].held);
         assert!(g.events.launch);
-        assert!(g.balls[0].pos.y < PADDLE_Y - RADIUS - 2.0);
+        assert!(g.balls[0].pos.y < PADDLE_Y - RADIUS - SERVE_GAP);
         assert!((g.balls[0].velocity.normalized().x - direction.x).abs() < 0.001);
     }
     #[test]

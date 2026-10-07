@@ -14,6 +14,7 @@ use ark::{
     geom::V2,
     profile::Profile,
     sectors::{CHAPTERS, SECTOR_COUNT, SectorId},
+    tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
 use macroquad::models::Vertex;
 use macroquad::prelude::*;
@@ -897,14 +898,14 @@ impl Renderer {
         let paddle = game.paddle_x;
         let x = paddle - game.paddle_width / 2.0;
         let w = game.paddle_width;
-        v.rounded(x, PADDLE_Y, w, 14.0, 7.0, INK);
+        v.rounded(x, PADDLE_Y, w, PADDLE_HEIGHT, PADDLE_HEIGHT / 2.0, INK);
         // The center sends the ball straight up; the ends steer it.
         v.rounded(paddle - 9.0, PADDLE_Y + 5.0, 18.0, 4.0, 2.0, CYAN);
         if game.anchor_charges > 0 || game.balls.iter().any(|b| b.active && b.held) {
             v.rect(x + 12.0, PADDLE_Y - 3.0, w - 24.0, 1.0, CYAN);
-            for i in 0..3 {
+            for i in 0..ANCHOR_CHARGES {
                 v.circle(
-                    V2::new(paddle - 8.0 + i as f32 * 8.0, PADDLE_Y + 22.0),
+                    V2::new(paddle - 8.0 + f32::from(i) * 8.0, PADDLE_Y + 22.0),
                     2.0,
                     if i < game.anchor_charges { CYAN } else { MUTED },
                 );
@@ -914,7 +915,7 @@ impl Renderer {
             v.rect(
                 x,
                 PADDLE_Y + 28.0,
-                w * (game.wide_time / 14.0).min(1.0),
+                w * (game.wide_time / WIDE_SECONDS).min(1.0),
                 2.0,
                 power_color(Power::Wide),
             );
@@ -923,7 +924,7 @@ impl Renderer {
             v.rect(
                 x,
                 PADDLE_Y + 32.0,
-                w * (game.slow_time / 12.0).min(1.0),
+                w * (game.slow_time / SLOW_SECONDS).min(1.0),
                 2.0,
                 power_color(Power::Slow),
             );

@@ -18,12 +18,13 @@ mod steam;
 mod ui;
 
 use ark::{
-    clock::{FixedClock, TICK_HZ},
+    clock::FixedClock,
     field::{BOTTOM, FIELD, LEFT, RIGHT, TOP},
     game::*,
     geom::V2,
     profile::{Origin, Profile},
     sectors::SectorId,
+    tuning::ADVANCE_DELAY_TICKS,
 };
 use audio::Audio;
 use input::{Device, Gamepads};
@@ -457,7 +458,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     }
                 } else if !changed && game.phase == Phase::Cleared {
                     let next = confirm || (click && ui::next_rect().contains(pointer));
-                    if next && game.phase_ticks >= TICK_HZ / 2 {
+                    if next && game.phase_ticks >= ADVANCE_DELAY_TICKS {
                         if game.mode == Mode::Practice {
                             ui.screen = Screen::Sectors;
                             ui.sector = game.sector;

@@ -5,12 +5,12 @@ use crate::{
     ui::{Controls, Screen, Ui},
 };
 use ark::{
-    clock::TICK_HZ,
     field::{BALL_RADIUS as RADIUS, CELLS, Cell, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
     game::*,
     geom::V2,
     profile::Profile,
     sectors::SectorId,
+    tuning::ADVANCE_DELAY_TICKS,
 };
 use macroquad::prelude::{request_new_screen_size, screen_dpi_scale, screen_height, screen_width};
 pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls {
@@ -52,7 +52,7 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
             assert_eq!(game.phase, Phase::Cleared);
             assert!(profile.unlocked >= 2);
             assert_eq!(profile.checkpoint.unwrap().sector.index(), 1);
-            game.phase_ticks = TICK_HZ / 2;
+            game.phase_ticks = ADVANCE_DELAY_TICKS;
         }
         26 => keys.focus_lost = true,
         27 => assert!(ui.paused),
