@@ -379,6 +379,8 @@ impl Game {
         }
     }
 
+    /// A tick of play: timers, assists, every ball, relays, then the
+    /// sector's end, a lost life, or falling capsules.
     fn step_playing(&mut self, launch: bool) {
         self.sector_ticks += 1;
         self.run_ticks += 1;
@@ -421,6 +423,7 @@ impl Game {
         }
     }
 
+    /// Sets up `self.sector` from its layout, ready to serve.
     fn load_sector(&mut self) {
         self.board = Board::new(&self.sector.sector().layout);
         self.director = DropDirector::new();
@@ -434,6 +437,7 @@ impl Game {
         self.reset_serve();
     }
 
+    /// One ball on a normal paddle, powers gone: the start of a serve.
     fn reset_serve(&mut self) {
         self.stage = Stage::Ready;
         self.stage_ticks = 0;
@@ -457,6 +461,8 @@ impl Game {
         };
     }
 
+    /// Scores the clear, awards medals and the chapter's extra life, and
+    /// shows the results (or ends the journey).
     fn finish_sector(&mut self) {
         let clean = !self.lost_in_sector;
         let swift = self.sector_ticks <= self.sector.sector().par_seconds * TICK_HZ;
@@ -492,6 +498,7 @@ impl Game {
         self.capsules.fill(Capsule::default());
     }
 
+    /// The last ball drained: a life is lost, and play serves again or ends.
     fn lose_life(&mut self) {
         self.lives -= 1;
         self.lost_in_sector = true;

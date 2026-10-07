@@ -16,7 +16,7 @@ pub(crate) enum Damage {
     Broken,
 }
 
-/// The brick grid. Hit points only change through [`Board::damage`], so the
+/// The brick grid. Play changes hit points only by damaging bricks, so the
 /// count of remaining bricks can never disagree with the grid.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Board {
