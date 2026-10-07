@@ -325,8 +325,11 @@ schedules ticks, `geom.rs` holds context-free geometry, `field.rs` the playfield
 and brick grid, `sectors.rs` the authored journey (parsed at compile time),
 `tuning.rs` every rule constant, `sim/` the rules (`game.rs` dispatches each
 tick; `ball.rs` sweeps a ball contact by contact; `board.rs`, `paddle.rs`,
-`power.rs` and `capsules.rs` own their state), and `profile.rs` persistence.
-The root package is the desktop app.
+`power.rs` and `capsules.rs` own their state), and `progress.rs` unlocks,
+medals and checkpoints with the save file's text format. The root package is the
+desktop app; its `src/storage.rs` reads and writes `progress.txt` (backup,
+set-aside, size cap, legacy import) and `src/settings.rs` holds sound and display
+settings.
 `src/main.rs` handles application transitions; `src/render.rs`,
 `src/audio.rs`, and `src/perf.rs` handle presentation, `src/ui.rs` holds menu
 layout and keyboard/mouse input, `src/input.rs` merges gamepads (via

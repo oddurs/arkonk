@@ -13,8 +13,10 @@ mod pixel_font;
 #[cfg(any(feature = "steam", test))]
 mod presence;
 mod render;
+mod settings;
 mod smoke;
 mod steam;
+mod storage;
 mod text;
 mod ui;
 
@@ -23,7 +25,6 @@ use ark::{
     clock::FixedClock,
     field::{BOTTOM, FIELD, LEFT, RIGHT, TOP},
     geom::V2,
-    profile::{Origin, Profile},
     sectors::SectorId,
     tuning::ADVANCE_DELAY_TICKS,
 };
@@ -34,6 +35,7 @@ use perf::Perf;
 use render::Renderer;
 use std::{path::PathBuf, time::Instant};
 use steam::Steam;
+use storage::{Origin, Profile};
 use ui::{Controls, Preview, Screen, Ui};
 
 /// A results card for screens the smoke test shows without playing to them.
@@ -141,7 +143,7 @@ fn enter(
 fn home(ui: &mut Ui, profile: &Profile) {
     ui.screen = Screen::Title;
     ui.paused = false;
-    ui.choice = usize::from(profile.checkpoint.is_none());
+    ui.choice = usize::from(profile.progress.checkpoint().is_none());
 }
 /// A GUI-subsystem process starts without a console. When launched from a
 /// terminal (`--version`, smoke and perf tests), borrow the parent's console so
@@ -187,8 +189,11 @@ fn main() {
         return;
     }
     let (mut profile, path, save_blocked) = load_progress(data.map(|d| d.join("progress.txt")));
-    profile.fullscreen |= flag("--fullscreen");
-    macroquad::Window::from_config(config(profile.fullscreen), run(profile, path, save_blocked));
+    profile.settings.fullscreen |= flag("--fullscreen");
+    macroquad::Window::from_config(
+        config(profile.settings.fullscreen),
+        run(profile, path, save_blocked),
+    );
 }
 async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
     prevent_quit();
@@ -200,7 +205,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
     let mut steam = if smoke {
         Steam::off()
     } else {
-        Steam::init(&profile)
+        Steam::init(&profile.progress)
     };
     let mut dirty = false;
     let mut last_save_attempt = -5.0;
@@ -213,7 +218,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         screen_width(),
         screen_height(),
         screen_dpi_scale(),
-        if profile.fullscreen {
+        if profile.settings.fullscreen {
             "fullscreen"
         } else {
             "windowed"
@@ -230,7 +235,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
     }
     let mut clock = FixedClock::default();
     let mut stats = false;
-    let mut display = display::Display::new(profile.fullscreen, (960.0, 900.0));
+    let mut display = display::Display::new(profile.settings.fullscreen, (960.0, 900.0));
     let mut last_frame = Instant::now();
     let mut last_mouse =
         render::mouse().unwrap_or(V2::new(render::WIDTH / 2.0, render::HEIGHT / 2.0));
@@ -260,28 +265,28 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             break;
         }
         if is_key_pressed(KeyCode::M) {
-            profile.muted = !profile.muted;
+            profile.settings.muted = !profile.settings.muted;
             dirty = true;
         }
         if is_key_pressed(KeyCode::LeftBracket) {
-            profile.volume = profile.volume.saturating_sub(1);
+            profile.settings.volume = profile.settings.volume.saturating_sub(1);
             dirty = true;
         }
         if is_key_pressed(KeyCode::RightBracket) {
-            profile.volume = (profile.volume + 1).min(10);
+            profile.settings.volume = (profile.settings.volume + 1).min(settings::MAX_VOLUME);
             dirty = true;
         }
         if is_key_pressed(KeyCode::F3) {
             stats = !stats;
         }
         if is_key_pressed(KeyCode::F) {
-            profile.fullscreen = !profile.fullscreen;
+            profile.settings.fullscreen = !profile.settings.fullscreen;
             dirty = true;
         }
-        // A settings screen changes `profile.fullscreen`; this applies it.
-        let held = display.update(profile.fullscreen, frame_seconds);
-        audio.muted = profile.muted;
-        audio.volume = f32::from(profile.volume) / 10.0;
+        // A settings screen changes `profile.settings.fullscreen`; this applies it.
+        let held = display.update(profile.settings.fullscreen, frame_seconds);
+        audio.muted = profile.settings.muted;
+        audio.volume = f32::from(profile.settings.volume) / f32::from(settings::MAX_VOLUME);
         let mouse = render::mouse().unwrap_or(last_mouse);
         let moved =
             !flow && ((mouse.x - last_mouse.x).abs() > 0.5 || (mouse.y - last_mouse.y).abs() > 0.5);
@@ -349,7 +354,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         match ui.screen {
             Screen::Title => {
                 // Continue is unavailable without a checkpoint; never select it.
-                let first = usize::from(profile.checkpoint.is_none());
+                let first = usize::from(profile.progress.checkpoint().is_none());
                 let hovered = ui::hover_menu(pointer).filter(|&row| row >= first);
                 ui.choice = ui::step_menu(ui.choice, first, up, down);
                 if (moved || click)
@@ -360,7 +365,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 if confirm || (click && hovered.is_some()) {
                     match ui.choice {
                         0 => {
-                            if let Some(c) = profile.checkpoint {
+                            if let Some(c) = profile.progress.checkpoint() {
                                 enter(
                                     Game::resume(c),
                                     &mut game,
@@ -373,14 +378,14 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                         }
                         1 => {
                             let fresh = Game::new();
-                            profile.begin(&fresh);
+                            profile.progress.begin(&fresh);
                             dirty = true;
                             enter(fresh, &mut game, &mut ui, &mut renderer, &mut clock);
                             changed = true;
                         }
                         _ => {
                             ui.screen = Screen::Sectors;
-                            ui.sector = SectorId::clamped(profile.unlocked - 1);
+                            ui.sector = SectorId::clamped(profile.progress.unlocked_count() - 1);
                         }
                     }
                 }
@@ -413,7 +418,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 let play = click
                     && (ui::hover_sector(pointer).is_some() || ui::play_rect().contains(pointer));
                 if (confirm || play)
-                    && ui.sector.index() < profile.unlocked
+                    && ui.sector.index() < profile.progress.unlocked_count()
                     && ui.screen == Screen::Sectors
                 {
                     enter(
@@ -461,12 +466,15 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                             1 => {
                                 let fresh = if game.mode() == Mode::Journey {
                                     // Retrying restores the entry checkpoint; scores cannot be farmed.
-                                    profile.checkpoint.map_or_else(Game::new, Game::resume)
+                                    profile
+                                        .progress
+                                        .checkpoint()
+                                        .map_or_else(Game::new, Game::resume)
                                 } else {
                                     Game::start(game.sector(), Mode::Practice)
                                 };
                                 if fresh.mode() == Mode::Journey {
-                                    profile.begin(&fresh);
+                                    profile.progress.begin(&fresh);
                                     dirty = true;
                                 }
                                 enter(fresh, &mut game, &mut ui, &mut renderer, &mut clock);
@@ -539,13 +547,13 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 renderer.record(&game, tick);
                 events.merge(tick);
                 if tick.clear {
-                    profile.finish(&game);
-                    steam.cleared(&game, &profile);
+                    profile.progress.finish(&game);
+                    steam.cleared(&game, &profile.progress);
                     dirty = true;
                     ui.choice = 0;
                 }
                 if game.stage() == Stage::GameOver && game.mode() == Mode::Journey {
-                    profile.best_score = profile.best_score.max(game.score());
+                    profile.progress.note_score(&game);
                     dirty = true;
                     ui.choice = 1;
                 }
@@ -554,11 +562,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         } else {
             clock.reset();
         }
-        if game.mode() == Mode::Journey
-            && (ui.paused || ui.screen != Screen::Play)
-            && game.score() > profile.best_score
-        {
-            profile.best_score = game.score();
+        if (ui.paused || ui.screen != Screen::Play) && profile.progress.note_score(&game) {
             dirty = true;
         }
         if dirty
@@ -695,9 +699,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         trace.report();
     }
     if !smoke {
-        if game.mode() == Mode::Journey {
-            profile.best_score = profile.best_score.max(game.score());
-        }
+        profile.progress.note_score(&game);
         if let Some(p) = &path
             && let Err(e) = profile.save(p)
         {

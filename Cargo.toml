@@ -33,6 +33,9 @@ gilrs = "0.11.2"
 macroquad = { version = "0.4.16", features = ["audio"] }
 steamworks = { version = "0.13.1", optional = true }
 
+[dev-dependencies]
+insta = "1.49.0"
+
 # Embeds the icon and version resource. Host-gated: only Windows builds use it.
 [target.'cfg(windows)'.build-dependencies]
 winresource = { version = "0.1.31", default-features = false }

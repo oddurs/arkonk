@@ -20,7 +20,7 @@ use crate::{
     clock::{DT, TICK_HZ},
     field::{BOTTOM, Cell, CellSet, FIELD, PADDLE_Y, cell_rect},
     geom::V2,
-    profile::Checkpoint,
+    progress::Checkpoint,
     sectors::SectorId,
     tuning::*,
 };

@@ -2,13 +2,13 @@
 use crate::{
     display::MIN_PHYSICAL,
     input::{Dir, Presses, pad_controls},
+    storage::Profile,
     ui::{Controls, Screen, Ui},
 };
 use ark::{
     Game, Input, Medals, Mode, Particle, Power, Stage,
     field::{BALL_RADIUS as RADIUS, Cell, CellSet, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
     geom::V2,
-    profile::Profile,
     sectors::SectorId,
     tuning::{ADVANCE_DELAY_TICKS, MAX_BALLS, MAX_CAPSULES},
 };
@@ -49,8 +49,8 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         }
         4 | 21 => {
             assert_eq!(game.stage(), Stage::Cleared);
-            assert!(profile.unlocked >= 2);
-            assert_eq!(profile.checkpoint.unwrap().sector.index(), 1);
+            assert!(profile.progress.unlocked_count() >= 2);
+            assert_eq!(profile.progress.checkpoint().unwrap().sector.index(), 1);
             game.sandbox().elapse(ADVANCE_DELAY_TICKS);
         }
         26 => keys.focus_lost = true,
@@ -64,9 +64,11 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
             assert!(ui.screen == Screen::Play && !ui.paused);
             assert_eq!(game.stage(), Stage::Ready);
             assert_eq!(game.sector().index(), 1);
-            assert_eq!(game.score(), profile.checkpoint.unwrap().score);
-            assert_eq!(profile.records[0].medals, Medals::ALL);
-            assert_eq!(profile.records[1].medals, Medals::ALL);
+            assert_eq!(game.score(), profile.progress.checkpoint().unwrap().score);
+            for sector in [0, 1] {
+                let record = profile.progress.record(SectorId::clamped(sector));
+                assert_eq!(record.medals, Medals::ALL);
+            }
             println!(
                 "UI flow passed: new journey, clear, checkpoint, home, continue, practice, focus pause, resume, retry"
             );

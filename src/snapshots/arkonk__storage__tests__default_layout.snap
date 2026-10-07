@@ -1,5 +1,5 @@
 ---
-source: tests/save_format.rs
+source: src/storage.rs
 expression: "visible(&Profile::default().encode())"
 ---
 ARKONK 1\n

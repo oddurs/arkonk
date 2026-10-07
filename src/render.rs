@@ -2,6 +2,7 @@ use crate::{
     input::Device,
     perf::Perf,
     pixel_font::{PixelFont, glyph},
+    storage::Profile,
     text::{TextId, text},
     ui::{self, Screen, Ui},
 };
@@ -13,7 +14,6 @@ use ark::{
         cell_rect,
     },
     geom::V2,
-    profile::Profile,
     sectors::{Chapter, SECTOR_COUNT, SectorId},
     tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
@@ -733,7 +733,11 @@ impl Renderer {
                     );
                     self.scratch.clear();
                     grouped(&mut self.scratch, game.score());
-                    let _ = write!(self.scratch, " POINTS   {} MEDALS", profile.medals());
+                    let _ = write!(
+                        self.scratch,
+                        " POINTS   {} MEDALS",
+                        profile.progress.medal_count()
+                    );
                     v.centered(&self.scratch, 362.0, 11.0, DIM);
                     self.menu(
                         v,
@@ -1031,7 +1035,7 @@ impl Renderer {
                 2.0,
                 if id == game.sector() {
                     CYAN
-                } else if profile.records[id.index()].medals != Medals::NONE {
+                } else if profile.progress.record(id).medals != Medals::NONE {
                     DIM
                 } else {
                     MUTED
@@ -1081,15 +1085,19 @@ impl Renderer {
     }
     fn options(&mut self, v: &Scene, profile: &Profile, y: f32) {
         self.scratch.clear();
-        let sound = if profile.muted { "OFF" } else { "ON" };
+        let sound = if profile.settings.muted { "OFF" } else { "ON" };
         // The shortcuts are keyboard-only; a pad player still sees the levels.
         let _ = match v.device {
             Device::KeyboardMouse => write!(
                 self.scratch,
                 "M SOUND {sound}   [ ] VOLUME {}   F FULLSCREEN",
-                profile.volume
+                profile.settings.volume
             ),
-            Device::Gamepad => write!(self.scratch, "SOUND {sound}   VOLUME {}", profile.volume),
+            Device::Gamepad => write!(
+                self.scratch,
+                "SOUND {sound}   VOLUME {}",
+                profile.settings.volume
+            ),
         };
         v.centered(&self.scratch, y, 11.0, MUTED);
     }
@@ -1105,10 +1113,10 @@ impl Renderer {
             v,
             ui.choice,
             ["CONTINUE JOURNEY", "NEW JOURNEY", "SECTOR SELECT"],
-            profile.checkpoint.is_none().then_some(0),
+            profile.progress.checkpoint().is_none().then_some(0),
         );
         self.scratch.clear();
-        if let Some(c) = profile.checkpoint {
+        if let Some(c) = profile.progress.checkpoint() {
             let _ = write!(
                 self.scratch,
                 "SAVED AT SECTOR {:02} / {}",
@@ -1126,12 +1134,21 @@ impl Renderer {
             self.scratch.clear();
             match i {
                 0 => {
-                    let _ = write!(self.scratch, "{} / {SECTOR_COUNT}", profile.unlocked);
+                    let _ = write!(
+                        self.scratch,
+                        "{} / {SECTOR_COUNT}",
+                        profile.progress.unlocked_count()
+                    );
                 }
                 1 => {
-                    let _ = write!(self.scratch, "{} / {}", profile.medals(), SECTOR_COUNT * 3);
+                    let _ = write!(
+                        self.scratch,
+                        "{} / {}",
+                        profile.progress.medal_count(),
+                        SECTOR_COUNT * 3
+                    );
                 }
-                _ => grouped(&mut self.scratch, profile.best_score),
+                _ => grouped(&mut self.scratch, profile.progress.best_score()),
             }
             v.center_at(label, x, 676.0, 11.0, DIM);
             v.center_at(&self.scratch, x, 702.0, 13.0, INK);
@@ -1172,7 +1189,7 @@ impl Renderer {
         for id in SectorId::all() {
             let (i, level) = (id.index(), id.sector());
             let r = ui::sector_rect(i);
-            let unlocked = i < profile.unlocked;
+            let unlocked = i < profile.progress.unlocked_count();
             let selected = id == ui.sector;
             if selected {
                 v.rounded(
@@ -1220,7 +1237,7 @@ impl Renderer {
                 }
             }
             if unlocked {
-                let record = profile.records[i];
+                let record = profile.progress.record(id);
                 for (j, medal) in MEDAL_ORDER.into_iter().enumerate() {
                     v.circle(
                         V2::new(r.x + 160.0 + j as f32 * 16.0, r.y + 52.0),
@@ -1251,7 +1268,7 @@ impl Renderer {
         }
 
         let level = ui.sector.sector();
-        let record = profile.records[ui.sector.index()];
+        let record = profile.progress.record(ui.sector);
         self.scratch.clear();
         let _ = write!(
             self.scratch,
@@ -1271,7 +1288,7 @@ impl Renderer {
             11.0,
             DIM,
         );
-        let open = ui.sector.index() < profile.unlocked;
+        let open = ui.sector.index() < profile.progress.unlocked_count();
         self.scratch.clear();
         if open {
             let _ = write!(self.scratch, "PLAY SECTOR {:02}", ui.sector.index() + 1);

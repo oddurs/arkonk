@@ -3,8 +3,8 @@
 //! is the matching partner-site configuration.
 use ark::{
     Game, Medals, Mode, SectorSummary, Stage,
-    profile::Profile,
-    sectors::{Chapter, SECTORS},
+    progress::Progress,
+    sectors::{Chapter, SectorId},
 };
 
 /// The best chain, as shown on the results card, that earns `Chain`.
@@ -62,16 +62,13 @@ impl Achievement {
     }
 }
 
-/// Everything the saved profile proves, so medals earned before Steam was
+/// Everything saved progress proves, so medals earned before Steam was
 /// present unlock on the next launch.
-pub fn from_profile(profile: &Profile) -> Vec<Achievement> {
+pub fn from_progress(progress: &Progress) -> Vec<Achievement> {
     let medals = |chapter: Option<Chapter>| {
-        profile
-            .records
-            .iter()
-            .zip(SECTORS.iter())
-            .filter(move |(_, sector)| chapter.is_none_or(|c| sector.chapter == c))
-            .map(|(record, _)| record.medals)
+        SectorId::all()
+            .filter(move |s| chapter.is_none_or(|c| s.sector().chapter == c))
+            .map(|s| progress.record(s).medals)
     };
     let any = |medal| medals(None).any(|m: Medals| m.contains(medal));
     let chapter = |c, wanted| medals(Some(c)).all(|m: Medals| m.contains(wanted));
@@ -134,27 +131,21 @@ fn from_results(journey_complete: bool, summary: &SectorSummary) -> Vec<Achievem
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ark::{
-        Input,
-        clock::TICK_HZ,
-        profile::Record,
-        sectors::{SECTOR_COUNT, SectorId},
-    };
+    use ark::{Input, clock::TICK_HZ, sectors::SECTOR_COUNT};
+    use std::fmt::Write;
 
-    fn with_medals(medals: [Medals; SECTOR_COUNT]) -> Profile {
-        let mut p = Profile::default();
-        for (record, m) in p.records.iter_mut().zip(medals) {
-            *record = Record {
-                medals: m,
-                best_ticks: if m == Medals::NONE { 0 } else { 24000 },
-            };
+    fn with_medals(medals: [Medals; SECTOR_COUNT]) -> Progress {
+        let mut file = String::from("ARKONK 1\n");
+        for (i, m) in medals.into_iter().enumerate() {
+            let ticks = if m == Medals::NONE { 0 } else { 24000 };
+            writeln!(file, "record {i} {} {ticks}", m.bits()).unwrap();
         }
-        p
+        Progress::decode(file.as_bytes()).unwrap()
     }
 
     #[test]
     fn fresh_profile_earns_nothing() {
-        assert!(from_profile(&Profile::default()).is_empty());
+        assert!(from_progress(&Progress::default()).is_empty());
     }
 
     #[test]
@@ -162,7 +153,7 @@ mod tests {
         let mut medals = [Medals::NONE; SECTOR_COUNT];
         medals[5] = Medals::CLEAR | Medals::SWIFT;
         assert_eq!(
-            from_profile(&with_medals(medals)),
+            from_progress(&with_medals(medals)),
             [Achievement::FirstLight, Achievement::Swift]
         );
     }
@@ -172,13 +163,13 @@ mod tests {
         let mut medals = [Medals::NONE; SECTOR_COUNT];
         medals[..4].fill(Medals::CLEAR);
         medals[4..7].fill(Medals::ALL);
-        let earned = from_profile(&with_medals(medals));
+        let earned = from_progress(&with_medals(medals));
         assert!(earned.contains(&Achievement::Daybreak));
         assert!(!earned.contains(&Achievement::DaybreakMedals));
         assert!(!earned.contains(&Achievement::BlueHour));
         assert!(!earned.contains(&Achievement::BlueHourMedals));
         medals[7] = Medals::ALL;
-        let earned = from_profile(&with_medals(medals));
+        let earned = from_progress(&with_medals(medals));
         assert!(earned.contains(&Achievement::BlueHour));
         assert!(earned.contains(&Achievement::BlueHourMedals));
         assert!(!earned.contains(&Achievement::AllMedals));
@@ -187,15 +178,15 @@ mod tests {
     #[test]
     fn thirty_six_medals_unlock_every_profile_achievement() {
         let p = with_medals([Medals::ALL; SECTOR_COUNT]);
-        assert_eq!(p.medals(), 36);
-        let earned = from_profile(&p);
+        assert_eq!(p.medal_count(), 36);
+        let earned = from_progress(&p);
         assert_eq!(earned.len(), 10);
         assert!(earned.contains(&Achievement::AllMedals));
     }
 
     #[test]
     fn profile_finish_feeds_the_derivation() {
-        let mut p = Profile::default();
+        let mut p = Progress::default();
         let mut g = Game::start(SectorId::FIRST, Mode::Practice);
         g.step(Input {
             launch: true,
@@ -209,7 +200,7 @@ mod tests {
         assert_eq!(g.summary().medals, Medals::CLEAR | Medals::CLEAN);
         p.finish(&g);
         assert_eq!(
-            from_profile(&p),
+            from_progress(&p),
             [Achievement::FirstLight, Achievement::Clean]
         );
     }

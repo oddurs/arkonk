@@ -4,7 +4,7 @@
 pub mod clock;
 pub mod field;
 pub mod geom;
-pub mod profile;
+pub mod progress;
 pub mod sectors;
 mod sim;
 pub mod tuning;

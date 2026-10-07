@@ -8,7 +8,7 @@ mod imp {
         achievements::{self, Achievement, MEDALS_STAT},
         presence::Presence,
     };
-    use ark::{Game, profile::Profile};
+    use ark::{Game, progress::Progress};
     use steamworks::{AppId, CallbackResult, Client, SteamAPIInitError};
 
     /// The one place the Steam app id lives. 480 is Valve's shared Spacewar test
@@ -41,7 +41,7 @@ mod imp {
         }
         /// Connects to the running Steam client. Without one the game carries on
         /// alone; progress still saves and unlocks on the next launch with Steam.
-        pub fn init(profile: &Profile) -> Self {
+        pub fn init(progress: &Progress) -> Self {
             match Client::init_app(APP_ID) {
                 Ok(client) => {
                     let mut session = Session {
@@ -53,7 +53,7 @@ mod imp {
                         presence: None,
                         warned_missing: false,
                     };
-                    session.queue(profile, Vec::new());
+                    session.queue(progress, Vec::new());
                     Self(Some(session))
                 }
                 Err(e) => {
@@ -96,10 +96,10 @@ mod imp {
                 .as_mut()
                 .is_some_and(|s| std::mem::take(&mut s.overlay_opened))
         }
-        /// Call where a sector clear has just been recorded in `profile`.
-        pub fn cleared(&mut self, game: &Game, profile: &Profile) {
+        /// Call where a sector clear has just been recorded in `progress`.
+        pub fn cleared(&mut self, game: &Game, progress: &Progress) {
             if let Some(s) = &mut self.0 {
-                s.queue(profile, achievements::from_clear(game));
+                s.queue(progress, achievements::from_clear(game));
             }
         }
         /// What friends see: menus, or the sector being played.
@@ -125,13 +125,16 @@ mod imp {
         }
     }
     impl Session {
-        fn queue(&mut self, profile: &Profile, extra: Vec<Achievement>) {
-            for a in achievements::from_profile(profile).into_iter().chain(extra) {
+        fn queue(&mut self, progress: &Progress, extra: Vec<Achievement>) {
+            for a in achievements::from_progress(progress)
+                .into_iter()
+                .chain(extra)
+            {
                 if !self.pending.contains(&a) {
                     self.pending.push(a);
                 }
             }
-            self.medals = profile.medals();
+            self.medals = progress.medal_count();
         }
         fn store(&mut self) {
             let stats = self.client.user_stats();
@@ -175,7 +178,7 @@ mod imp {
 
 #[cfg(not(feature = "steam"))]
 mod imp {
-    use ark::{Game, profile::Profile};
+    use ark::{Game, progress::Progress};
 
     pub fn restart_through_steam() -> bool {
         false
@@ -185,14 +188,14 @@ mod imp {
         pub fn off() -> Self {
             Self
         }
-        pub fn init(_: &Profile) -> Self {
+        pub fn init(_: &Progress) -> Self {
             Self
         }
         pub fn run_callbacks(&mut self) {}
         pub fn overlay_opened(&mut self) -> bool {
             false
         }
-        pub fn cleared(&mut self, _: &Game, _: &Profile) {}
+        pub fn cleared(&mut self, _: &Game, _: &Progress) {}
         pub fn presence(&mut self, _: bool, _: &Game) {}
     }
 }
