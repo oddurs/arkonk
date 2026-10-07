@@ -1,5 +1,4 @@
 mod audio;
-mod crt;
 mod perf;
 mod pixel_font;
 mod render;
@@ -102,9 +101,6 @@ async fn main() {
     let mut profile = path
         .as_ref()
         .map_or_else(Profile::default, |p| Profile::load(p));
-    if std::env::args().any(|a| a == "--no-crt") {
-        profile.crt = false;
-    }
     let mut dirty = false;
     let mut last_save_attempt = -5.0;
     let mut game = Game::new();
@@ -121,7 +117,7 @@ async fn main() {
     let mut stats = false;
     let mut fullscreen = std::env::args().any(|a| a == "--fullscreen");
     let mut last_frame = Instant::now();
-    let mut last_mouse = View::new().mouse(profile.crt);
+    let mut last_mouse = View::new().mouse();
     let mut mouse_control = false;
     let mut pending_launch = false;
     let mut cursor_visible = true;
@@ -149,11 +145,6 @@ async fn main() {
             profile.muted = !profile.muted;
             dirty = true;
         }
-        if is_key_pressed(KeyCode::C) {
-            profile.crt = !profile.crt;
-            last_mouse = View::new().mouse(profile.crt);
-            dirty = true;
-        }
         if is_key_pressed(KeyCode::LeftBracket) {
             profile.volume = profile.volume.saturating_sub(1);
             dirty = true;
@@ -171,7 +162,7 @@ async fn main() {
         }
         audio.muted = profile.muted;
         audio.volume = f32::from(profile.volume) / 10.0;
-        let mouse = View::new().mouse(profile.crt);
+        let mouse = View::new().mouse();
         let moved =
             !flow && ((mouse.x - last_mouse.x).abs() > 0.5 || (mouse.y - last_mouse.y).abs() > 0.5);
         if moved {
@@ -214,18 +205,16 @@ async fn main() {
         let mut changed = false;
         match ui.screen {
             Screen::Title => {
-                if up {
-                    ui.choice = (ui.choice + 2) % 3;
-                }
-                if down {
-                    ui.choice = (ui.choice + 1) % 3;
-                }
+                // Continue is unavailable without a checkpoint; never select it.
+                let first = usize::from(profile.checkpoint.is_none());
+                let hovered = ui::hover_menu(pointer).filter(|&row| row >= first);
+                ui.choice = ui::step_menu(ui.choice, first, up, down);
                 if (moved || click)
-                    && let Some(row) = ui::hover_menu(pointer)
+                    && let Some(row) = hovered
                 {
                     ui.choice = row;
                 }
-                if confirm || (click && ui::hover_menu(pointer).is_some()) {
+                if confirm || (click && hovered.is_some()) {
                     match ui.choice {
                         0 => {
                             if let Some(c) = profile.checkpoint {
@@ -268,12 +257,12 @@ async fn main() {
                 {
                     ui.sector = index;
                 }
-                if click && Rect::new(105.0, 100.0, 120.0, 44.0).contains(pointer) {
+                if click && ui::back_rect().contains(pointer) {
                     home(&mut ui, &profile);
                 }
-                if (confirm || (click && ui::hover_sector(pointer).is_some()))
-                    && ui.sector < profile.unlocked
-                    && ui.screen == Screen::Sectors
+                let play = click
+                    && (ui::hover_sector(pointer).is_some() || ui::play_rect().contains(pointer));
+                if (confirm || play) && ui.sector < profile.unlocked && ui.screen == Screen::Sectors
                 {
                     enter(
                         Game::at(ui.sector, Mode::Practice),
@@ -298,12 +287,7 @@ async fn main() {
                     changed = true;
                 }
                 if ui.screen == Screen::Play && (ui.paused || terminal) {
-                    if up {
-                        ui.choice = (ui.choice + 2) % 3;
-                    }
-                    if down {
-                        ui.choice = (ui.choice + 1) % 3;
-                    }
+                    ui.choice = ui::step_menu(ui.choice, 0, up, down);
                     if (moved || click)
                         && let Some(row) = ui::hover_menu(pointer)
                     {
@@ -340,8 +324,7 @@ async fn main() {
                         changed = true;
                     }
                 } else if !changed && game.phase == Phase::Cleared {
-                    let next = confirm
-                        || (click && Rect::new(280.0, 622.0, 400.0, 44.0).contains(pointer));
+                    let next = confirm || (click && ui::next_rect().contains(pointer));
                     if next && game.phase_ticks >= TICK_HZ / 2 {
                         if game.mode == Mode::Practice {
                             ui.screen = Screen::Sectors;
@@ -448,7 +431,7 @@ async fn main() {
         let actual_phase = game.phase;
         let actual_screen = ui.screen;
         let actual_pause = ui.paused;
-        if smoke && !flow && !perf_test && profile.crt {
+        if smoke && !flow && !perf_test {
             match frames {
                 30 => ui.screen = Screen::Title,
                 150 => ui.paused = true,
@@ -476,27 +459,23 @@ async fn main() {
         perf.draw((get_time() - draw_start) * 1000.0);
         if smoke && !flow && !perf_test {
             let capture = match frames {
-                30 if profile.crt => Some("target/attract.png"),
-                120 => Some(if profile.crt {
-                    "target/smoke-test.png"
-                } else {
-                    "target/smoke-plain.png"
-                }),
-                150 if profile.crt => Some("target/paused.png"),
-                160 if profile.crt => Some("target/game-over.png"),
-                170 if profile.crt => Some("target/stats.png"),
-                180 if profile.crt => Some("target/clear.png"),
-                190 if profile.crt => Some("target/sectors.png"),
-                230 if profile.crt => Some("target/resized.png"),
+                30 => Some("target/attract.png"),
+                120 => Some("target/smoke-test.png"),
+                150 => Some("target/paused.png"),
+                160 => Some("target/game-over.png"),
+                170 => Some("target/stats.png"),
+                180 => Some("target/clear.png"),
+                190 => Some("target/sectors.png"),
+                230 => Some("target/resized.png"),
                 _ => None,
             };
             if let Some(p) = capture {
                 renderer.capture(p);
             }
-            if profile.crt && frames == 200 {
+            if frames == 200 {
                 request_new_screen_size(800.0, 600.0);
             }
-            if profile.crt && frames == 240 {
+            if frames == 240 {
                 request_new_screen_size(960.0, 900.0);
             }
         }
@@ -505,9 +484,8 @@ async fn main() {
         }
         if smoke && !flow && frames >= if perf_test { 3899 } else { 660 } {
             println!(
-                "Render smoke: {} frames, CRT {}, score {}, collision caps {}, sounds loaded {}/17",
+                "Render smoke: {} frames, score {}, collision caps {}, sounds loaded {}/17",
                 frames + 1,
-                profile.crt,
                 game.score,
                 game.collision_caps,
                 audio.loaded()

@@ -30,7 +30,6 @@ pub struct Profile {
     pub records: [Record; LEVEL_COUNT],
     pub checkpoint: Option<Checkpoint>,
     pub muted: bool,
-    pub crt: bool,
     pub volume: u8,
 }
 impl Default for Profile {
@@ -41,7 +40,6 @@ impl Default for Profile {
             records: [Record::default(); LEVEL_COUNT],
             checkpoint: None,
             muted: false,
-            crt: true,
             volume: 6,
         }
     }
@@ -94,9 +92,9 @@ impl Profile {
             match (key, nums.as_slice()) {
                 ("best", [n]) => p.best_score = *n,
                 ("unlocked", [n]) => p.unlocked = (*n as usize).clamp(1, LEVEL_COUNT),
-                ("settings", [mute, crt, volume]) => {
+                // Older saves carry a retired display flag between the two.
+                ("settings", [mute, volume] | [mute, _, volume]) => {
                     p.muted = *mute != 0;
-                    p.crt = *crt != 0;
                     p.volume = (*volume).min(10) as u8;
                 }
                 ("record", [i, medals, ticks]) if (*i as usize) < LEVEL_COUNT => {
@@ -127,11 +125,10 @@ impl Profile {
     pub fn encode(&self) -> String {
         use std::fmt::Write;
         let mut out = format!(
-            "ARKONK 1\nbest {}\nunlocked {}\nsettings {} {} {}\n",
+            "ARKONK 1\nbest {}\nunlocked {}\nsettings {} {}\n",
             self.best_score,
             self.unlocked,
             u8::from(self.muted),
-            u8::from(self.crt),
             self.volume
         );
         for (i, r) in self.records.iter().enumerate() {
@@ -198,6 +195,12 @@ mod tests {
         assert_eq!(p.checkpoint, None);
         assert_eq!(p.records[0].medals, 7);
         assert_eq!(Profile::decode("unknown version"), Profile::default());
+    }
+    #[test]
+    fn legacy_settings_keep_sound_and_volume() {
+        let p = Profile::decode("ARKONK 1\nsettings 1 0 4\n");
+        assert!(p.muted);
+        assert_eq!(p.volume, 4);
     }
     #[test]
     fn practice_records_do_not_replace_journey_checkpoint() {

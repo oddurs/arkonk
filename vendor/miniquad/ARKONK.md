@@ -10,7 +10,7 @@ ARKONK uses one color attachment, single sampling, and no depth/stencil testing.
 The macOS Metal view and pipelines therefore omit depth/stencil attachments.
 Offscreen color targets match the view's BGRA format. Pipelines declare only
 attachment zero. Without these fixes the released backend fails Metal validation
-and the CRT render target appears black.
+and offscreen render targets appear black.
 
 Scissor coordinates use the active render attachment's dimensions, including
 Retina offscreen targets and drawable/window size differences during resizing.
