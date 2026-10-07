@@ -50,6 +50,15 @@ done
 : "${STEAM_DEPOT_MACOS:?set STEAM_DEPOT_MACOS}"
 : "${STEAM_DEPOT_LINUX:?set STEAM_DEPOT_LINUX}"
 
+# The game initialises Steam with the id compiled into it; a build for any
+# other app would fail to start from Steam.
+built_id=$(sed -n 's/.*const APP_ID: u32 = \([0-9]*\);.*/\1/p' src/steam.rs)
+if [ "$built_id" != "$STEAM_APP_ID" ]; then
+    echo "src/steam.rs has APP_ID '$built_id' but STEAM_APP_ID is $STEAM_APP_ID." >&2
+    echo "Set APP_ID to the real id and rebuild before uploading (docs/steam/README.md)." >&2
+    exit 1
+fi
+
 pkgid=$(cargo pkgid)
 version=${pkgid##*[#@]}
 commit=$(git rev-parse --short HEAD)
@@ -70,6 +79,12 @@ for os in windows macos linux; do
     mv "$root/unpack/arkonk-$version-$os-steam" "$content/$os"
 done
 rmdir "$root/unpack"
+# steam_appid.txt beside a shipped executable disables Steam's relaunch check.
+stray=$(find "$content" -name steam_appid.txt)
+if [ -n "$stray" ]; then
+    echo "Refusing to upload steam_appid.txt: $stray" >&2
+    exit 1
+fi
 
 for template in packaging/steam/*.vdf; do
     sed -e "s|@APP_ID@|$STEAM_APP_ID|g" \

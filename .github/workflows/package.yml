@@ -91,13 +91,7 @@ jobs:
             } >>"$GITHUB_ENV"
           fi
       - run: scripts/package.sh
-      - name: Steam build
-        run: |
-          if grep -q '^steam = \[' Cargo.toml; then
-            scripts/package.sh --steam
-          else
-            echo "::notice::Steam build skipped: Cargo.toml has no steam feature yet."
-          fi
+      - run: scripts/package.sh --steam
       - uses: actions/upload-artifact@v4
         with:
           name: arkonk-${{ matrix.platform }}

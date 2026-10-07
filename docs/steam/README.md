@@ -71,6 +71,9 @@ found without `LD_LIBRARY_PATH`.
 Default-feature builds must not ship the library, and no build should ship
 `steam_appid.txt`.
 
+`scripts/package.sh --steam` builds and stages all of this, and
+`scripts/steam-upload.sh` uploads it; see [RELEASING.md](../RELEASING.md).
+
 ## Partner site checklist
 
 1. Put the real app id in `src/steam.rs` (`APP_ID`).

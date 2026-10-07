@@ -41,7 +41,7 @@ GitHub Release. It uploads to Steam only when you tick **steam**.
 Each zip has one top-level folder that also holds `LICENSE.txt` and
 `THIRD_PARTY_LICENSES.txt`. The `-steam` variants are built with
 `--features steam` and add the Steam API redistributable; they go to Steam
-only and are not attached to the GitHub Release.
+only and are not attached to the GitHub Release, which stays DRM-free.
 
 Linux packaging fails if the binary needs a glibc newer than 2.31, the version
 in Steam's runtime. The plain Linux zip runs outside Steam on any x86_64
@@ -154,18 +154,21 @@ build to the default branch from Steamworks > SteamPipe > Builds.
 
 ## The `steam` feature and the Steam API library
 
-Steam builds use `cargo build --features steam`, a feature the Steamworks
-integration defines. Until `Cargo.toml` has it, the release workflow skips the
-Steam build and upload with a notice, and `scripts/package.sh --steam` exits
-with an error.
+Steam builds use `cargo build --features steam`; [docs/steam](steam/README.md)
+describes the integration. Before the first upload, replace the test id 480 in
+`APP_ID` (`src/steam.rs`) with the real app id. `scripts/steam-upload.sh`
+refuses to upload when `APP_ID` and `STEAM_APP_ID` differ, and refuses any
+`steam_appid.txt` in the depot content.
 
 The redistributable comes from the `steamworks-sys` crate the build links
 against, or from `STEAM_SDK_LOCATION` when that is set
-(`scripts/steam-redist.sh`). It is placed where the loader looks:
+(`scripts/steam-redist.sh`). `scripts/package.sh --steam` places it where the
+loader looks, then starts the staged binary to prove it loads:
 
 - Windows: `steam_api64.dll` beside `arkonk.exe`.
-- Linux: `libsteam_api.so` beside `arkonk`; `build.rs` adds an `$ORIGIN` rpath
-  to Steam builds, so no wrapper script sets `LD_LIBRARY_PATH`.
+- Linux: `libsteam_api.so` beside `arkonk`. `build.rs` gives Steam builds an
+  `$ORIGIN` run path, which packaging checks, so no wrapper script has to set
+  `LD_LIBRARY_PATH`.
 - macOS: `libsteam_api.dylib` in `ARKONK.app/Contents/MacOS` (its install name
   is `@loader_path`), re-signed with the app before notarization.
 

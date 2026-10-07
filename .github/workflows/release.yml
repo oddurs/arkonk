@@ -103,10 +103,7 @@ jobs:
               missing="$missing $name"
             fi
           done
-          if [ -z "$(find dist -name '*-steam.zip')" ]; then
-            echo "::notice::Steam upload skipped: no Steam builds, because Cargo.toml has no steam feature yet."
-            echo "upload=false" >>"$GITHUB_OUTPUT"
-          elif [ -n "$missing" ]; then
+          if [ -n "$missing" ]; then
             echo "::notice::Steam upload skipped: not configured:$missing (see docs/RELEASING.md)."
             echo "upload=false" >>"$GITHUB_OUTPUT"
           else

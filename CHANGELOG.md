@@ -18,6 +18,8 @@ GitHub Release notes, so each `## [x.y.z]` heading must exist before tagging.
   per tick, verified by a headless benchmark.
 - A flat, modern presentation with an original 5×7 pixel typeface,
   synthesized sound, native Metal on macOS, and OpenGL on Windows and Linux.
+- Opt-in Steamworks integration (`steam` feature): achievements, rich
+  presence, overlay pause, and Steam Cloud.
 - Release packaging: per-platform zips with third-party license notices, a
   universal macOS app with Developer ID signing and notarization, a Windows
   executable with an icon and version resource and no console window, and a

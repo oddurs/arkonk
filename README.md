@@ -280,8 +280,9 @@ Additional tests cover medals, checkpoint isolation, malformed saves, replacing
 save files, drop cadence, anti-stall behavior, timing at 30–360 Hz, and the
 gamepad mapping: stick deadzone, menu repeat, device switching, and axis merging.
 `scripts/task` is the one entry point for checks: `fmt`, `fmt:check`, `lint`
-(Clippy over all features, `steam` included, with warnings denied), `test`, `build`, and `check`, which runs the
-format check, lint, tests, release build, and allocation benchmark in turn.
+(Clippy over all features, `steam` included, with warnings denied), `test`,
+`build`, and `check`, which runs the format check, lint, tests, release build,
+and allocation benchmark in turn.
 GitHub Actions runs `scripts/task check` on macOS, Linux, and Windows, and
 packages every platform on each pull request with the same workflow a release
 uses. `scripts/package.sh` builds this platform's release zip into `dist/`;
