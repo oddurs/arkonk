@@ -4,7 +4,7 @@ use crate::{
     pixel_font::{PixelFont, glyph},
     ui::{self, Screen, Ui},
 };
-use arkonk::{game::*, levels::CHAPTERS, physics::V2, profile::Profile};
+use ark::{game::*, levels::CHAPTERS, physics::V2, profile::Profile};
 use macroquad::models::Vertex;
 use macroquad::prelude::*;
 use std::{

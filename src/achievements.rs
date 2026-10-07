@@ -1,7 +1,7 @@
 //! Achievements derived from saved progress and sector results. The derivation is
 //! pure so it can be tested without a Steam client; `docs/steam/achievements.md`
 //! is the matching partner-site configuration.
-use crate::{
+use ark::{
     game::{Game, Mode, Phase},
     levels::LEVELS,
     profile::Profile,
@@ -32,7 +32,9 @@ pub enum Achievement {
     Chain,
 }
 impl Achievement {
-    pub const ALL: [Self; 12] = [
+    /// Every achievement, for checking the partner-site table.
+    #[cfg(test)]
+    const ALL: [Self; 12] = [
         Self::FirstLight,
         Self::Clean,
         Self::Swift,
@@ -113,7 +115,7 @@ pub fn from_clear(game: &Game) -> Vec<Achievement> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{game::LEVEL_COUNT, profile::Record};
+    use ark::{game::LEVEL_COUNT, profile::Record};
 
     fn with_medals(medals: [u8; LEVEL_COUNT]) -> Profile {
         let mut p = Profile::default();

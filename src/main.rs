@@ -1,21 +1,25 @@
 // Release builds use the GUI subsystem so Windows opens no console window
 // beside the game. Debug builds keep the console for development output.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+// Only Steam reports achievements and presence; both are tested without it.
+#[cfg(any(feature = "steam", test))]
+mod achievements;
 mod audio;
 mod diagnostics;
 mod display;
 mod input;
 mod perf;
 mod pixel_font;
+#[cfg(any(feature = "steam", test))]
+mod presence;
 mod render;
 mod smoke;
 mod steam;
 mod ui;
 
-use arkonk::{
+use ark::{
     game::*,
     physics::V2,
-    presence::Presence,
     profile::{Origin, Profile},
     timing::FixedClock,
 };
@@ -548,7 +552,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 }
             }
         }
-        steam.presence(Presence::of(ui.screen == Screen::Play, &game));
+        steam.presence(ui.screen == Screen::Play, &game);
         let show_cursor = ui.device == Device::KeyboardMouse
             && (ui.screen != Screen::Play || ui.paused || game.phase != Phase::Playing);
         if cursor_visible != show_cursor {

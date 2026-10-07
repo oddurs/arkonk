@@ -1,6 +1,6 @@
 //! The version-1 save file, byte for byte. Players' existing files must keep
 //! loading and must be rewritten exactly as before.
-use arkonk::profile::{Checkpoint, Profile, Record};
+use ark::profile::{Checkpoint, Profile, Record};
 
 #[test]
 fn encoded_layout() {

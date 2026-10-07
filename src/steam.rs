@@ -4,12 +4,11 @@ pub use imp::{Steam, restart_through_steam};
 
 #[cfg(feature = "steam")]
 mod imp {
-    use arkonk::{
+    use crate::{
         achievements::{self, Achievement, MEDALS_STAT},
-        game::Game,
         presence::Presence,
-        profile::Profile,
     };
+    use ark::{game::Game, profile::Profile};
     use steamworks::{AppId, CallbackResult, Client, SteamAPIInitError};
 
     /// The one place the Steam app id lives. 480 is Valve's shared Spacewar test
@@ -103,8 +102,10 @@ mod imp {
                 s.queue(profile, achievements::from_clear(game));
             }
         }
-        pub fn presence(&mut self, presence: Presence) {
+        /// What friends see: menus, or the sector being played.
+        pub fn presence(&mut self, playing: bool, game: &Game) {
             let Some(s) = &mut self.0 else { return };
+            let presence = Presence::of(playing, game);
             if s.presence == Some(presence) {
                 return;
             }
@@ -174,7 +175,7 @@ mod imp {
 
 #[cfg(not(feature = "steam"))]
 mod imp {
-    use arkonk::{game::Game, presence::Presence, profile::Profile};
+    use ark::{game::Game, profile::Profile};
 
     pub fn restart_through_steam() -> bool {
         false
@@ -192,6 +193,6 @@ mod imp {
             false
         }
         pub fn cleared(&mut self, _: &Game, _: &Profile) {}
-        pub fn presence(&mut self, _: Presence) {}
+        pub fn presence(&mut self, _: bool, _: &Game) {}
     }
 }

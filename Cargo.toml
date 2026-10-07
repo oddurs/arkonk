@@ -1,12 +1,26 @@
+[workspace]
+members = [".", "crates/ark"]
+default-members = [".", "crates/ark"]
+# Path dependencies under the workspace root join it automatically; the
+# vendored miniquad must stay outside so lints never run on it.
+exclude = ["vendor/miniquad"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+repository = "https://github.com/oddurs/arkonk"
+
 [package]
 name = "arkonk"
 version = "0.1.0"
-edition = "2024"
-rust-version = "1.88"
+edition.workspace = true
+rust-version.workspace = true
 default-run = "arkonk"
 description = "A compact, fixed-timestep Rust brick breaker"
-license = "MIT"
-repository = "https://github.com/oddurs/arkonk"
+license.workspace = true
+repository.workspace = true
 
 [features]
 # Opt-in so development, CI tests and the benchmark never need a Steam client;
@@ -14,12 +28,10 @@ repository = "https://github.com/oddurs/arkonk"
 steam = ["dep:steamworks"]
 
 [dependencies]
+ark = { path = "crates/ark" }
 gilrs = "0.11.2"
 macroquad = { version = "0.4.16", features = ["audio"] }
 steamworks = { version = "0.13.1", optional = true }
-
-[dev-dependencies]
-insta = "1.49.0"
 
 # Embeds the icon and version resource. Host-gated: only Windows builds use it.
 [target.'cfg(windows)'.build-dependencies]

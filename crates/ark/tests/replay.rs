@@ -12,7 +12,7 @@
 //! differently.
 mod common;
 
-use arkonk::game::{Events, Game, Input, Mode, Phase, Power};
+use ark::game::{Events, Game, Input, Mode, Phase, Power};
 use common::script::Pilot;
 use std::fmt::Write;
 

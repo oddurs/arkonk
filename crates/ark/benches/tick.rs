@@ -1,5 +1,10 @@
-//! Headless benchmarks. Run with `cargo run --release --bin benchmark`.
-use arkonk::{game::*, physics::V2};
+//! Headless simulation benchmark: `cargo bench -p ark`.
+//!
+//! Its assertions are gates, not just measurements: zero heap allocations
+//! while simulating, no exhausted collision budget, real brick impacts and
+//! every sector covered. Under `cargo test` (no `--bench` argument) it runs a
+//! shorter workload with the same assertions.
+use ark::{game::*, physics::V2};
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     hint::black_box,
@@ -92,11 +97,25 @@ fn setup(stress: bool, relays: bool, level: usize) -> Game {
     g
 }
 
-fn run(stress: bool, relays: bool) {
-    const BATCH: usize = 64;
-    const BATCHES: usize = 4096;
+/// How much work one scenario does.
+struct Load {
+    batches: usize,
+    /// Ticks spent in each sector before moving to the next.
+    sector_ticks: usize,
+}
+const BENCH: Load = Load {
+    batches: 4096,
+    sector_ticks: 20000,
+};
+const TEST: Load = Load {
+    batches: 1024,
+    sector_ticks: 5000,
+};
+const BATCH: usize = 64;
+
+fn run(load: &Load, stress: bool, relays: bool) {
     let mut game = setup(stress, relays, 0);
-    let mut samples = Vec::with_capacity(BATCHES);
+    let mut samples = Vec::with_capacity(load.batches);
     let mut score = 0_u64;
     let mut caps = 0_u64;
     let mut impacts = 0_u64;
@@ -107,16 +126,16 @@ fn run(stress: bool, relays: bool) {
     let mut tick = 0;
     ALLOCATIONS.store(0, Ordering::Relaxed);
     COUNTING.store(true, Ordering::Relaxed);
-    for _ in 0..BATCHES {
+    for _ in 0..load.batches {
         let start = Instant::now();
         for _ in 0..BATCH {
-            if tick % 20000 == 0
+            if tick % load.sector_ticks == 0
                 || matches!(game.phase, Phase::GameOver | Phase::Victory)
                 || (stress && (tick % 240 == 0 || game.phase != Phase::Playing))
             {
                 score += u64::from(game.score);
                 caps += game.collision_caps;
-                game = setup(stress, relays, (tick / 20000) % LEVEL_COUNT);
+                game = setup(stress, relays, (tick / load.sector_ticks) % LEVEL_COUNT);
             }
             level_mask |= 1 << game.level;
             if stress {
@@ -194,10 +213,10 @@ fn run(stress: bool, relays: bool) {
         } else {
             "Gameplay (autopaddle, all levels)"
         },
-        BATCH * BATCHES,
+        BATCH * load.batches,
         mean,
-        samples[BATCHES * 95 / 100],
-        samples[BATCHES * 99 / 100]
+        samples[load.batches * 95 / 100],
+        samples[load.batches * 99 / 100]
     );
     println!(
         "  allocations {allocations}, collision caps {caps}, brick impact ticks {impacts}, score checksum {score}, level mask {level_mask:012b}"
@@ -222,8 +241,13 @@ fn run(stress: bool, relays: bool) {
 }
 
 fn main() {
+    let load = if std::env::args().any(|a| a == "--bench") {
+        &BENCH
+    } else {
+        &TEST
+    };
     println!("ARKONK headless simulation benchmark (batch percentiles; excludes graphics/audio)");
-    run(false, false);
-    run(true, false);
-    run(true, true);
+    run(load, false, false);
+    run(load, true, false);
+    run(load, true, true);
 }

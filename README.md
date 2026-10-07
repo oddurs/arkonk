@@ -194,7 +194,7 @@ fixed pools in the renderer. A restart reuses them.
 Run the headless benchmark:
 
 ```sh
-cargo run --locked --release --bin benchmark
+cargo bench --locked -p ark
 ```
 
 Measured on an **Apple M4 Pro, arm64, Rust 1.98.1**, release profile:
@@ -320,9 +320,11 @@ desk cannot steer them. The OpenGL smoke test also writes `target/*-pad.png`
 captures of every screen with gamepad prompts.
 `--effects-test` exercises repeated full-board cascades, full pools, and resizing.
 
-`src/physics.rs` contains context-free geometry; `src/game.rs` contains the pure
-fixed-step simulation. `src/levels.rs` authors the journey, `src/profile.rs` persists it, and
-`src/timing.rs` schedules ticks. `src/main.rs` handles application transitions; `src/render.rs`,
+The simulation is its own crate, `crates/ark`, with no dependencies: `physics.rs`
+contains context-free geometry, `game.rs` the pure fixed-step simulation,
+`levels.rs` the authored journey, `profile.rs` its persistence, and `timing.rs`
+the tick scheduler. The root package is the desktop app.
+`src/main.rs` handles application transitions; `src/render.rs`,
 `src/audio.rs`, and `src/perf.rs` handle presentation, `src/ui.rs` holds menu
 layout and keyboard/mouse input, `src/input.rs` merges gamepads (via
 [gilrs](https://crates.io/crates/gilrs)) into the same controls and tracks the
@@ -336,9 +338,12 @@ Additional tests cover medals, checkpoint isolation, malformed saves, replacing
 save files, drop cadence, anti-stall behavior, timing at 30–360 Hz, and the
 gamepad mapping: stick deadzone, menu repeat, device switching, and axis merging.
 `scripts/task` is the one entry point for checks: `fmt`, `fmt:check`, `lint`
-(Clippy over all features, `steam` included, with warnings denied), `test`,
-`build`, and `check`, which runs the format check, lint, tests, release build,
-and allocation benchmark in turn.
+(Clippy over the whole workspace and all features, `steam` included, with
+warnings denied), `test` (every workspace target plus doc tests), `build`, and
+`check`, which runs the format check, lint, tests, release build, and
+allocation benchmark in turn. `crates/ark/tests/replay.rs` replays scripted
+sessions against recorded digests, so any change in simulation behaviour fails
+a test; `crates/ark/tests/save_format.rs` pins the save file byte for byte.
 GitHub Actions runs `scripts/task check` on macOS, Linux, and Windows, and
 packages every platform on each pull request with the same workflow a release
 uses. `scripts/package.sh` builds this platform's release zip into `dist/`;

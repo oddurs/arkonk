@@ -4,7 +4,7 @@ use crate::{
     input::{Dir, Presses, pad_controls},
     ui::{Controls, Screen, Ui},
 };
-use arkonk::{game::*, physics::V2, profile::Profile};
+use ark::{game::*, physics::V2, profile::Profile};
 use macroquad::prelude::{request_new_screen_size, screen_dpi_scale, screen_height, screen_width};
 pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls {
     let mut keys = Controls::default();

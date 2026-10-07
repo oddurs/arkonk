@@ -1,6 +1,6 @@
 //! What friends see in their Steam list. Tokens must match the localization file
 //! uploaded to Steam, `docs/steam/rich_presence.vdf`.
-use crate::{
+use ark::{
     game::{Game, Mode},
     levels::LEVELS,
 };
