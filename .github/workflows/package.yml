@@ -40,6 +40,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: package
+      - name: Refresh the container's package index
+        # install-action installs jq with apt, and the image's index is stale.
+        if: matrix.container
+        run: apt-get update
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-about@0.9.2
