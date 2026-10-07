@@ -4,7 +4,14 @@ use crate::{
     input::{Dir, Presses, pad_controls},
     ui::{Controls, Screen, Ui},
 };
-use ark::{game::*, physics::V2, profile::Profile};
+use ark::{
+    clock::TICK_HZ,
+    field::{BALL_RADIUS as RADIUS, CELLS, Cell, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
+    game::*,
+    geom::V2,
+    profile::Profile,
+    sectors::SectorId,
+};
 use macroquad::prelude::{request_new_screen_size, screen_dpi_scale, screen_height, screen_width};
 pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls {
     let mut keys = Controls::default();
@@ -44,7 +51,7 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         4 | 21 => {
             assert_eq!(game.phase, Phase::Cleared);
             assert!(profile.unlocked >= 2);
-            assert_eq!(profile.checkpoint.unwrap().level, 1);
+            assert_eq!(profile.checkpoint.unwrap().sector.index(), 1);
             game.phase_ticks = TICK_HZ / 2;
         }
         26 => keys.focus_lost = true,
@@ -57,7 +64,7 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         32 => {
             assert!(ui.screen == Screen::Play && !ui.paused);
             assert_eq!(game.phase, Phase::Ready);
-            assert_eq!(game.level, 1);
+            assert_eq!(game.sector.index(), 1);
             assert_eq!(game.score, profile.checkpoint.unwrap().score);
             assert_eq!(profile.records[0].medals, 7);
             assert_eq!(profile.records[1].medals, 7);
@@ -87,14 +94,14 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         40 => {
             assert!(!game.balls[0].held);
             assert_eq!(game.balls[0].phase_hits, 3);
-            *game = Game::at(8, Mode::Practice);
+            *game = Game::start(SectorId::clamped(8), Mode::Practice);
             game.step(&Input {
                 launch: true,
                 ..Input::default()
             });
             game.apply_power(Power::Phase);
-            let core = game.cores.iter().position(|&b| b).unwrap();
-            let r = Game::brick_rect(core);
+            let core = Cell::all().find(|c| game.cores[c.index()]).unwrap();
+            let r = cell_rect(core);
             game.balls[0].pos = V2::new(r.x - RADIUS - 1.0, r.y + r.h / 2.0);
             game.balls[0].velocity = V2::new(500.0, 0.0);
         }
@@ -126,7 +133,7 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         56 | 58 => {
             assert!(ui.screen == Screen::Play && !ui.paused);
             assert_eq!(game.phase, Phase::Ready);
-            assert!(game.level == 8 && game.mode == Mode::Practice);
+            assert!(game.sector.index() == 8 && game.mode == Mode::Practice);
             if frame == 56 {
                 keys = pad_controls(start, None, false);
             } else {
@@ -146,10 +153,10 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
 /// rendering stress fixture, deliberately denser than any shipped sector.
 pub fn effects(game: &mut Game, frame: u32) {
     if frame.is_multiple_of(90) {
-        *game = Game::at(10, Mode::Practice);
+        *game = Game::start(SectorId::clamped(10), Mode::Practice);
         game.bricks.fill(1);
         game.cores.fill(true);
-        game.remaining = ROWS * COLS;
+        game.remaining = CELLS;
         game.step(&Input {
             launch: true,
             ..Input::default()

@@ -2,21 +2,21 @@
 //! uploaded to Steam, `docs/steam/rich_presence.vdf`.
 use ark::{
     game::{Game, Mode},
-    levels::LEVELS,
+    sectors::SectorId,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Presence {
     Menus,
-    Journey(usize),
-    Practice(usize),
+    Journey(SectorId),
+    Practice(SectorId),
 }
 impl Presence {
     pub fn of(playing: bool, game: &Game) -> Self {
         match (playing, game.mode) {
             (false, _) => Self::Menus,
-            (true, Mode::Journey) => Self::Journey(game.level),
-            (true, Mode::Practice) => Self::Practice(game.level),
+            (true, Mode::Journey) => Self::Journey(game.sector),
+            (true, Mode::Practice) => Self::Practice(game.sector),
         }
     }
     /// The `steam_display` token.
@@ -29,10 +29,11 @@ impl Presence {
     }
     /// The `%sector%` and `%name%` substitutions, e.g. `("03", "Slipstream")`.
     pub fn sector(self) -> Option<(String, String)> {
-        let (Self::Journey(level) | Self::Practice(level)) = self else {
+        let (Self::Journey(sector) | Self::Practice(sector)) = self else {
             return None;
         };
-        let name = LEVELS[level]
+        let name = sector
+            .sector()
             .name
             .split_whitespace()
             .map(|word| {
@@ -41,7 +42,7 @@ impl Presence {
             })
             .collect::<Vec<_>>()
             .join(" ");
-        Some((format!("{:02}", level + 1), name))
+        Some((format!("{:02}", sector.index() + 1), name))
     }
 }
 
@@ -51,22 +52,27 @@ mod tests {
 
     #[test]
     fn menus_and_sectors_read_naturally() {
-        let mut game = Game::at(2, Mode::Journey);
+        let mut game = Game::start(SectorId::clamped(2), Mode::Journey);
         assert_eq!(Presence::of(false, &game), Presence::Menus);
         assert_eq!(Presence::Menus.sector(), None);
         let journey = Presence::of(true, &game);
-        assert_eq!(journey, Presence::Journey(2));
+        assert_eq!(journey, Presence::Journey(SectorId::clamped(2)));
         assert_eq!(journey.sector(), Some(("03".into(), "Slipstream".into())));
-        game = Game::at(0, Mode::Practice);
+        game = Game::start(SectorId::FIRST, Mode::Practice);
         let practice = Presence::of(true, &game);
-        assert_eq!(practice, Presence::Practice(0));
+        assert_eq!(practice, Presence::Practice(SectorId::FIRST));
         assert_eq!(practice.sector(), Some(("01".into(), "First Light".into())));
     }
 
     #[test]
     fn localization_file_defines_every_token() {
         let vdf = include_str!("../docs/steam/rich_presence.vdf");
-        for p in [Presence::Menus, Presence::Journey(0), Presence::Practice(0)] {
+        let first = SectorId::FIRST;
+        for p in [
+            Presence::Menus,
+            Presence::Journey(first),
+            Presence::Practice(first),
+        ] {
             assert!(vdf.contains(&format!("\"{}\"", p.token())), "{p:?}");
         }
         assert!(vdf.contains("%sector%") && vdf.contains("%name%"));

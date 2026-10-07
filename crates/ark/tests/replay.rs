@@ -12,7 +12,10 @@
 //! differently.
 mod common;
 
-use ark::game::{Events, Game, Input, Mode, Phase, Power};
+use ark::{
+    game::{Events, Game, Input, Mode, Phase, Power},
+    sectors::SectorId,
+};
 use common::script::Pilot;
 use std::fmt::Write;
 
@@ -52,7 +55,7 @@ impl Digest {
             Mode::Journey => 0,
             Mode::Practice => 1,
         });
-        self.u8(g.level as u8);
+        self.u8(g.sector.index() as u8);
         self.u32(g.score);
         self.u8(g.lives);
         self.u32(g.remaining as u32);
@@ -181,7 +184,7 @@ impl Recorder {
                     self.out,
                     "{:>6}  sector {:02} {:<9} score {:>6}  lives {}  bricks {:>2}  {:016x}",
                     self.tick,
-                    game.level + 1,
+                    game.sector.index() + 1,
                     stage_name(game.phase),
                     game.score,
                     game.lives,
@@ -207,7 +210,7 @@ fn every_sector() {
     let mut out = String::new();
     for sector in 0..12 {
         for (seed, mode) in [(1, Mode::Journey), (2, Mode::Practice)] {
-            let mut game = Game::at(sector, mode);
+            let mut game = Game::start(SectorId::new(sector).unwrap(), mode);
             let mut r = Recorder::new(&format!("sector {:02} {mode:?} seed {seed}", sector + 1));
             r.run(&mut game, 6 * CHECKPOINT, pilot(seed * 100 + sector as u64));
             out += &r.out;
@@ -244,7 +247,7 @@ fn journey() {
     ignore = "f32 goldens are recorded on macOS arm64 at opt-level 0"
 )]
 fn full_board_relay() {
-    let mut game = Game::at(0, Mode::Journey);
+    let mut game = Game::start(SectorId::new(0).unwrap(), Mode::Journey);
     game.step(&Input {
         launch: true,
         ..Input::default()
@@ -271,7 +274,7 @@ fn every_power() {
         Power::Anchor,
         Power::Phase,
     ];
-    let mut game = Game::at(4, Mode::Practice);
+    let mut game = Game::start(SectorId::new(4).unwrap(), Mode::Practice);
     let mut r = Recorder::new("every power in turn, twice");
     let mut pilot = pilot(12);
     r.run(&mut game, 8 * CHECKPOINT, |tick, game| {
@@ -290,7 +293,7 @@ fn every_power() {
     ignore = "f32 goldens are recorded on macOS arm64 at opt-level 0"
 )]
 fn anchor_hold() {
-    let mut game = Game::at(1, Mode::Journey);
+    let mut game = Game::start(SectorId::new(1).unwrap(), Mode::Journey);
     let mut r = Recorder::new("anchor catches held for seconds, then released");
     let mut pilot = pilot(13);
     r.run(&mut game, 6 * CHECKPOINT, |tick, game| {
@@ -314,7 +317,7 @@ fn sector_endings() {
     // The last sector of each chapter: medals, the chapter's extra life, the
     // next chapter's opening and, after the twelfth, victory.
     for sector in [3, 7, 11] {
-        let mut game = Game::at(sector, Mode::Journey);
+        let mut game = Game::start(SectorId::new(sector).unwrap(), Mode::Journey);
         let mut kept = 0;
         for cell in (0..game.bricks.len()).rev() {
             if game.bricks[cell] > 0 {

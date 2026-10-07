@@ -4,13 +4,27 @@ use crate::{
     pixel_font::{PixelFont, glyph},
     ui::{self, Screen, Ui},
 };
-use ark::{game::*, levels::CHAPTERS, physics::V2, profile::Profile};
+use ark::{
+    clock::{DT, TICK_HZ},
+    field::{
+        BALL_RADIUS as RADIUS, BOTTOM, CELL_H, CELL_W, CELLS, Cell, LEFT, PADDLE_Y, RIGHT, TOP,
+        cell_rect,
+    },
+    game::*,
+    geom::V2,
+    profile::Profile,
+    sectors::{CHAPTERS, SECTOR_COUNT, SectorId},
+};
 use macroquad::models::Vertex;
 use macroquad::prelude::*;
 use std::{
     f32::consts::{FRAC_PI_2, TAU},
     fmt::Write,
 };
+
+/// The fixed scene, in scene units; the window shows it scaled and centered.
+pub const WIDTH: f32 = 960.0;
+pub const HEIGHT: f32 = 900.0;
 
 const BG: Color = Color::new(0.027, 0.033, 0.055, 1.0);
 const SURFACE: Color = Color::new(0.050, 0.060, 0.092, 1.0);
@@ -399,12 +413,12 @@ pub struct Renderer {
     trails: [[V2; 12]; MAX_BALLS],
     trail_len: [usize; MAX_BALLS],
     cursor: usize,
-    brick_flash: [f32; ROWS * COLS],
-    previous_bricks: [u8; ROWS * COLS],
+    brick_flash: [f32; CELLS],
+    previous_bricks: [u8; CELLS],
     popups: [Popup; 16],
     popup_cursor: usize,
     previous_score: u32,
-    previous_level: usize,
+    previous_sector: Option<SectorId>,
     paddle_flash: f32,
     wall_flash: f32,
     pickup_flash: f32,
@@ -424,12 +438,12 @@ impl Renderer {
             trails: [[V2::default(); 12]; MAX_BALLS],
             trail_len: [0; MAX_BALLS],
             cursor: 0,
-            brick_flash: [0.0; ROWS * COLS],
-            previous_bricks: [0; ROWS * COLS],
+            brick_flash: [0.0; CELLS],
+            previous_bricks: [0; CELLS],
             popups: [Popup::default(); 16],
             popup_cursor: 0,
             previous_score: 0,
-            previous_level: usize::MAX,
+            previous_sector: None,
             paddle_flash: 0.0,
             wall_flash: 0.0,
             pickup_flash: 0.0,
@@ -452,15 +466,15 @@ impl Renderer {
         self.previous_bricks.fill(0);
         self.popups.fill(Popup::default());
         self.previous_score = 0;
-        self.previous_level = usize::MAX;
+        self.previous_sector = None;
         self.paddle_flash = 0.0;
         self.wall_flash = 0.0;
         self.pickup_flash = 0.0;
     }
     pub fn record(&mut self, game: &Game) {
-        if self.previous_level != game.level {
+        if self.previous_sector != Some(game.sector) {
             self.reset();
-            self.previous_level = game.level;
+            self.previous_sector = Some(game.sector);
             self.previous_bricks = game.bricks;
             self.previous_score = game.score;
         }
@@ -490,12 +504,13 @@ impl Renderer {
             popup.pos.y -= 22.0 * DT;
         }
         let mut popup_spawned = false;
-        for (i, flash) in self.brick_flash.iter_mut().enumerate() {
+        for (cell, flash) in Cell::all().zip(&mut self.brick_flash) {
+            let i = cell.index();
             *flash = (*flash - DT).max(0.0);
             if game.events.brick && game.bricks[i] < self.previous_bricks[i] {
                 *flash = 0.18;
                 if !popup_spawned && game.score > self.previous_score {
-                    let r = Game::brick_rect(i);
+                    let r = cell_rect(cell);
                     self.popups[self.popup_cursor] = Popup {
                         pos: V2::new(r.x + r.w / 2.0, r.y),
                         life: 0.65,
@@ -747,17 +762,17 @@ impl Renderer {
     }
     fn bricks(&self, v: &Scene, game: &Game) {
         // Quiet connections make the actual orthogonal blast routes readable.
-        for (i, &core) in game.cores.iter().enumerate() {
-            if !core || game.bricks[i] == 0 {
+        for cell in Cell::all() {
+            let i = cell.index();
+            if !game.cores[i] || game.bricks[i] == 0 {
                 continue;
             }
-            let r = Game::brick_rect(i);
-            for (valid, other) in [
-                (i % COLS + 1 < COLS, i + 1),
-                (i / COLS + 1 < ROWS, i + COLS),
-            ] {
-                if valid && game.cores[other] && game.bricks[other] > 0 {
-                    let next = Game::brick_rect(other);
+            let r = cell_rect(cell);
+            let [_, right, _, down] = cell.neighbors();
+            for other in [right, down].into_iter().flatten() {
+                let other_i = other.index();
+                if game.cores[other_i] && game.bricks[other_i] > 0 {
+                    let next = cell_rect(other);
                     v.line(
                         V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0),
                         V2::new(next.x + next.w / 2.0, next.y + next.h / 2.0),
@@ -768,12 +783,14 @@ impl Renderer {
             }
         }
         let pulse = 0.7 + 0.15 * (game.phase_ticks as f32 * DT * 2.0).sin();
-        for (i, &hp) in game.bricks.iter().enumerate() {
-            let r = Game::brick_rect(i);
+        for cell in Cell::all() {
+            let i = cell.index();
+            let hp = game.bricks[i];
+            let r = cell_rect(cell);
             let c = if game.cores[i] {
                 AMBER
             } else {
-                sector_color(i / COLS, LEVELS[game.level].chapter)
+                sector_color(cell.row(), game.sector.sector().chapter)
             };
             let flash = self.brick_flash[i] / 0.18;
             if hp == 0 {
@@ -820,11 +837,12 @@ impl Renderer {
         }
     }
     fn effects(&self, v: &Scene, game: &Game) {
-        for (index, &flash) in game.relay_flash.iter().enumerate() {
+        for cell in Cell::all() {
+            let flash = game.relay_flash[cell.index()];
             if flash == 0 {
                 continue;
             }
-            let r = Game::brick_rect(index);
+            let r = cell_rect(cell);
             let progress = 1.0 - f32::from(flash) / 36.0;
             let center = V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
             let color = opacity(AMBER, (1.0 - progress) * 0.75);
@@ -854,7 +872,7 @@ impl Renderer {
                 continue;
             }
             let c = opacity(
-                sector_color(p.hue % 7, LEVELS[game.level].chapter),
+                sector_color(p.hue % 7, game.sector.sector().chapter),
                 (p.life * 3.0).min(1.0),
             );
             v.line(
@@ -985,19 +1003,19 @@ impl Renderer {
             } else {
                 "SECTOR"
             },
-            game.level + 1
+            game.sector.index() + 1
         );
         v.centered(&self.scratch, 72.0, 11.0, DIM);
-        v.centered(LEVELS[game.level].name, 104.0, 13.0, INK);
-        for i in 0..LEVEL_COUNT {
+        v.centered(game.sector.sector().name, 104.0, 13.0, INK);
+        for id in SectorId::all() {
             v.rect(
-                WIDTH / 2.0 - 94.0 + i as f32 * 16.0,
+                WIDTH / 2.0 - 94.0 + id.index() as f32 * 16.0,
                 116.0,
                 12.0,
                 2.0,
-                if i == game.level {
+                if id == game.sector {
                     CYAN
-                } else if profile.records[i].medals > 0 {
+                } else if profile.records[id.index()].medals > 0 {
                     DIM
                 } else {
                     MUTED
@@ -1016,13 +1034,13 @@ impl Renderer {
         }
     }
     fn ready(&mut self, v: &Scene, game: &Game) {
-        let level = &LEVELS[game.level];
+        let level = game.sector.sector();
         self.scratch.clear();
         let _ = write!(
             self.scratch,
             "{}   SECTOR {:02}",
             CHAPTERS[level.chapter],
-            game.level + 1
+            game.sector.index() + 1
         );
         v.centered(&self.scratch, 548.0, 11.0, sector_color(0, level.chapter));
         v.centered(level.name, 584.0, 22.0, INK);
@@ -1077,8 +1095,8 @@ impl Renderer {
             let _ = write!(
                 self.scratch,
                 "SAVED AT SECTOR {:02} / {}",
-                c.level + 1,
-                LEVELS[c.level].name
+                c.sector.index() + 1,
+                c.sector.sector().name
             );
         } else {
             self.scratch
@@ -1091,10 +1109,10 @@ impl Renderer {
             self.scratch.clear();
             match i {
                 0 => {
-                    let _ = write!(self.scratch, "{} / {LEVEL_COUNT}", profile.unlocked);
+                    let _ = write!(self.scratch, "{} / {SECTOR_COUNT}", profile.unlocked);
                 }
                 1 => {
-                    let _ = write!(self.scratch, "{} / {}", profile.medals(), LEVEL_COUNT * 3);
+                    let _ = write!(self.scratch, "{} / {}", profile.medals(), SECTOR_COUNT * 3);
                 }
                 _ => grouped(&mut self.scratch, profile.best_score),
             }
@@ -1133,10 +1151,11 @@ impl Renderer {
             let r = ui::sector_rect(chapter * 4);
             v.text(title, r.x + 2.0, r.y - 16.0, 11.0, sector_color(0, chapter));
         }
-        for (i, level) in LEVELS.iter().enumerate() {
+        for id in SectorId::all() {
+            let (i, level) = (id.index(), id.sector());
             let r = ui::sector_rect(i);
             let unlocked = i < profile.unlocked;
-            let selected = i == ui.sector;
+            let selected = id == ui.sector;
             if selected {
                 v.rounded(
                     r.x - 1.5,
@@ -1165,23 +1184,21 @@ impl Renderer {
                 11.0,
                 if unlocked { INK } else { MUTED },
             );
-            for (row, pattern) in level.rows.iter().enumerate() {
-                for (col, hp) in pattern.bytes().enumerate() {
-                    if hp != b'.' {
-                        v.rect(
-                            r.x + 14.0 + col as f32 * 9.0,
-                            r.y + 38.0 + row as f32 * 7.0,
-                            7.0,
-                            4.0,
-                            if !unlocked {
-                                opacity(MUTED, 0.45)
-                            } else if hp == b'R' {
-                                AMBER
-                            } else {
-                                shade(sector_color(row, level.chapter), 0.8)
-                            },
-                        );
-                    }
+            for cell in Cell::all() {
+                if level.layout.hp[cell.index()] > 0 {
+                    v.rect(
+                        r.x + 14.0 + cell.col() as f32 * 9.0,
+                        r.y + 38.0 + cell.row() as f32 * 7.0,
+                        7.0,
+                        4.0,
+                        if !unlocked {
+                            opacity(MUTED, 0.45)
+                        } else if level.layout.cores.contains(cell) {
+                            AMBER
+                        } else {
+                            shade(sector_color(cell.row(), level.chapter), 0.8)
+                        },
+                    );
                 }
             }
             if unlocked {
@@ -1215,13 +1232,13 @@ impl Renderer {
             }
         }
 
-        let level = &LEVELS[ui.sector];
-        let record = profile.records[ui.sector];
+        let level = ui.sector.sector();
+        let record = profile.records[ui.sector.index()];
         self.scratch.clear();
         let _ = write!(
             self.scratch,
             "{:02} {}   SWIFT UNDER {} SECONDS",
-            ui.sector + 1,
+            ui.sector.index() + 1,
             level.name,
             level.par_seconds
         );
@@ -1236,10 +1253,10 @@ impl Renderer {
             11.0,
             DIM,
         );
-        let open = ui.sector < profile.unlocked;
+        let open = ui.sector.index() < profile.unlocked;
         self.scratch.clear();
         if open {
-            let _ = write!(self.scratch, "PLAY SECTOR {:02}", ui.sector + 1);
+            let _ = write!(self.scratch, "PLAY SECTOR {:02}", ui.sector.index() + 1);
         } else {
             self.scratch.push_str("CLEAR THE PREVIOUS SECTOR");
         }

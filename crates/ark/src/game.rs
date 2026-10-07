@@ -1,25 +1,16 @@
-use crate::physics::{Rect, V2, sweep_circle};
+use crate::{
+    clock::{DT, TICK_HZ},
+    field::{
+        BALL_RADIUS as RADIUS, BOTTOM, CELLS, COLS, Cell, FIELD, LEFT, PADDLE_Y, RIGHT, TOP,
+        cell_rect, swept_cells,
+    },
+    geom::{Rect, V2, sweep_circle_rect},
+    sectors::SectorId,
+};
 
-pub const WIDTH: f32 = 960.0;
-pub const HEIGHT: f32 = 900.0;
-pub const LEFT: f32 = 64.0;
-pub const RIGHT: f32 = 896.0;
-pub const TOP: f32 = 136.0;
-pub const BOTTOM: f32 = 814.0;
-pub const PADDLE_Y: f32 = 770.0;
-pub const RADIUS: f32 = 7.0;
-pub const TICK_HZ: u32 = 240;
-pub const DT: f32 = 1.0 / TICK_HZ as f32;
 pub const PADDLE_WIDTH: f32 = 118.0;
-pub const COLS: usize = 12;
-pub const ROWS: usize = 7;
-pub const GRID_X: f32 = 96.0;
-pub const GRID_Y: f32 = 190.0;
-pub const CELL_W: f32 = 64.0;
-pub const CELL_H: f32 = 32.0;
 pub const MAX_BALLS: usize = 3;
 pub const RELAY_TICKS: u8 = 10; // 42 ms per hop, independent of display refresh.
-pub use crate::levels::{LEVEL_COUNT, LEVELS};
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum Mode {
@@ -162,11 +153,11 @@ pub struct Game {
     pub anchor_charges: u8,
     pub notice: Option<Power>,
     pub notice_ticks: u32,
-    pub cores: [bool; ROWS * COLS],
-    pub relay_delay: [u8; ROWS * COLS],
-    pub relay_flash: [u8; ROWS * COLS],
+    pub cores: [bool; CELLS],
+    pub relay_delay: [u8; CELLS],
+    pub relay_flash: [u8; CELLS],
     pub balls: [Ball; MAX_BALLS],
-    pub bricks: [u8; ROWS * COLS],
+    pub bricks: [u8; CELLS],
     pub particles: [Particle; 384],
     pub drops: [Drop; 12],
     pub paddle_x: f32,
@@ -174,7 +165,7 @@ pub struct Game {
     pub paddle_width: f32,
     pub score: u32,
     pub lives: u8,
-    pub level: usize,
+    pub sector: SectorId,
     pub remaining: usize,
     pub wide_time: f32,
     pub slow_time: f32,
@@ -212,19 +203,19 @@ impl Game {
             anchor_charges: 0,
             notice: None,
             notice_ticks: 0,
-            cores: [false; ROWS * COLS],
-            relay_delay: [0; ROWS * COLS],
-            relay_flash: [0; ROWS * COLS],
+            cores: [false; CELLS],
+            relay_delay: [0; CELLS],
+            relay_flash: [0; CELLS],
             balls: [Ball::default(); MAX_BALLS],
-            bricks: [0; ROWS * COLS],
+            bricks: [0; CELLS],
             particles: [Particle::default(); 384],
             drops: [Drop::default(); 12],
-            paddle_x: WIDTH / 2.0,
-            paddle_previous: WIDTH / 2.0,
+            paddle_x: FIELD.center().x,
+            paddle_previous: FIELD.center().x,
             paddle_width: PADDLE_WIDTH,
             score: 0,
             lives: 3,
-            level: 0,
+            sector: SectorId::FIRST,
             remaining: 0,
             wide_time: 0.0,
             slow_time: 0.0,
@@ -234,7 +225,7 @@ impl Game {
             particle_cursor: 0,
             combo: 0,
         };
-        game.load_level();
+        game.load_sector();
         game
     }
 
@@ -245,26 +236,20 @@ impl Game {
         self.random as f32 / u32::MAX as f32
     }
 
-    pub fn brick_rect(index: usize) -> Rect {
-        Rect {
-            x: GRID_X + (index % COLS) as f32 * CELL_W,
-            y: GRID_Y + (index / COLS) as f32 * CELL_H,
-            w: 58.0,
-            h: 24.0,
-        }
-    }
-
-    pub fn at(level: usize, mode: Mode) -> Self {
+    pub fn start(sector: SectorId, mode: Mode) -> Self {
         let mut game = Self::new();
-        game.level = level.min(LEVEL_COUNT - 1);
+        game.sector = sector;
         game.mode = mode;
-        game.load_level();
+        game.load_sector();
         game
     }
 
-    fn load_level(&mut self) {
-        self.bricks = crate::levels::layout(self.level);
-        self.cores = crate::levels::cores(self.level);
+    fn load_sector(&mut self) {
+        let layout = self.sector.sector().layout;
+        self.bricks = layout.hp;
+        for cell in Cell::all() {
+            self.cores[cell.index()] = layout.cores.contains(cell);
+        }
         self.relay_delay.fill(0);
         self.relay_flash.fill(0);
         self.opening_collected = false;
@@ -283,10 +268,11 @@ impl Game {
 
     fn finish_sector(&mut self) {
         let clean = !self.lost_in_sector;
-        let swift = self.sector_ticks <= LEVELS[self.level].par_seconds * TICK_HZ;
+        let swift = self.sector_ticks <= self.sector.sector().par_seconds * TICK_HZ;
         let bonus = 1000 + u32::from(clean) * 500 + u32::from(swift) * 500;
-        let life_earned =
-            self.mode == Mode::Journey && (self.level + 1).is_multiple_of(4) && self.lives < 5;
+        let life_earned = self.mode == Mode::Journey
+            && (self.sector.index() + 1).is_multiple_of(4)
+            && self.lives < 5;
         if life_earned {
             self.lives += 1;
         }
@@ -298,7 +284,7 @@ impl Game {
             best_combo: self.best_combo,
             life_earned,
         };
-        self.phase = if self.level + 1 == LEVEL_COUNT && self.mode == Mode::Journey {
+        self.phase = if self.sector.next().is_none() && self.mode == Mode::Journey {
             Phase::Victory
         } else {
             Phase::Cleared
@@ -337,12 +323,12 @@ impl Game {
     }
 
     pub fn speed(&self) -> f32 {
-        (LEVELS[self.level].speed + self.rally_hits.min(20) as f32 * 4.0)
+        (self.sector.sector().speed + self.rally_hits.min(20) as f32 * 4.0)
             * if self.slow_time > 0.0 { 0.74 } else { 1.0 }
     }
 
     pub fn launch_velocity(&self) -> V2 {
-        let toward_center = if self.paddle_x > WIDTH / 2.0 + 40.0 {
+        let toward_center = if self.paddle_x > FIELD.center().x + 40.0 {
             -1.0
         } else {
             1.0
@@ -385,9 +371,10 @@ impl Game {
             if self.mode == Mode::Journey
                 && self.advance_requested
                 && self.phase_ticks >= TICK_HZ / 2
+                && let Some(next) = self.sector.next()
             {
-                self.level += 1;
-                self.load_level();
+                self.sector = next;
+                self.load_sector();
             }
             return;
         }
@@ -437,7 +424,11 @@ impl Game {
                     && ball.velocity.x.abs() < ball.velocity.length() * 0.08
                 {
                     let speed = ball.velocity.length();
-                    let sign = if ball.pos.x > WIDTH / 2.0 { -1.0 } else { 1.0 };
+                    let sign = if ball.pos.x > FIELD.center().x {
+                        -1.0
+                    } else {
+                        1.0
+                    };
                     ball.velocity =
                         V2::new(speed * 0.16 * sign, ball.velocity.y).normalized() * speed;
                 }
@@ -499,7 +490,8 @@ impl Game {
         while ignored != 0 {
             let i = ignored.trailing_zeros() as usize;
             ignored &= ignored - 1;
-            let r = Self::brick_rect(i);
+            let Some(cell) = Cell::new(i) else { continue };
+            let r = cell_rect(cell);
             if ball.pos.x < r.x - RADIUS
                 || ball.pos.x > r.x + r.w + RADIUS
                 || ball.pos.y < r.y - RADIUS
@@ -576,7 +568,7 @@ impl Game {
                     w: self.paddle_width,
                     h: 14.0,
                 };
-                if let Some(hit) = sweep_circle(
+                if let Some(hit) = sweep_circle_rect(
                     ball.pos,
                     delta - V2::new(paddle_speed * remaining, 0.0),
                     RADIUS,
@@ -588,27 +580,17 @@ impl Game {
                     kind = 2;
                 }
             }
-            let end = ball.pos + delta;
-            let c0 = (((ball.pos.x.min(end.x) - RADIUS - GRID_X) / CELL_W).floor() as i32).max(0);
-            let c1 = (((ball.pos.x.max(end.x) + RADIUS - GRID_X) / CELL_W).floor() as i32)
-                .min(COLS as i32 - 1);
-            let r0 = (((ball.pos.y.min(end.y) - RADIUS - GRID_Y) / CELL_H).floor() as i32).max(0);
-            let r1 = (((ball.pos.y.max(end.y) + RADIUS - GRID_Y) / CELL_H).floor() as i32)
-                .min(ROWS as i32 - 1);
-            for row in r0..=r1 {
-                for col in c0..=c1 {
-                    let i = row as usize * COLS + col as usize;
-                    if self.bricks[i] > 0
-                        && ball.phase_ignore & (1_u128 << i) == 0
-                        && let Some(hit) =
-                            sweep_circle(ball.pos, delta, RADIUS, Self::brick_rect(i))
-                        && hit.t <= hit_t
-                    {
-                        hit_t = hit.t;
-                        normal = hit.normal;
-                        kind = 3;
-                        brick_index = i;
-                    }
+            for cell in swept_cells(ball.pos, ball.pos + delta, RADIUS) {
+                let i = cell.index();
+                if self.bricks[i] > 0
+                    && ball.phase_ignore & (1_u128 << i) == 0
+                    && let Some(hit) = sweep_circle_rect(ball.pos, delta, RADIUS, cell_rect(cell))
+                    && hit.t <= hit_t
+                {
+                    hit_t = hit.t;
+                    normal = hit.normal;
+                    kind = 3;
+                    brick_index = i;
                 }
             }
             ball.pos += delta * hit_t;
@@ -728,9 +710,9 @@ impl Game {
             || (self.since_drop >= 3 && self.random() < 0.18)
         {
             let power = if !self.opening_collected {
-                LEVELS[self.level].opening
+                self.sector.sector().opening
             } else {
-                let count = match self.level {
+                let count = match self.sector.index() {
                     0 => 2,
                     1..=3 => 3,
                     4..=7 => 4,
@@ -758,7 +740,7 @@ impl Game {
     fn advance_relays(&mut self) {
         // Snapshot the due cells before propagation: traversal order cannot
         // change timing, and even a full board fits this fixed queue.
-        let mut due = [false; ROWS * COLS];
+        let mut due = [false; CELLS];
         for (index, delay) in self.relay_delay.iter_mut().enumerate() {
             if *delay > 0 {
                 *delay -= 1;
@@ -771,18 +753,11 @@ impl Game {
             }
             self.events.relay = true;
             self.relay_flash[index] = 36;
-            let row = index / COLS;
-            let col = index % COLS;
-            for (valid, neighbor) in [
-                (col > 0, index.wrapping_sub(1)),
-                (col + 1 < COLS, index + 1),
-                (row > 0, index.wrapping_sub(COLS)),
-                (row + 1 < ROWS, index + COLS),
-            ] {
-                if valid {
-                    let r = Self::brick_rect(neighbor);
-                    self.damage_brick(neighbor, V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0), false);
-                }
+            let Some(cell) = Cell::new(index) else {
+                continue;
+            };
+            for neighbor in cell.neighbors().into_iter().flatten() {
+                self.damage_brick(neighbor.index(), cell_rect(neighbor).center(), false);
             }
         }
     }
@@ -826,7 +801,7 @@ impl Game {
         self.events.pickup = true;
         self.notice = Some(power);
         self.notice_ticks = TICK_HZ * 2;
-        if power == LEVELS[self.level].opening {
+        if power == self.sector.sector().opening {
             self.opening_collected = true;
         }
         self.burst(V2::new(self.paddle_x, PADDLE_Y), 2, 24);
@@ -885,6 +860,13 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        field::{CELL_H, CELL_W, GRID_X, GRID_Y, ROWS},
+        sectors::SECTOR_COUNT,
+    };
+    fn sector(index: usize) -> SectorId {
+        SectorId::new(index).unwrap()
+    }
     fn playing() -> Game {
         let mut g = Game::new();
         g.step(&Input {
@@ -956,7 +938,7 @@ mod tests {
     #[test]
     fn exhausted_budget_keeps_last_safe_position() {
         let mut g = playing();
-        g.balls[0].pos = V2::new(WIDTH / 2.0, 600.0);
+        g.balls[0].pos = V2::new(FIELD.center().x, 600.0);
         g.balls[0].velocity = V2::new(1_000_000_000.0, 0.0);
         g.step(&Input::default());
         assert_eq!(g.collision_caps, 1);
@@ -983,7 +965,7 @@ mod tests {
         g.bricks.fill(0);
         g.remaining = 0;
         g.step(&Input::default());
-        assert_eq!(g.level, 0);
+        assert_eq!(g.sector, SectorId::FIRST);
         assert_eq!(g.phase, Phase::Cleared);
         for _ in 0..TICK_HZ {
             g.step(&Input::default());
@@ -993,9 +975,9 @@ mod tests {
             launch: true,
             ..Input::default()
         });
-        assert_eq!(g.level, 1);
+        assert_eq!(g.sector, sector(1));
         assert_eq!(g.phase, Phase::Ready);
-        g.level = LEVELS.len() - 1;
+        g.sector = sector(SECTOR_COUNT - 1);
         g.phase = Phase::Playing;
         g.bricks.fill(0);
         g.remaining = 0;
@@ -1034,7 +1016,7 @@ mod tests {
     }
     #[test]
     fn chapter_rewards_and_medals_follow_actual_play() {
-        let mut g = Game::at(3, Mode::Journey);
+        let mut g = Game::start(sector(3), Mode::Journey);
         g.phase = Phase::Playing;
         g.remaining = 0;
         g.bricks.fill(0);
@@ -1049,12 +1031,12 @@ mod tests {
         }
         assert_eq!(g.sector_ticks, ticks);
         assert_eq!(g.lives, 4);
-        let mut g = Game::at(0, Mode::Practice);
+        let mut g = Game::start(sector(0), Mode::Practice);
         g.phase = Phase::Playing;
         g.remaining = 0;
         g.bricks.fill(0);
         g.lost_in_sector = true;
-        g.sector_ticks = LEVELS[0].par_seconds * TICK_HZ;
+        g.sector_ticks = SectorId::FIRST.sector().par_seconds * TICK_HZ;
         g.step(&Input::default());
         assert_eq!(g.summary.medals, 1);
         assert_eq!(g.summary.bonus, 1000);
@@ -1065,7 +1047,7 @@ mod tests {
             });
         }
         assert_eq!(g.phase, Phase::Cleared);
-        assert_eq!(g.level, 0);
+        assert_eq!(g.sector, SectorId::FIRST);
     }
     #[test]
     fn flat_rallies_are_corrected_without_changing_speed() {
@@ -1315,8 +1297,9 @@ mod tests {
     }
     #[test]
     fn opening_drops_teach_the_sector_and_random_drops_follow_unlocks() {
-        for (level, definition) in LEVELS.iter().enumerate() {
-            let mut g = Game::at(level, Mode::Practice);
+        for id in SectorId::all() {
+            let (level, definition) = (id.index(), id.sector());
+            let mut g = Game::start(id, Mode::Practice);
             g.cores.fill(false);
             g.bricks.fill(1);
             g.remaining = ROWS * COLS;
@@ -1350,7 +1333,7 @@ mod tests {
                 .balls
                 .iter()
                 .find(|b| b.active)
-                .map_or(WIDTH / 2.0, |b| b.pos.x)
+                .map_or(FIELD.center().x, |b| b.pos.x)
                 + (tick as f32 * 0.003).sin() * 36.0;
             let input = Input {
                 mouse_x: Some(x),

@@ -18,10 +18,12 @@ mod steam;
 mod ui;
 
 use ark::{
+    clock::{FixedClock, TICK_HZ},
+    field::{BOTTOM, FIELD, LEFT, RIGHT, TOP},
     game::*,
-    physics::V2,
+    geom::V2,
     profile::{Origin, Profile},
-    timing::FixedClock,
+    sectors::SectorId,
 };
 use audio::Audio;
 use input::{Device, Gamepads};
@@ -216,7 +218,8 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
     let mut stats = false;
     let mut display = display::Display::new(profile.fullscreen, (960.0, 900.0));
     let mut last_frame = Instant::now();
-    let mut last_mouse = render::mouse().unwrap_or(V2::new(WIDTH / 2.0, HEIGHT / 2.0));
+    let mut last_mouse =
+        render::mouse().unwrap_or(V2::new(render::WIDTH / 2.0, render::HEIGHT / 2.0));
     let mut mouse_control = false;
     let mut pending_launch = false;
     let mut cursor_visible = true;
@@ -357,7 +360,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                         }
                         _ => {
                             ui.screen = Screen::Sectors;
-                            ui.sector = profile.unlocked - 1;
+                            ui.sector = SectorId::clamped(profile.unlocked - 1);
                         }
                     }
                 }
@@ -366,17 +369,18 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 if escape {
                     home(&mut ui, &profile);
                 }
+                let at = ui.sector.index();
                 if up {
-                    ui.sector = ui.sector.saturating_sub(1);
+                    ui.sector = SectorId::clamped(at.saturating_sub(1));
                 }
                 if down {
-                    ui.sector = (ui.sector + 1).min(LEVEL_COUNT - 1);
+                    ui.sector = SectorId::clamped(at + 1);
                 }
                 if left {
-                    ui.sector = ui.sector.saturating_sub(4);
+                    ui.sector = SectorId::clamped(at.saturating_sub(4));
                 }
                 if right {
-                    ui.sector = (ui.sector + 4).min(LEVEL_COUNT - 1);
+                    ui.sector = SectorId::clamped(at + 4);
                 }
                 if (moved || click)
                     && let Some(index) = ui::hover_sector(pointer)
@@ -388,10 +392,12 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 }
                 let play = click
                     && (ui::hover_sector(pointer).is_some() || ui::play_rect().contains(pointer));
-                if (confirm || play) && ui.sector < profile.unlocked && ui.screen == Screen::Sectors
+                if (confirm || play)
+                    && ui.sector.index() < profile.unlocked
+                    && ui.screen == Screen::Sectors
                 {
                     enter(
-                        Game::at(ui.sector, Mode::Practice),
+                        Game::start(ui.sector, Mode::Practice),
                         &mut game,
                         &mut ui,
                         &mut renderer,
@@ -430,14 +436,14 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                             }
                             0 => {
                                 ui.screen = Screen::Sectors;
-                                ui.sector = game.level;
+                                ui.sector = game.sector;
                             }
                             1 => {
                                 let fresh = if game.mode == Mode::Journey {
                                     // Retrying restores the entry checkpoint; scores cannot be farmed.
                                     profile.checkpoint.map_or_else(Game::new, |c| c.game())
                                 } else {
-                                    Game::at(game.level, Mode::Practice)
+                                    Game::start(game.sector, Mode::Practice)
                                 };
                                 if fresh.mode == Mode::Journey {
                                     profile.begin(&fresh);
@@ -454,7 +460,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     if next && game.phase_ticks >= TICK_HZ / 2 {
                         if game.mode == Mode::Practice {
                             ui.screen = Screen::Sectors;
-                            ui.sector = game.level;
+                            ui.sector = game.sector;
                         } else {
                             pending_launch = true;
                         }
@@ -492,7 +498,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 game.balls
                     .iter()
                     .find(|b| b.active)
-                    .map_or(WIDTH / 2.0, |b| b.pos.x)
+                    .map_or(FIELD.center().x, |b| b.pos.x)
                     + (now as f32 * 0.7).sin() * 32.0,
             );
             pending_launch = matches!(game.phase, Phase::Ready | Phase::Cleared)
@@ -504,7 +510,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             alpha = frame.alpha;
             perf.dropped_ticks += frame.dropped;
             let mut events = Events::default();
-            for _ in 0..frame.steps {
+            for _ in 0..frame.ticks {
                 input.launch = pending_launch;
                 pending_launch = false;
                 let tick_start = get_time();

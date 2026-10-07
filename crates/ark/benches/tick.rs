@@ -4,7 +4,12 @@
 //! while simulating, no exhausted collision budget, real brick impacts and
 //! every sector covered. Under `cargo test` (no `--bench` argument) it runs a
 //! shorter workload with the same assertions.
-use ark::{game::*, physics::V2};
+use ark::{
+    field::{BALL_RADIUS, CELLS, FIELD, PADDLE_Y},
+    game::*,
+    geom::V2,
+    sectors::{SECTOR_COUNT, SectorId},
+};
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     hint::black_box,
@@ -45,8 +50,8 @@ unsafe impl GlobalAlloc for CountingAllocator {
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
-fn setup(stress: bool, relays: bool, level: usize) -> Game {
-    let mut g = Game::at(level, Mode::Journey);
+fn setup(stress: bool, relays: bool, sector: SectorId) -> Game {
+    let mut g = Game::start(sector, Mode::Journey);
     g.step(&Input {
         launch: true,
         ..Default::default()
@@ -54,7 +59,7 @@ fn setup(stress: bool, relays: bool, level: usize) -> Game {
     if relays {
         g.bricks.fill(1);
         g.cores.fill(true);
-        g.remaining = ROWS * COLS;
+        g.remaining = CELLS;
         g.initial_bricks = g.remaining;
         for power in [
             Power::Anchor,
@@ -76,7 +81,7 @@ fn setup(stress: bool, relays: bool, level: usize) -> Game {
         if relays {
             // Exercise an actual catch/release before the upward balls ignite
             // the board; this fast scenario clears before capsules can fall.
-            g.balls[0].pos = V2::new(WIDTH / 2.0, PADDLE_Y - RADIUS - 1.0);
+            g.balls[0].pos = V2::new(FIELD.center().x, PADDLE_Y - BALL_RADIUS - 1.0);
             g.balls[0].previous = g.balls[0].pos;
             g.balls[0].velocity = V2::new(0.0, 12000.0);
         }
@@ -114,7 +119,7 @@ const TEST: Load = Load {
 const BATCH: usize = 64;
 
 fn run(load: &Load, stress: bool, relays: bool) {
-    let mut game = setup(stress, relays, 0);
+    let mut game = setup(stress, relays, SectorId::FIRST);
     let mut samples = Vec::with_capacity(load.batches);
     let mut score = 0_u64;
     let mut caps = 0_u64;
@@ -135,9 +140,10 @@ fn run(load: &Load, stress: bool, relays: bool) {
             {
                 score += u64::from(game.score);
                 caps += game.collision_caps;
-                game = setup(stress, relays, (tick / load.sector_ticks) % LEVEL_COUNT);
+                let next = SectorId::new((tick / load.sector_ticks) % SECTOR_COUNT);
+                game = setup(stress, relays, next.expect("taken modulo the sector count"));
             }
-            level_mask |= 1 << game.level;
+            level_mask |= 1 << game.sector.index();
             if stress {
                 // Replenish depleted pools to keep the measured workload full.
                 for (i, ball) in game.balls.iter_mut().enumerate() {
@@ -177,7 +183,7 @@ fn run(load: &Load, stress: bool, relays: bool) {
                 .balls
                 .iter()
                 .find(|b| b.active)
-                .map_or(WIDTH / 2.0, |b| b.pos.x)
+                .map_or(FIELD.center().x, |b| b.pos.x)
                 + (tick as f32 * 0.003).sin() * 36.0;
             game.step(black_box(&Input {
                 mouse_x: Some(x),
@@ -234,7 +240,7 @@ fn run(load: &Load, stress: bool, relays: bool) {
     if !stress {
         assert_eq!(
             level_mask,
-            (1 << LEVEL_COUNT) - 1,
+            (1 << SECTOR_COUNT) - 1,
             "Gameplay must exercise all twelve sectors"
         );
     }

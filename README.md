@@ -320,10 +320,11 @@ desk cannot steer them. The OpenGL smoke test also writes `target/*-pad.png`
 captures of every screen with gamepad prompts.
 `--effects-test` exercises repeated full-board cascades, full pools, and resizing.
 
-The simulation is its own crate, `crates/ark`, with no dependencies: `physics.rs`
-contains context-free geometry, `game.rs` the pure fixed-step simulation,
-`levels.rs` the authored journey, `profile.rs` its persistence, and `timing.rs`
-the tick scheduler. The root package is the desktop app.
+The simulation is its own crate, `crates/ark`, with no dependencies: `clock.rs`
+schedules ticks, `geom.rs` holds context-free geometry, `field.rs` the playfield
+and brick grid, `sectors.rs` the authored journey (parsed at compile time),
+`game.rs` the pure fixed-step simulation, and `profile.rs` its persistence.
+The root package is the desktop app.
 `src/main.rs` handles application transitions; `src/render.rs`,
 `src/audio.rs`, and `src/perf.rs` handle presentation, `src/ui.rs` holds menu
 layout and keyboard/mouse input, `src/input.rs` merges gamepads (via

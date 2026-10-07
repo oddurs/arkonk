@@ -1,5 +1,8 @@
 //! Versioned local progress. Disk access happens at menu/sector boundaries.
-use crate::game::{Game, LEVEL_COUNT, Mode, Phase};
+use crate::{
+    game::{Game, Mode, Phase},
+    sectors::{SECTOR_COUNT, SectorId},
+};
 use std::{
     fs, io,
     path::{Path, PathBuf},
@@ -12,14 +15,14 @@ pub struct Record {
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Checkpoint {
-    pub level: usize,
+    pub sector: SectorId,
     pub score: u32,
     pub lives: u8,
     pub ticks: u32,
 }
 impl Checkpoint {
     pub fn game(self) -> Game {
-        let mut game = Game::at(self.level, Mode::Journey);
+        let mut game = Game::start(self.sector, Mode::Journey);
         game.score = self.score;
         game.lives = self.lives;
         game.run_ticks = self.ticks;
@@ -30,7 +33,7 @@ impl Checkpoint {
 pub struct Profile {
     pub best_score: u32,
     pub unlocked: usize,
-    pub records: [Record; LEVEL_COUNT],
+    pub records: [Record; SECTOR_COUNT],
     pub checkpoint: Option<Checkpoint>,
     pub muted: bool,
     pub volume: u8,
@@ -42,7 +45,7 @@ impl Default for Profile {
         Self {
             best_score: 0,
             unlocked: 1,
-            records: [Record::default(); LEVEL_COUNT],
+            records: [Record::default(); SECTOR_COUNT],
             checkpoint: None,
             muted: false,
             volume: 6,
@@ -56,30 +59,31 @@ impl Profile {
     }
     pub fn begin(&mut self, game: &Game) {
         self.checkpoint = Some(Checkpoint {
-            level: game.level,
+            sector: game.sector,
             score: game.score,
             lives: game.lives,
             ticks: game.run_ticks,
         });
     }
     pub fn finish(&mut self, game: &Game) {
-        let record = &mut self.records[game.level];
+        let record = &mut self.records[game.sector.index()];
         record.medals |= game.summary.medals;
         if record.best_ticks == 0 || game.summary.ticks < record.best_ticks {
             record.best_ticks = game.summary.ticks;
         }
-        self.unlocked = self.unlocked.max((game.level + 2).min(LEVEL_COUNT));
+        self.unlocked = self
+            .unlocked
+            .max((game.sector.index() + 2).min(SECTOR_COUNT));
         if game.mode == Mode::Journey {
             self.best_score = self.best_score.max(game.score);
-            self.checkpoint = if game.phase == Phase::Victory {
-                None
-            } else {
-                Some(Checkpoint {
-                    level: game.level + 1,
+            self.checkpoint = match game.sector.next() {
+                Some(next) if game.phase != Phase::Victory => Some(Checkpoint {
+                    sector: next,
                     score: game.score,
                     lives: game.lives,
                     ticks: game.run_ticks,
-                })
+                }),
+                _ => None,
             };
         }
     }
@@ -99,34 +103,34 @@ impl Profile {
             };
             match (key, nums.as_slice()) {
                 ("best", [n]) => p.best_score = *n,
-                ("unlocked", [n]) => p.unlocked = (*n as usize).clamp(1, LEVEL_COUNT),
+                ("unlocked", [n]) => p.unlocked = (*n as usize).clamp(1, SECTOR_COUNT),
                 // Older saves carry a retired display flag between the two.
                 ("settings", [mute, volume] | [mute, _, volume]) => {
                     p.muted = *mute != 0;
                     p.volume = (*volume).min(10) as u8;
                 }
                 ("display", [fullscreen]) => p.fullscreen = *fullscreen == 1,
-                ("record", [i, medals, ticks]) if (*i as usize) < LEVEL_COUNT => {
+                ("record", [i, medals, ticks]) if (*i as usize) < SECTOR_COUNT => {
                     p.records[*i as usize] = Record {
                         medals: (*medals as u8) & 7,
                         best_ticks: *ticks,
                     }
                 }
-                ("checkpoint", [level, score, lives, ticks])
-                    if (*level as usize) < LEVEL_COUNT && (1..=5).contains(lives) =>
-                {
-                    p.checkpoint = Some(Checkpoint {
-                        level: *level as usize,
-                        score: *score,
-                        lives: *lives as u8,
-                        ticks: *ticks,
-                    })
+                ("checkpoint", [level, score, lives, ticks]) if (1..=5).contains(lives) => {
+                    if let Some(sector) = SectorId::new(*level as usize) {
+                        p.checkpoint = Some(Checkpoint {
+                            sector,
+                            score: *score,
+                            lives: *lives as u8,
+                            ticks: *ticks,
+                        })
+                    }
                 }
                 _ => {}
             }
         }
         // Never offer a checkpoint in a sector that is still locked.
-        if p.checkpoint.is_some_and(|c| c.level >= p.unlocked) {
+        if p.checkpoint.is_some_and(|c| c.sector.index() >= p.unlocked) {
             p.checkpoint = None;
         }
         Some(p)
@@ -148,7 +152,10 @@ impl Profile {
             let _ = writeln!(
                 out,
                 "checkpoint {} {} {} {}",
-                c.level, c.score, c.lives, c.ticks
+                c.sector.index(),
+                c.score,
+                c.lives,
+                c.ticks
             );
         }
         out
@@ -300,7 +307,7 @@ mod tests {
             medals: 7,
             best_ticks: 15400,
         };
-        p.begin(&Game::at(6, Mode::Journey));
+        p.begin(&Game::start(SectorId::new(6).unwrap(), Mode::Journey));
         assert_eq!(Profile::decode(&p.encode()), Some(p));
     }
     #[test]
@@ -309,7 +316,7 @@ mod tests {
             "ARKONK 1\nunlocked 999\nsettings 0 1 300\ncheckpoint 20 0 90 0\nrecord 500 7 0\nrecord 0 255 25\nbest nonsense",
         )
         .unwrap();
-        assert_eq!(p.unlocked, LEVEL_COUNT);
+        assert_eq!(p.unlocked, SECTOR_COUNT);
         assert_eq!(p.volume, 10);
         assert_eq!(p.checkpoint, None);
         assert_eq!(p.records[0].medals, 7);
@@ -327,7 +334,7 @@ mod tests {
         let mut p = Profile::default();
         p.begin(&Game::new());
         let saved = p.checkpoint;
-        let mut g = Game::at(0, Mode::Practice);
+        let mut g = Game::start(SectorId::FIRST, Mode::Practice);
         g.phase = Phase::Cleared;
         g.summary.medals = 7;
         g.summary.ticks = 1200;

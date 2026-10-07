@@ -3,8 +3,8 @@
 //! is the matching partner-site configuration.
 use ark::{
     game::{Game, Mode, Phase},
-    levels::LEVELS,
     profile::Profile,
+    sectors::SECTORS,
 };
 
 const CLEAR: u8 = 1;
@@ -73,8 +73,8 @@ pub fn from_profile(profile: &Profile) -> Vec<Achievement> {
         profile
             .records
             .iter()
-            .zip(LEVELS.iter())
-            .filter(move |(_, level)| chapter.is_none_or(|c| level.chapter == c))
+            .zip(SECTORS.iter())
+            .filter(move |(_, sector)| chapter.is_none_or(|c| sector.chapter == c))
             .map(|(record, _)| record.medals)
     };
     let any = |bit| medals(None).any(|m| m & bit != 0);
@@ -115,9 +115,12 @@ pub fn from_clear(game: &Game) -> Vec<Achievement> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ark::{game::LEVEL_COUNT, profile::Record};
+    use ark::{
+        profile::Record,
+        sectors::{SECTOR_COUNT, SectorId},
+    };
 
-    fn with_medals(medals: [u8; LEVEL_COUNT]) -> Profile {
+    fn with_medals(medals: [u8; SECTOR_COUNT]) -> Profile {
         let mut p = Profile::default();
         for (record, m) in p.records.iter_mut().zip(medals) {
             *record = Record {
@@ -135,7 +138,7 @@ mod tests {
 
     #[test]
     fn single_medals_unlock_their_firsts() {
-        let mut medals = [0; LEVEL_COUNT];
+        let mut medals = [0; SECTOR_COUNT];
         medals[5] = CLEAR | SWIFT;
         assert_eq!(
             from_profile(&with_medals(medals)),
@@ -145,7 +148,7 @@ mod tests {
 
     #[test]
     fn chapters_need_every_sector_in_that_chapter() {
-        let mut medals = [0; LEVEL_COUNT];
+        let mut medals = [0; SECTOR_COUNT];
         medals[..4].fill(CLEAR);
         medals[4..7].fill(ALL_MEDALS);
         let earned = from_profile(&with_medals(medals));
@@ -162,7 +165,7 @@ mod tests {
 
     #[test]
     fn thirty_six_medals_unlock_every_profile_achievement() {
-        let p = with_medals([ALL_MEDALS; LEVEL_COUNT]);
+        let p = with_medals([ALL_MEDALS; SECTOR_COUNT]);
         assert_eq!(p.medals(), 36);
         let earned = from_profile(&p);
         assert_eq!(earned.len(), 10);
@@ -172,7 +175,7 @@ mod tests {
     #[test]
     fn profile_finish_feeds_the_derivation() {
         let mut p = Profile::default();
-        let mut g = Game::at(0, Mode::Practice);
+        let mut g = Game::start(SectorId::FIRST, Mode::Practice);
         g.phase = Phase::Cleared;
         g.summary.medals = CLEAR | CLEAN;
         p.finish(&g);
@@ -184,7 +187,7 @@ mod tests {
 
     #[test]
     fn journey_victory_and_long_chains_come_from_the_clear() {
-        let mut g = Game::at(LEVEL_COUNT - 1, Mode::Journey);
+        let mut g = Game::start(SectorId::clamped(SECTOR_COUNT - 1), Mode::Journey);
         g.phase = Phase::Victory;
         g.summary.best_combo = CHAIN_TARGET - 1;
         assert_eq!(from_clear(&g), [Achievement::Homecoming]);
@@ -194,7 +197,7 @@ mod tests {
             [Achievement::Homecoming, Achievement::Chain]
         );
         // Practice cannot finish the journey, however the sector ends.
-        let mut g = Game::at(LEVEL_COUNT - 1, Mode::Practice);
+        let mut g = Game::start(SectorId::clamped(SECTOR_COUNT - 1), Mode::Practice);
         g.phase = Phase::Cleared;
         assert!(from_clear(&g).is_empty());
     }

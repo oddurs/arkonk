@@ -1,6 +1,9 @@
 //! The version-1 save file, byte for byte. Players' existing files must keep
 //! loading and must be rewritten exactly as before.
-use ark::profile::{Checkpoint, Profile, Record};
+use ark::{
+    profile::{Checkpoint, Profile, Record},
+    sectors::SectorId,
+};
 
 #[test]
 fn encoded_layout() {
@@ -21,7 +24,7 @@ fn encoded_layout() {
         best_ticks: 30001,
     };
     p.checkpoint = Some(Checkpoint {
-        level: 6,
+        sector: SectorId::new(6).unwrap(),
         score: 31250,
         lives: 4,
         ticks: 99000,
