@@ -5,9 +5,9 @@ chapters, saved checkpoints, replayable sectors, and 36 medals to earn at your o
 pace. Direct mouse control, 240 Hz collision simulation, and restrained feedback
 keep the focus on the next bounce.
 
-The CRT soul stays intact: a menu-only pixel marquee, amber scores, beveled bricks,
-a silver-and-red paddle, phosphor trails, and softly curved glass. Each chapter
-has its own palette. Gameplay keeps only the score, lives, and a quiet sector strip.
+The presentation is flat and quiet: rounded bricks, a pill paddle, an original
+5×7 pixel typeface, and a dark field. Each chapter has its own palette. The HUD
+shows only the score, the sector with a progress strip, and remaining lives.
 [Start screen](docs/attract.png) · [Sector map](docs/sectors.png)
 
 ![ARKONK in play](docs/screenshot.png)
@@ -56,7 +56,6 @@ sudo apt-get install libasound2-dev libx11-dev libxi-dev libgl1-mesa-dev
 | [ / ] | Lower / raise volume |
 | F | Toggle fullscreen |
 | F3 | Performance overlay |
-| C | Toggle CRT effects |
 | Q / Close window | Quit |
 
 Keyboard input takes control until the mouse moves again. Hit the ball with the
@@ -89,7 +88,8 @@ The layouts progress from isolated cores to branching chains and armored pockets
 If the last two bricks have stalled a single-ball rally for twelve seconds, one
 Anchor catch becomes available to aim the finish. Ball speed rises gently through
 a rally, and rare angle corrections prevent flat or perfectly vertical stalls.
-Leaving the window pauses play automatically.
+Leaving the window pauses play automatically. The paddle's cyan center mark is
+the straight-up spot.
 
 [Anchor with combined powers](docs/anchor.png) · [Relay ignition](docs/relay.png)
 
@@ -121,21 +121,16 @@ The versioned `progress.txt` is written through a temporary file at
 menu/sector boundaries; legacy `best.txt` scores are imported automatically.
 No account, network connection, or asset download is used during play.
 
-## CRT presentation
+## Presentation
 
-macOS uses native Metal; Windows and Linux use OpenGL. The scene renders into
-one fixed 960×900 buffer. A single five-tap shader adds
-restrained phosphor bloom, scanlines, an RGB grille, curved glass, edge shading,
-and faint grain. Scanlines fade at smaller window sizes. Mouse coordinates use
-the same curvature mapping as the screen, keeping paddle control aligned.
+macOS uses native Metal; Windows and Linux use OpenGL. The fixed 960×900 scene
+is drawn straight to the window through a letterboxing camera, so shapes render
+at native resolution and glyph cells snap to whole physical pixels. One final
+full-window draw restores framebuffer alpha after translucent overlays, so no
+compositor can show the window through them.
 
 Brick-hit flashes, floating scores, paddle impact lights, and pickup rings use
-fixed pools in the renderer. A restart reuses the scene buffer and shader.
-Press **C** for the clean pixel-art view, or start without effects:
-
-```sh
-cargo run --locked --release -- --no-crt
-```
+fixed pools in the renderer. A restart reuses them.
 
 ## Performance
 
@@ -198,7 +193,7 @@ and reports
 p95, p99, worst frame, and counts above 16.7, 25, and 50 ms. The stress scene
 repeatedly ignites 84 connected cores with all powers and full effect pools.
 There are no screenshot writes or window resizes in this measurement. Run with
-`--no-crt` to compare the shader cost or `--opengl` on macOS to compare backends.
+`--opengl` on macOS to compare backends.
 Add `--fullscreen` to measure fullscreen presentation. Keep the window visible
 and focused; run graphics comparisons sequentially.
 The report counts unfocused frames and retains them in its timings so background
@@ -232,8 +227,7 @@ The smoke test opens a window, launches a ball, follows it with the paddle,
 reports frame statistics,
 and exits automatically. On OpenGL it also writes `target/smoke-test.png` and
 presentation captures. Metal texture readback is not implemented by Miniquad;
-use macOS window capture for Metal screenshots. To compare without CRT effects,
-add `--no-crt`. To check Metal correctness, run the smoke/effects and flow tests
+use macOS window capture for Metal screenshots. To check Metal correctness, run the smoke/effects and flow tests
 with `MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1`; disable validation for timings.
 Both graphical checks need a desktop session and leave your saved progress alone.
 `--flow-test` drives the real menu input handlers through new journey, sector clear,
@@ -245,8 +239,8 @@ pause/resume while holding, explicit release, Phase contacts, and relay ignition
 `src/physics.rs` contains context-free geometry; `src/game.rs` contains the pure
 fixed-step simulation. `src/levels.rs` authors the journey, `src/profile.rs` persists it, and
 `src/timing.rs` schedules ticks. `src/main.rs` handles application transitions; `src/render.rs`,
-`src/audio.rs`, and `src/perf.rs` handle presentation. `src/crt.rs` contains the
-post-processing pass, and `src/pixel_font.rs` contains the original bitmap type.
+`src/audio.rs`, and `src/perf.rs` handle presentation, `src/ui.rs` holds menu
+layout and input, and `src/pixel_font.rs` contains the original bitmap type.
 Collision tests cover high
 speed tunneling, rounded corners, departing/parallel trajectories, moving
 paddle interception, bounce steering, life loss, powers, and level transitions.

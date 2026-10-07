@@ -1,10 +1,13 @@
 //! A small original 5x7 alphabet, packed once into a single nearest-filtered atlas.
-//! UI glyphs then share a texture batch and stay crisp in the fixed scene buffer.
+//! UI glyphs share a texture batch; glyph cells snap to whole physical pixels so
+//! text stays even at any window scale.
 use macroquad::prelude::*;
 
 #[derive(Clone)]
 pub struct PixelFont {
     texture: Texture2D,
+    /// Physical pixels per scene unit, set once per frame by the renderer.
+    pub density: f32,
 }
 impl PixelFont {
     pub fn new() -> Self {
@@ -23,10 +26,13 @@ impl PixelFont {
         }
         let texture = Texture2D::from_image(&image);
         texture.set_filter(FilterMode::Nearest);
-        Self { texture }
+        Self {
+            texture,
+            density: 1.0,
+        }
     }
-    fn pixel(size: f32) -> f32 {
-        if size >= 28.0 {
+    fn pixel(&self, size: f32) -> f32 {
+        let cell = if size >= 28.0 {
             4.0
         } else if size >= 20.0 {
             3.0
@@ -34,17 +40,23 @@ impl PixelFont {
             2.0
         } else {
             1.0
-        }
+        };
+        (cell * self.density).round().max(1.0) / self.density
     }
-    pub fn width(text: &str, size: f32) -> f32 {
+    fn snap(&self, value: f32) -> f32 {
+        (value * self.density).round() / self.density
+    }
+    pub fn width(&self, text: &str, size: f32) -> f32 {
         if text.is_empty() {
             0.0
         } else {
-            (text.chars().count() as f32 * 6.0 - 1.0) * Self::pixel(size)
+            (text.chars().count() as f32 * 6.0 - 1.0) * self.pixel(size)
         }
     }
     pub fn draw(&self, text: &str, x: f32, baseline: f32, size: f32, color: Color) {
-        let pixel = Self::pixel(size);
+        let pixel = self.pixel(size);
+        let x = self.snap(x);
+        let top = self.snap(baseline - 7.0 * pixel);
         for (i, character) in text.chars().enumerate() {
             let character = character.to_ascii_uppercase();
             if character == ' ' {
@@ -57,8 +69,8 @@ impl PixelFont {
             } - 32;
             draw_texture_ex(
                 &self.texture,
-                (x + i as f32 * 6.0 * pixel).round(),
-                (baseline - 7.0 * pixel).round(),
+                x + i as f32 * 6.0 * pixel,
+                top,
                 color,
                 DrawTextureParams {
                     source: Some(Rect::new(
@@ -75,7 +87,7 @@ impl PixelFont {
     }
 }
 
-fn glyph(character: char) -> [u8; 7] {
+pub fn glyph(character: char) -> [u8; 7] {
     match character {
         'A' => [14, 17, 17, 31, 17, 17, 17],
         'B' => [30, 17, 17, 30, 17, 17, 30],

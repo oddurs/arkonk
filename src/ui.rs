@@ -24,18 +24,38 @@ impl Default for Ui {
     }
 }
 pub fn menu_rect(row: usize) -> Rect {
-    Rect::new(280.0, 471.0 + row as f32 * 53.0, 400.0, 43.0)
+    Rect::new(310.0, 380.0 + row as f32 * 56.0, 340.0, 46.0)
+}
+/// The single action on the sector-clear card.
+pub fn next_rect() -> Rect {
+    Rect::new(310.0, 524.0, 340.0, 46.0)
+}
+pub fn back_rect() -> Rect {
+    Rect::new(64.0, 46.0, 104.0, 36.0)
+}
+pub fn play_rect() -> Rect {
+    Rect::new(310.0, 768.0, 340.0, 46.0)
 }
 pub fn sector_rect(index: usize) -> Rect {
     Rect::new(
         105.0 + (index / 4) as f32 * 255.0,
-        239.0 + (index % 4) as f32 * 121.0,
+        196.0 + (index % 4) as f32 * 118.0,
         240.0,
-        107.0,
+        104.0,
     )
 }
 pub fn hover_menu(mouse: Vec2) -> Option<usize> {
     (0..3).find(|&i| menu_rect(i).contains(mouse))
+}
+/// Moves through the three menu rows, wrapping, never landing below `first`.
+pub fn step_menu(choice: usize, first: usize, up: bool, down: bool) -> usize {
+    match (up, down) {
+        (true, false) if choice <= first => 2,
+        (true, false) => choice - 1,
+        (false, true) if choice >= 2 => first,
+        (false, true) => choice + 1,
+        _ => choice,
+    }
 }
 pub fn hover_sector(mouse: Vec2) -> Option<usize> {
     (0..12).find(|&i| sector_rect(i).contains(mouse))
@@ -70,5 +90,18 @@ impl Controls {
             restart: is_key_pressed(KeyCode::R),
             focus_lost: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn menu_steps_skip_unavailable_rows() {
+        assert_eq!(step_menu(1, 1, true, false), 2);
+        assert_eq!(step_menu(2, 1, false, true), 1);
+        assert_eq!(step_menu(0, 0, true, false), 2);
+        assert_eq!(step_menu(2, 0, false, true), 0);
+        assert_eq!(step_menu(1, 0, false, false), 1);
     }
 }
