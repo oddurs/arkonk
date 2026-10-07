@@ -51,22 +51,56 @@ impl SectorId {
     pub fn all() -> impl DoubleEndedIterator<Item = Self> {
         (0..SECTOR_COUNT as u8).map(Self)
     }
+    /// Whether this is the last sector of its chapter.
+    pub fn ends_chapter(self) -> bool {
+        self.next()
+            .is_none_or(|next| next.sector().chapter != self.sector().chapter)
+    }
 }
 
-/// Chapter titles, in order.
-pub const CHAPTERS: [&str; 3] = ["DAYBREAK", "BLUE HOUR", "AFTERLIGHT"];
+/// The journey's three chapters, four sectors each.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Chapter {
+    /// Sectors 1 to 4: isolated cores and open routes.
+    Daybreak,
+    /// Sectors 5 to 8: branching relay lines.
+    BlueHour,
+    /// Sectors 9 to 12: armoured pockets and dense chains.
+    Afterlight,
+}
 
-/// A sector's authored content.
+impl Chapter {
+    /// Every chapter, in journey order.
+    pub const ALL: [Self; 3] = [Self::Daybreak, Self::BlueHour, Self::Afterlight];
+
+    /// A stable lowercase key for string tables and stats; never displayed.
+    pub const fn slug(self) -> &'static str {
+        match self {
+            Self::Daybreak => "daybreak",
+            Self::BlueHour => "blue_hour",
+            Self::Afterlight => "afterlight",
+        }
+    }
+    /// The chapter's first sector.
+    pub const fn first_sector(self) -> SectorId {
+        SectorId(match self {
+            Self::Daybreak => 0,
+            Self::BlueHour => 4,
+            Self::Afterlight => 8,
+        })
+    }
+}
+
+/// A sector's authored content. Display text lives with the front end,
+/// keyed by [`Sector::slug`] or [`SectorId`].
 #[derive(Debug)]
 pub struct Sector {
-    /// Display name.
-    pub name: &'static str,
+    /// A stable lowercase key for string tables and stats; never displayed.
+    pub slug: &'static str,
     /// The capsule that drops first, teaching this sector's idea.
     pub opening: Power,
-    /// One line of advice shown before serving.
-    pub tip: &'static str,
-    /// Index into [`CHAPTERS`].
-    pub chapter: usize,
+    /// The chapter it belongs to.
+    pub chapter: Chapter,
     /// Serve speed in pixels per second, before rally speed-up.
     pub speed: f32,
     /// The Swift medal's target time.
@@ -116,10 +150,9 @@ const fn layout(rows: [&str; ROWS]) -> Layout {
 /// The journey, in order.
 pub const SECTORS: [Sector; SECTOR_COUNT] = [
     Sector {
-        name: "FIRST LIGHT",
+        slug: "first_light",
         opening: Power::Wide,
-        tip: "W WIDE / S SLOW / CATCH THE FALLING CAPSULES",
-        chapter: 0,
+        chapter: Chapter::Daybreak,
         speed: 420.0,
         par_seconds: 100,
         layout: layout([
@@ -133,10 +166,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "SATELLITES",
+        slug: "satellites",
         opening: Power::Anchor,
-        tip: "A ANCHOR / CATCH, REPOSITION, CLICK TO RELEASE",
-        chapter: 0,
+        chapter: Chapter::Daybreak,
         speed: 440.0,
         par_seconds: 110,
         layout: layout([
@@ -150,10 +182,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "SLIPSTREAM",
+        slug: "slipstream",
         opening: Power::Anchor,
-        tip: "AMBER CORES / EACH BLAST REACHES FOUR NEIGHBORS",
-        chapter: 0,
+        chapter: Chapter::Daybreak,
         speed: 455.0,
         par_seconds: 100,
         layout: layout([
@@ -167,10 +198,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "RESONANCE",
+        slug: "resonance",
         opening: Power::Anchor,
-        tip: "NEIGHBORING CORES CARRY THE REACTION",
-        chapter: 0,
+        chapter: Chapter::Daybreak,
         speed: 470.0,
         par_seconds: 115,
         layout: layout([
@@ -184,10 +214,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "PRISM",
+        slug: "prism",
         opening: Power::Multi,
-        tip: "M MULTIBALL / THREE BALLS, ONE OPENING",
-        chapter: 1,
+        chapter: Chapter::BlueHour,
         speed: 480.0,
         par_seconds: 120,
         layout: layout([
@@ -201,10 +230,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "CROSSFADE",
+        slug: "crossfade",
         opening: Power::Anchor,
-        tip: "OPEN A ROUTE THROUGH THE TWO RELAY LINES",
-        chapter: 1,
+        chapter: Chapter::BlueHour,
         speed: 495.0,
         par_seconds: 125,
         layout: layout([
@@ -218,10 +246,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "UNDERTOW",
+        slug: "undertow",
         opening: Power::Wide,
-        tip: "BREAK INTO THE POCKETS BEHIND THE ARMOR",
-        chapter: 1,
+        chapter: Chapter::BlueHour,
         speed: 510.0,
         par_seconds: 135,
         layout: layout([
@@ -235,10 +262,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "MOONRISE",
+        slug: "moonrise",
         opening: Power::Multi,
-        tip: "FOLLOW THE RELAY AROUND THE OPEN CENTER",
-        chapter: 1,
+        chapter: Chapter::BlueHour,
         speed: 525.0,
         par_seconds: 135,
         layout: layout([
@@ -252,10 +278,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "AFTERGLOW",
+        slug: "afterglow",
         opening: Power::Phase,
-        tip: "P PHASE / THREE BRICK CONTACTS WITHOUT A BOUNCE",
-        chapter: 2,
+        chapter: Chapter::Afterlight,
         speed: 540.0,
         par_seconds: 135,
         layout: layout([
@@ -269,10 +294,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "PARALLAX",
+        slug: "parallax",
         opening: Power::Phase,
-        tip: "PIERCE THE SHELL, THEN IGNITE THE INNER ROUTE",
-        chapter: 2,
+        chapter: Chapter::Afterlight,
         speed: 555.0,
         par_seconds: 150,
         layout: layout([
@@ -286,10 +310,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "SUPERNOVA",
+        slug: "supernova",
         opening: Power::Multi,
-        tip: "CATCH A RETURN WHILE THE OTHER BALLS KEEP GOING",
-        chapter: 2,
+        chapter: Chapter::Afterlight,
         speed: 570.0,
         par_seconds: 145,
         layout: layout([
@@ -303,10 +326,9 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        name: "HOMECOMING",
+        slug: "homecoming",
         opening: Power::Phase,
-        tip: "ONE LAST ORBIT / MAKE EACH OPENING COUNT",
-        chapter: 2,
+        chapter: Chapter::Afterlight,
         speed: 585.0,
         par_seconds: 160,
         layout: layout([
@@ -338,5 +360,37 @@ mod tests {
             }
         }
         assert_eq!(SectorId::new(SECTOR_COUNT - 1).unwrap().next(), None);
+    }
+    #[test]
+    fn chapters_are_four_consecutive_sectors() {
+        for chapter in Chapter::ALL {
+            let sectors: Vec<_> = SectorId::all()
+                .filter(|s| s.sector().chapter == chapter)
+                .map(SectorId::index)
+                .collect();
+            let first = chapter.first_sector().index();
+            assert_eq!(sectors, (first..first + 4).collect::<Vec<_>>());
+        }
+        let ends: Vec<_> = SectorId::all()
+            .filter(|s| s.ends_chapter())
+            .map(SectorId::index)
+            .collect();
+        assert_eq!(ends, [3, 7, 11]);
+    }
+    #[test]
+    fn slugs_are_unique_lowercase_keys() {
+        let slugs = SectorId::all()
+            .map(|s| s.sector().slug)
+            .chain(Chapter::ALL.map(Chapter::slug))
+            .chain(Power::ALL.map(Power::slug));
+        let mut seen = Vec::new();
+        for slug in slugs {
+            assert!(
+                slug.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'),
+                "{slug}"
+            );
+            assert!(!seen.contains(&slug), "{slug}");
+            seen.push(slug);
+        }
     }
 }

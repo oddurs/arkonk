@@ -15,6 +15,7 @@ mod presence;
 mod render;
 mod smoke;
 mod steam;
+mod text;
 mod ui;
 
 use ark::{

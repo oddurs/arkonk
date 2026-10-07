@@ -1,5 +1,6 @@
 //! What friends see in their Steam list. Tokens must match the localization file
 //! uploaded to Steam, `docs/steam/rich_presence.vdf`.
+use crate::text::{TextId, text};
 use ark::{Game, Mode, sectors::SectorId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,9 +30,7 @@ impl Presence {
         let (Self::Journey(sector) | Self::Practice(sector)) = self else {
             return None;
         };
-        let name = sector
-            .sector()
-            .name
+        let name = text(TextId::SectorName(sector))
             .split_whitespace()
             .map(|word| {
                 let (first, rest) = word.split_at(1);

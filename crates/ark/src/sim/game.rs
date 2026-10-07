@@ -468,9 +468,8 @@ impl Game {
             medals |= Medals::SWIFT;
         }
         let bonus = CLEAR_BONUS + u32::from(clean) * MEDAL_BONUS + u32::from(swift) * MEDAL_BONUS;
-        let life_earned = self.mode == Mode::Journey
-            && (self.sector.index() + 1).is_multiple_of(4)
-            && self.lives < MAX_LIVES;
+        let life_earned =
+            self.mode == Mode::Journey && self.sector.ends_chapter() && self.lives < MAX_LIVES;
         if life_earned {
             self.lives += 1;
         }

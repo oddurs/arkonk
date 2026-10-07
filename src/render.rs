@@ -2,6 +2,7 @@ use crate::{
     input::Device,
     perf::Perf,
     pixel_font::{PixelFont, glyph},
+    text::{TextId, text},
     ui::{self, Screen, Ui},
 };
 use ark::{
@@ -13,7 +14,7 @@ use ark::{
     },
     geom::V2,
     profile::Profile,
-    sectors::{CHAPTERS, SECTOR_COUNT, SectorId},
+    sectors::{Chapter, SECTOR_COUNT, SectorId},
     tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
 use macroquad::models::Vertex;
@@ -649,7 +650,13 @@ impl Renderer {
         self.hud(v, game, profile);
         for drop in game.capsules() {
             if drop.active {
-                v.center_at(drop.power.label(), drop.pos.x, drop.pos.y + 7.0, 13.0, BG);
+                v.center_at(
+                    capsule_letter(drop.power),
+                    drop.pos.x,
+                    drop.pos.y + 7.0,
+                    13.0,
+                    BG,
+                );
             }
         }
         for popup in &self.popups {
@@ -679,7 +686,8 @@ impl Renderer {
                 && let Some(power) = game.effects().notice
             {
                 let fade = (game.effects().notice_ticks as f32 / 60.0).min(1.0);
-                v.centered(power.name(), 687.0, 13.0, opacity(power_color(power), fade));
+                let name = text(TextId::PowerName(power));
+                v.centered(name, 687.0, 13.0, opacity(power_color(power), fade));
             }
         }
         if ui.paused {
@@ -1014,7 +1022,7 @@ impl Renderer {
             game.sector().index() + 1
         );
         v.centered(&self.scratch, 72.0, 11.0, DIM);
-        v.centered(game.sector().sector().name, 104.0, 13.0, INK);
+        v.centered(text(TextId::SectorName(game.sector())), 104.0, 13.0, INK);
         for id in SectorId::all() {
             v.rect(
                 WIDTH / 2.0 - 94.0 + id.index() as f32 * 16.0,
@@ -1042,17 +1050,18 @@ impl Renderer {
         }
     }
     fn ready(&mut self, v: &Scene, game: &Game) {
-        let level = game.sector().sector();
+        let id = game.sector();
+        let chapter = id.sector().chapter;
         self.scratch.clear();
         let _ = write!(
             self.scratch,
             "{}   SECTOR {:02}",
-            CHAPTERS[level.chapter],
-            game.sector().index() + 1
+            text(TextId::ChapterName(chapter)),
+            id.index() + 1
         );
-        v.centered(&self.scratch, 548.0, 11.0, sector_color(0, level.chapter));
-        v.centered(level.name, 584.0, 22.0, INK);
-        v.centered(level.tip, 614.0, 11.0, DIM);
+        v.centered(&self.scratch, 548.0, 11.0, sector_color(0, chapter));
+        v.centered(text(TextId::SectorName(id)), 584.0, 22.0, INK);
+        v.centered(text(TextId::SectorTip(id)), 614.0, 11.0, DIM);
         v.hint(
             "CLICK OR SPACE TO SERVE",
             &[Pad(Glyph::A), Text(" TO SERVE")],
@@ -1104,7 +1113,7 @@ impl Renderer {
                 self.scratch,
                 "SAVED AT SECTOR {:02} / {}",
                 c.sector.index() + 1,
-                c.sector.sector().name
+                text(TextId::SectorName(c.sector))
             );
         } else {
             self.scratch
@@ -1155,8 +1164,9 @@ impl Renderer {
         }
         v.centered("SECTORS", 74.0, 22.0, INK);
         v.centered("PRACTICE RUNS NEVER CHANGE YOUR JOURNEY", 104.0, 11.0, DIM);
-        for (chapter, title) in CHAPTERS.iter().enumerate() {
-            let r = ui::sector_rect(chapter * 4);
+        for chapter in Chapter::ALL {
+            let r = ui::sector_rect(chapter.first_sector().index());
+            let title = text(TextId::ChapterName(chapter));
             v.text(title, r.x + 2.0, r.y - 16.0, 11.0, sector_color(0, chapter));
         }
         for id in SectorId::all() {
@@ -1186,7 +1196,7 @@ impl Renderer {
             let _ = write!(self.scratch, "{:02}", i + 1);
             v.text(&self.scratch, r.x + 14.0, r.y + 24.0, 11.0, DIM);
             v.text(
-                level.name,
+                text(TextId::SectorName(id)),
                 r.x + 34.0,
                 r.y + 24.0,
                 11.0,
@@ -1247,7 +1257,7 @@ impl Renderer {
             self.scratch,
             "{:02} {}   SWIFT UNDER {} SECONDS",
             ui.sector.index() + 1,
-            level.name,
+            text(TextId::SectorName(ui.sector)),
             level.par_seconds
         );
         if record.best_ticks > 0 {
@@ -1411,14 +1421,25 @@ fn hp_grid(game: &Game) -> [u8; CELLS] {
     hp
 }
 
-fn sector_color(row: usize, chapter: usize) -> Color {
+fn sector_color(row: usize, chapter: Chapter) -> Color {
     const BLUE: [usize; 7] = [4, 4, 5, 5, 6, 5, 4];
     const DUSK: [usize; 7] = [6, 0, 1, 2, 1, 0, 6];
     PALETTE[match chapter {
-        1 => BLUE[row % 7],
-        2 => DUSK[row % 7],
-        _ => row % 7,
+        Chapter::Daybreak => row % 7,
+        Chapter::BlueHour => BLUE[row % 7],
+        Chapter::Afterlight => DUSK[row % 7],
     }]
+}
+/// The letter on a capsule: fixed iconography, like a Tetris piece's
+/// letter, so string tables never replace it.
+fn capsule_letter(power: Power) -> &'static str {
+    match power {
+        Power::Wide => "W",
+        Power::Slow => "S",
+        Power::Multi => "M",
+        Power::Anchor => "A",
+        Power::Phase => "P",
+    }
 }
 fn power_color(power: Power) -> Color {
     match power {

@@ -1,7 +1,11 @@
 //! Achievements derived from saved progress and sector results. The derivation is
 //! pure so it can be tested without a Steam client; `docs/steam/achievements.md`
 //! is the matching partner-site configuration.
-use ark::{Game, Medals, Mode, SectorSummary, Stage, profile::Profile, sectors::SECTORS};
+use ark::{
+    Game, Medals, Mode, SectorSummary, Stage,
+    profile::Profile,
+    sectors::{Chapter, SECTORS},
+};
 
 /// The best chain, as shown on the results card, that earns `Chain`.
 pub const CHAIN_TARGET: u32 = 20;
@@ -61,7 +65,7 @@ impl Achievement {
 /// Everything the saved profile proves, so medals earned before Steam was
 /// present unlock on the next launch.
 pub fn from_profile(profile: &Profile) -> Vec<Achievement> {
-    let medals = |chapter: Option<usize>| {
+    let medals = |chapter: Option<Chapter>| {
         profile
             .records
             .iter()
@@ -75,12 +79,30 @@ pub fn from_profile(profile: &Profile) -> Vec<Achievement> {
         (Achievement::FirstLight, any(Medals::CLEAR)),
         (Achievement::Clean, any(Medals::CLEAN)),
         (Achievement::Swift, any(Medals::SWIFT)),
-        (Achievement::Daybreak, chapter(0, Medals::CLEAR)),
-        (Achievement::BlueHour, chapter(1, Medals::CLEAR)),
-        (Achievement::Afterlight, chapter(2, Medals::CLEAR)),
-        (Achievement::DaybreakMedals, chapter(0, Medals::ALL)),
-        (Achievement::BlueHourMedals, chapter(1, Medals::ALL)),
-        (Achievement::AfterlightMedals, chapter(2, Medals::ALL)),
+        (
+            Achievement::Daybreak,
+            chapter(Chapter::Daybreak, Medals::CLEAR),
+        ),
+        (
+            Achievement::BlueHour,
+            chapter(Chapter::BlueHour, Medals::CLEAR),
+        ),
+        (
+            Achievement::Afterlight,
+            chapter(Chapter::Afterlight, Medals::CLEAR),
+        ),
+        (
+            Achievement::DaybreakMedals,
+            chapter(Chapter::Daybreak, Medals::ALL),
+        ),
+        (
+            Achievement::BlueHourMedals,
+            chapter(Chapter::BlueHour, Medals::ALL),
+        ),
+        (
+            Achievement::AfterlightMedals,
+            chapter(Chapter::Afterlight, Medals::ALL),
+        ),
         (
             Achievement::AllMedals,
             medals(None).all(|m| m == Medals::ALL),

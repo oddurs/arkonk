@@ -331,7 +331,9 @@ The root package is the desktop app.
 `src/audio.rs`, and `src/perf.rs` handle presentation, `src/ui.rs` holds menu
 layout and keyboard/mouse input, `src/input.rs` merges gamepads (via
 [gilrs](https://crates.io/crates/gilrs)) into the same controls and tracks the
-active device, and `src/pixel_font.rs` contains the original bitmap type.
+active device, `src/pixel_font.rs` contains the original bitmap type, and
+`src/text.rs` holds the English names and tips for sectors, chapters and powers,
+which the simulation knows only by id and slug.
 `src/steam.rs` is the only Steamworks caller; `src/achievements.rs` and
 `src/presence.rs` decide what it reports.
 Collision tests cover high

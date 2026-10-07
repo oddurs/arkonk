@@ -18,24 +18,23 @@ pub enum Power {
 }
 
 impl Power {
-    /// The capsule's full name.
-    pub fn name(self) -> &'static str {
+    /// Every power, in declaration order.
+    pub const ALL: [Self; 5] = [
+        Self::Wide,
+        Self::Slow,
+        Self::Multi,
+        Self::Anchor,
+        Self::Phase,
+    ];
+
+    /// A stable lowercase key for string tables and stats; never displayed.
+    pub const fn slug(self) -> &'static str {
         match self {
-            Self::Wide => "WIDE",
-            Self::Slow => "SLOW",
-            Self::Multi => "MULTIBALL",
-            Self::Anchor => "ANCHOR",
-            Self::Phase => "PHASE",
-        }
-    }
-    /// The letter printed on the capsule.
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Wide => "W",
-            Self::Slow => "S",
-            Self::Multi => "M",
-            Self::Anchor => "A",
-            Self::Phase => "P",
+            Self::Wide => "wide",
+            Self::Slow => "slow",
+            Self::Multi => "multi",
+            Self::Anchor => "anchor",
+            Self::Phase => "phase",
         }
     }
 }
