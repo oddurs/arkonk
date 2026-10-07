@@ -2,7 +2,13 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  # A manual run is a dry run: it builds and checks every package but
+  # Changes to the release path rehearse it as a dry run before merging.
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/release-notes.sh
+      - scripts/steam-upload.sh
+  # A manual run is a dry run too: it builds and checks every package but
   # publishes no GitHub Release. It uploads to Steam only when asked.
   workflow_dispatch:
     inputs:
