@@ -1,16 +1,8 @@
 //! Achievements derived from saved progress and sector results. The derivation is
 //! pure so it can be tested without a Steam client; `docs/steam/achievements.md`
 //! is the matching partner-site configuration.
-use ark::{
-    game::{Game, Mode, Phase},
-    profile::Profile,
-    sectors::SECTORS,
-};
+use ark::{Game, Medals, Mode, Stage, profile::Profile, sectors::SECTORS};
 
-const CLEAR: u8 = 1;
-const CLEAN: u8 = 2;
-const SWIFT: u8 = 4;
-const ALL_MEDALS: u8 = CLEAR | CLEAN | SWIFT;
 /// The best chain, as shown on the results card, that earns `Chain`.
 pub const CHAIN_TARGET: u32 = 20;
 /// Integer stat backing the progress bar on `AllMedals`.
@@ -77,21 +69,21 @@ pub fn from_profile(profile: &Profile) -> Vec<Achievement> {
             .filter(move |(_, sector)| chapter.is_none_or(|c| sector.chapter == c))
             .map(|(record, _)| record.medals)
     };
-    let any = |bit| medals(None).any(|m| m & bit != 0);
-    let chapter = |c, bits| medals(Some(c)).all(|m| m & bits == bits);
+    let any = |medal| medals(None).any(|m: Medals| m.contains(medal));
+    let chapter = |c, wanted| medals(Some(c)).all(|m: Medals| m.contains(wanted));
     [
-        (Achievement::FirstLight, any(CLEAR)),
-        (Achievement::Clean, any(CLEAN)),
-        (Achievement::Swift, any(SWIFT)),
-        (Achievement::Daybreak, chapter(0, CLEAR)),
-        (Achievement::BlueHour, chapter(1, CLEAR)),
-        (Achievement::Afterlight, chapter(2, CLEAR)),
-        (Achievement::DaybreakMedals, chapter(0, ALL_MEDALS)),
-        (Achievement::BlueHourMedals, chapter(1, ALL_MEDALS)),
-        (Achievement::AfterlightMedals, chapter(2, ALL_MEDALS)),
+        (Achievement::FirstLight, any(Medals::CLEAR)),
+        (Achievement::Clean, any(Medals::CLEAN)),
+        (Achievement::Swift, any(Medals::SWIFT)),
+        (Achievement::Daybreak, chapter(0, Medals::CLEAR)),
+        (Achievement::BlueHour, chapter(1, Medals::CLEAR)),
+        (Achievement::Afterlight, chapter(2, Medals::CLEAR)),
+        (Achievement::DaybreakMedals, chapter(0, Medals::ALL)),
+        (Achievement::BlueHourMedals, chapter(1, Medals::ALL)),
+        (Achievement::AfterlightMedals, chapter(2, Medals::ALL)),
         (
             Achievement::AllMedals,
-            medals(None).all(|m| m == ALL_MEDALS),
+            medals(None).all(|m| m == Medals::ALL),
         ),
     ]
     .into_iter()
@@ -103,7 +95,7 @@ pub fn from_profile(profile: &Profile) -> Vec<Achievement> {
 /// record them.
 pub fn from_clear(game: &Game) -> Vec<Achievement> {
     let mut earned = Vec::new();
-    if game.mode == Mode::Journey && game.phase == Phase::Victory {
+    if game.mode == Mode::Journey && game.stage == Stage::Victory {
         earned.push(Achievement::Homecoming);
     }
     if game.summary.best_combo >= CHAIN_TARGET {
@@ -120,12 +112,12 @@ mod tests {
         sectors::{SECTOR_COUNT, SectorId},
     };
 
-    fn with_medals(medals: [u8; SECTOR_COUNT]) -> Profile {
+    fn with_medals(medals: [Medals; SECTOR_COUNT]) -> Profile {
         let mut p = Profile::default();
         for (record, m) in p.records.iter_mut().zip(medals) {
             *record = Record {
                 medals: m,
-                best_ticks: if m == 0 { 0 } else { 24000 },
+                best_ticks: if m == Medals::NONE { 0 } else { 24000 },
             };
         }
         p
@@ -138,8 +130,8 @@ mod tests {
 
     #[test]
     fn single_medals_unlock_their_firsts() {
-        let mut medals = [0; SECTOR_COUNT];
-        medals[5] = CLEAR | SWIFT;
+        let mut medals = [Medals::NONE; SECTOR_COUNT];
+        medals[5] = Medals::CLEAR | Medals::SWIFT;
         assert_eq!(
             from_profile(&with_medals(medals)),
             [Achievement::FirstLight, Achievement::Swift]
@@ -148,15 +140,15 @@ mod tests {
 
     #[test]
     fn chapters_need_every_sector_in_that_chapter() {
-        let mut medals = [0; SECTOR_COUNT];
-        medals[..4].fill(CLEAR);
-        medals[4..7].fill(ALL_MEDALS);
+        let mut medals = [Medals::NONE; SECTOR_COUNT];
+        medals[..4].fill(Medals::CLEAR);
+        medals[4..7].fill(Medals::ALL);
         let earned = from_profile(&with_medals(medals));
         assert!(earned.contains(&Achievement::Daybreak));
         assert!(!earned.contains(&Achievement::DaybreakMedals));
         assert!(!earned.contains(&Achievement::BlueHour));
         assert!(!earned.contains(&Achievement::BlueHourMedals));
-        medals[7] = ALL_MEDALS;
+        medals[7] = Medals::ALL;
         let earned = from_profile(&with_medals(medals));
         assert!(earned.contains(&Achievement::BlueHour));
         assert!(earned.contains(&Achievement::BlueHourMedals));
@@ -165,7 +157,7 @@ mod tests {
 
     #[test]
     fn thirty_six_medals_unlock_every_profile_achievement() {
-        let p = with_medals([ALL_MEDALS; SECTOR_COUNT]);
+        let p = with_medals([Medals::ALL; SECTOR_COUNT]);
         assert_eq!(p.medals(), 36);
         let earned = from_profile(&p);
         assert_eq!(earned.len(), 10);
@@ -176,8 +168,8 @@ mod tests {
     fn profile_finish_feeds_the_derivation() {
         let mut p = Profile::default();
         let mut g = Game::start(SectorId::FIRST, Mode::Practice);
-        g.phase = Phase::Cleared;
-        g.summary.medals = CLEAR | CLEAN;
+        g.stage = Stage::Cleared;
+        g.summary.medals = Medals::CLEAR | Medals::CLEAN;
         p.finish(&g);
         assert_eq!(
             from_profile(&p),
@@ -188,7 +180,7 @@ mod tests {
     #[test]
     fn journey_victory_and_long_chains_come_from_the_clear() {
         let mut g = Game::start(SectorId::clamped(SECTOR_COUNT - 1), Mode::Journey);
-        g.phase = Phase::Victory;
+        g.stage = Stage::Victory;
         g.summary.best_combo = CHAIN_TARGET - 1;
         assert_eq!(from_clear(&g), [Achievement::Homecoming]);
         g.summary.best_combo = CHAIN_TARGET;
@@ -198,7 +190,7 @@ mod tests {
         );
         // Practice cannot finish the journey, however the sector ends.
         let mut g = Game::start(SectorId::clamped(SECTOR_COUNT - 1), Mode::Practice);
-        g.phase = Phase::Cleared;
+        g.stage = Stage::Cleared;
         assert!(from_clear(&g).is_empty());
     }
 

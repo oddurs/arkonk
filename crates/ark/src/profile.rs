@@ -1,6 +1,6 @@
 //! Versioned local progress. Disk access happens at menu/sector boundaries.
 use crate::{
-    game::{Game, Mode, Phase},
+    Game, Medals, Mode, Stage,
     sectors::{SECTOR_COUNT, SectorId},
 };
 use std::{
@@ -10,7 +10,7 @@ use std::{
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Record {
-    pub medals: u8,
+    pub medals: Medals,
     pub best_ticks: u32,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -55,7 +55,7 @@ impl Default for Profile {
 }
 impl Profile {
     pub fn medals(&self) -> u32 {
-        self.records.iter().map(|r| r.medals.count_ones()).sum()
+        self.records.iter().map(|r| r.medals.count()).sum()
     }
     pub fn begin(&mut self, game: &Game) {
         self.checkpoint = Some(Checkpoint {
@@ -77,7 +77,7 @@ impl Profile {
         if game.mode == Mode::Journey {
             self.best_score = self.best_score.max(game.score);
             self.checkpoint = match game.sector.next() {
-                Some(next) if game.phase != Phase::Victory => Some(Checkpoint {
+                Some(next) if game.stage != Stage::Victory => Some(Checkpoint {
                     sector: next,
                     score: game.score,
                     lives: game.lives,
@@ -112,7 +112,7 @@ impl Profile {
                 ("display", [fullscreen]) => p.fullscreen = *fullscreen == 1,
                 ("record", [i, medals, ticks]) if (*i as usize) < SECTOR_COUNT => {
                     p.records[*i as usize] = Record {
-                        medals: (*medals as u8) & 7,
+                        medals: Medals::from_bits(*medals as u8),
                         best_ticks: *ticks,
                     }
                 }
@@ -146,7 +146,7 @@ impl Profile {
             u8::from(self.fullscreen)
         );
         for (i, r) in self.records.iter().enumerate() {
-            let _ = writeln!(out, "record {i} {} {}", r.medals, r.best_ticks);
+            let _ = writeln!(out, "record {i} {} {}", r.medals.bits(), r.best_ticks);
         }
         if let Some(c) = self.checkpoint {
             let _ = writeln!(
@@ -304,7 +304,7 @@ mod tests {
             ..Profile::default()
         };
         p.records[5] = Record {
-            medals: 7,
+            medals: Medals::ALL,
             best_ticks: 15400,
         };
         p.begin(&Game::start(SectorId::new(6).unwrap(), Mode::Journey));
@@ -319,7 +319,7 @@ mod tests {
         assert_eq!(p.unlocked, SECTOR_COUNT);
         assert_eq!(p.volume, 10);
         assert_eq!(p.checkpoint, None);
-        assert_eq!(p.records[0].medals, 7);
+        assert_eq!(p.records[0].medals, Medals::ALL);
         assert_eq!(Profile::decode("unknown version"), None);
         assert_eq!(Profile::decode(""), None);
     }
@@ -335,20 +335,20 @@ mod tests {
         p.begin(&Game::new());
         let saved = p.checkpoint;
         let mut g = Game::start(SectorId::FIRST, Mode::Practice);
-        g.phase = Phase::Cleared;
-        g.summary.medals = 7;
+        g.stage = Stage::Cleared;
+        g.summary.medals = Medals::ALL;
         g.summary.ticks = 1200;
         g.score = 5000;
         p.finish(&g);
         g.summary.ticks = 1500;
-        g.summary.medals = 1;
+        g.summary.medals = Medals::CLEAR;
         p.finish(&g);
         assert_eq!(p.checkpoint, saved);
         assert_eq!(p.best_score, 0);
         assert_eq!(
             p.records[0],
             Record {
-                medals: 7,
+                medals: Medals::ALL,
                 best_ticks: 1200
             }
         );
@@ -366,8 +366,8 @@ mod tests {
             best_score: 24600,
             ..Profile::default()
         };
-        p.records[0].medals = 7;
-        p.records[3].medals = 1;
+        p.records[0].medals = Medals::ALL;
+        p.records[3].medals = Medals::CLEAR;
         p
     }
     fn set_aside_files(path: &Path) -> Vec<Vec<u8>> {

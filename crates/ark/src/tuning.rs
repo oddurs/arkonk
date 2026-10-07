@@ -1,7 +1,7 @@
 //! Every rule constant, named. Distances are world pixels, speeds pixels per
 //! second, and durations ticks unless the name says seconds. Changing any of
 //! these changes the game, and the golden replays will say so.
-use crate::{clock::TICK_HZ, game::Power, geom::V2, sectors::SECTOR_COUNT};
+use crate::{Power, clock::TICK_HZ, geom::V2, sectors::SECTOR_COUNT};
 
 // The paddle.
 
@@ -67,10 +67,10 @@ pub const ANCHOR_CHARGES: u8 = 3;
 /// Brick contacts each ball passes through after a Phase capsule.
 pub const PHASE_CONTACTS: u8 = 3;
 
-// Capsule drops.
+// Capsules.
 
 /// How fast a capsule falls.
-pub const DROP_SPEED: f32 = 155.0;
+pub const CAPSULE_SPEED: f32 = 155.0;
 /// How far above the paddle's top edge a capsule is caught.
 pub const CATCH_ABOVE: f32 = 10.0;
 /// How far below the paddle's top edge a capsule is still caught.
@@ -147,6 +147,6 @@ pub const CONTACT_SKIN: f32 = 0.01;
 /// Balls in play at once.
 pub const MAX_BALLS: usize = 3;
 /// Capsules falling at once.
-pub const MAX_DROPS: usize = 12;
+pub const MAX_CAPSULES: usize = 12;
 /// The random generator's starting state; any nonzero value works.
 pub const RNG_SEED: u32 = 0x51f1_5e77;

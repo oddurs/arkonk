@@ -13,7 +13,8 @@
 mod common;
 
 use ark::{
-    game::{Events, Game, Input, Mode, Phase, Power},
+    Events, Game, Input, Mode, Power, Stage,
+    field::{CELLS, Cell, CellSet},
     sectors::SectorId,
 };
 use common::script::Pilot;
@@ -50,7 +51,7 @@ impl Digest {
     }
 
     fn game(&mut self, g: &Game) {
-        self.u8(stage(g.phase));
+        self.u8(stage(g.stage));
         self.u8(match g.mode {
             Mode::Journey => 0,
             Mode::Practice => 1,
@@ -58,12 +59,12 @@ impl Digest {
         self.u8(g.sector.index() as u8);
         self.u32(g.score);
         self.u8(g.lives);
-        self.u32(g.remaining as u32);
-        self.u32(g.initial_bricks as u32);
-        for cell in 0..g.bricks.len() {
-            self.u8(g.bricks[cell]);
-            self.bool(g.cores[cell]);
-            self.u8(g.relay_delay[cell]);
+        self.u32(g.board.remaining() as u32);
+        self.u32(g.board.initial() as u32);
+        for cell in Cell::all() {
+            self.u8(g.board.hp(cell));
+            self.bool(g.board.is_core(cell));
+            self.u8(g.board.relay_countdown(cell));
         }
         for b in &g.balls {
             for v in [b.pos, b.previous, b.velocity] {
@@ -73,29 +74,33 @@ impl Digest {
             self.bool(b.active);
             self.bool(b.held);
             self.f32(b.held_offset);
-            self.u8(b.phase_hits);
-            self.bytes(&b.phase_ignore.to_le_bytes());
+            self.u8(b.phase_charges);
+            let phased = b
+                .phased
+                .iter()
+                .fold(0_u128, |bits, c| bits | 1 << c.index());
+            self.bytes(&phased.to_le_bytes());
         }
-        for d in &g.drops {
+        for d in &g.capsules {
             self.f32(d.pos.x);
             self.f32(d.pos.y);
             self.u8(power(d.power));
             self.bool(d.active);
         }
-        self.f32(g.paddle_x);
-        self.f32(g.paddle_previous);
-        self.f32(g.paddle_width);
-        self.f32(g.wide_time);
-        self.f32(g.slow_time);
-        self.u8(g.anchor_charges);
+        self.f32(g.paddle.x);
+        self.f32(g.paddle.previous);
+        self.f32(g.paddle.width);
+        self.f32(g.powers.wide_seconds);
+        self.f32(g.powers.slow_seconds);
+        self.u8(g.powers.anchor_charges);
         self.u32(g.sector_ticks);
         self.u32(g.run_ticks);
-        self.u32(g.phase_ticks);
+        self.u32(g.stage_ticks);
         self.u32(g.combo);
         self.u32(g.best_combo);
         let s = g.summary;
         self.u32(s.ticks);
-        self.u8(s.medals);
+        self.u8(s.medals.bits());
         self.u32(s.bonus);
         self.u32(s.best_combo);
         self.bool(s.life_earned);
@@ -121,18 +126,18 @@ impl Digest {
     }
 }
 
-fn stage(phase: Phase) -> u8 {
-    match phase {
-        Phase::Ready => 0,
-        Phase::Playing => 1,
-        Phase::Cleared => 2,
-        Phase::GameOver => 3,
-        Phase::Victory => 4,
+fn stage(stage: Stage) -> u8 {
+    match stage {
+        Stage::Ready => 0,
+        Stage::Playing => 1,
+        Stage::Cleared => 2,
+        Stage::GameOver => 3,
+        Stage::Victory => 4,
     }
 }
 
-fn stage_name(phase: Phase) -> &'static str {
-    ["ready", "playing", "cleared", "game over", "victory"][usize::from(stage(phase))]
+fn stage_name(s: Stage) -> &'static str {
+    ["ready", "playing", "cleared", "game over", "victory"][usize::from(stage(s))]
 }
 
 fn power(p: Power) -> u8 {
@@ -185,10 +190,10 @@ impl Recorder {
                     "{:>6}  sector {:02} {:<9} score {:>6}  lives {}  bricks {:>2}  {:016x}",
                     self.tick,
                     game.sector.index() + 1,
-                    stage_name(game.phase),
+                    stage_name(game.stage),
                     game.score,
                     game.lives,
-                    game.remaining,
+                    game.board.remaining(),
                     self.digest.0,
                 );
             }
@@ -231,7 +236,7 @@ fn journey() {
         let mut r = Recorder::new(&format!("journey seed {seed}"));
         let mut pilot = pilot(seed);
         r.run(&mut game, 120 * CHECKPOINT, |tick, game| {
-            if matches!(game.phase, Phase::GameOver | Phase::Victory) {
+            if matches!(game.stage, Stage::GameOver | Stage::Victory) {
                 *game = Game::new();
             }
             pilot(tick, game)
@@ -252,10 +257,7 @@ fn full_board_relay() {
         launch: true,
         ..Input::default()
     });
-    game.bricks.fill(1);
-    game.cores.fill(true);
-    game.remaining = game.bricks.len();
-    game.initial_bricks = game.remaining;
+    game.board.reset([1; CELLS], CellSet::ALL);
     let mut r = Recorder::new("full board of relay cores");
     r.run(&mut game, 4 * CHECKPOINT, pilot(11));
     insta::assert_snapshot!(r.out);
@@ -279,7 +281,7 @@ fn every_power() {
     let mut pilot = pilot(12);
     r.run(&mut game, 8 * CHECKPOINT, |tick, game| {
         let turn = (tick / 600) as usize;
-        if tick % 600 == 300 && turn < 2 * ORDER.len() && game.phase == Phase::Playing {
+        if tick % 600 == 300 && turn < 2 * ORDER.len() && game.stage == Stage::Playing {
             game.apply_power(ORDER[turn % ORDER.len()]);
         }
         pilot(tick, game)
@@ -297,11 +299,11 @@ fn anchor_hold() {
     let mut r = Recorder::new("anchor catches held for seconds, then released");
     let mut pilot = pilot(13);
     r.run(&mut game, 6 * CHECKPOINT, |tick, game| {
-        if game.phase == Phase::Playing && game.anchor_charges == 0 {
+        if game.stage == Stage::Playing && game.powers.anchor_charges == 0 {
             game.apply_power(Power::Anchor);
         }
         let mut input = pilot(tick, game);
-        input.launch = game.phase != Phase::Playing || tick % 960 == 0;
+        input.launch = game.stage != Stage::Playing || tick % 960 == 0;
         input
     });
     insta::assert_snapshot!(r.out);
@@ -319,16 +321,15 @@ fn sector_endings() {
     for sector in [3, 7, 11] {
         let mut game = Game::start(SectorId::new(sector).unwrap(), Mode::Journey);
         let mut kept = 0;
-        for cell in (0..game.bricks.len()).rev() {
-            if game.bricks[cell] > 0 {
+        for cell in Cell::all().rev() {
+            if game.board.hp(cell) > 0 {
                 if kept < 3 {
                     kept += 1;
                 } else {
-                    game.bricks[cell] = 0;
+                    game.board.set(cell, 0, game.board.is_core(cell));
                 }
             }
         }
-        game.remaining = kept;
         let mut r = Recorder::new(&format!(
             "sector {:02} down to its last three bricks",
             sector + 1

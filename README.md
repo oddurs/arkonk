@@ -323,7 +323,9 @@ captures of every screen with gamepad prompts.
 The simulation is its own crate, `crates/ark`, with no dependencies: `clock.rs`
 schedules ticks, `geom.rs` holds context-free geometry, `field.rs` the playfield
 and brick grid, `sectors.rs` the authored journey (parsed at compile time),
-`game.rs` the pure fixed-step simulation, and `profile.rs` its persistence.
+`tuning.rs` every rule constant, `sim/` the rules (`game.rs` dispatches each
+tick; `ball.rs` sweeps a ball contact by contact; `board.rs`, `paddle.rs`,
+`power.rs` and `capsules.rs` own their state), and `profile.rs` persistence.
 The root package is the desktop app.
 `src/main.rs` handles application transitions; `src/render.rs`,
 `src/audio.rs`, and `src/perf.rs` handle presentation, `src/ui.rs` holds menu

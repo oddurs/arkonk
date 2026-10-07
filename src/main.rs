@@ -18,9 +18,9 @@ mod steam;
 mod ui;
 
 use ark::{
+    Events, Game, Input, Medals, Mode, Stage,
     clock::FixedClock,
     field::{BOTTOM, FIELD, LEFT, RIGHT, TOP},
-    game::*,
     geom::V2,
     profile::{Origin, Profile},
     sectors::SectorId,
@@ -285,7 +285,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         let pad = pads.poll(
             frame_seconds,
             focused,
-            ui.paused || matches!(game.phase, Phase::GameOver | Phase::Victory),
+            ui.paused || matches!(game.stage, Stage::GameOver | Stage::Victory),
             moved || input::pointer_pressed(),
         );
         ui.device = pads.device;
@@ -310,11 +310,11 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         if effects {
             smoke::effects(&mut game, frames);
         }
-        let terminal = matches!(game.phase, Phase::GameOver | Phase::Victory);
+        let terminal = matches!(game.stage, Stage::GameOver | Stage::Victory);
         if (!smoke || flow)
             && ui.screen == Screen::Play
             && !terminal
-            && (focus.lost || (frame_seconds > 0.25 && game.phase == Phase::Playing && !held))
+            && (focus.lost || (frame_seconds > 0.25 && game.stage == Stage::Playing && !held))
         {
             if !ui.paused {
                 diagnostics::info(format_args!(
@@ -456,9 +456,9 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                         }
                         changed = true;
                     }
-                } else if !changed && game.phase == Phase::Cleared {
+                } else if !changed && game.stage == Stage::Cleared {
                     let next = confirm || (click && ui::next_rect().contains(pointer));
-                    if next && game.phase_ticks >= ADVANCE_DELAY_TICKS {
+                    if next && game.stage_ticks >= ADVANCE_DELAY_TICKS {
                         if game.mode == Mode::Practice {
                             ui.screen = Screen::Sectors;
                             ui.sector = game.sector;
@@ -502,7 +502,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     .map_or(FIELD.center().x, |b| b.pos.x)
                     + (now as f32 * 0.7).sin() * 32.0,
             );
-            pending_launch = matches!(game.phase, Phase::Ready | Phase::Cleared)
+            pending_launch = matches!(game.stage, Stage::Ready | Stage::Cleared)
                 || game.balls.iter().any(|b| b.active && b.held);
         }
         let mut alpha = 1.0;
@@ -525,7 +525,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     dirty = true;
                     ui.choice = 0;
                 }
-                if game.phase == Phase::GameOver && game.mode == Mode::Journey {
+                if game.stage == Stage::GameOver && game.mode == Mode::Journey {
                     profile.best_score = profile.best_score.max(game.score);
                     dirty = true;
                     ui.choice = 1;
@@ -544,7 +544,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         }
         if dirty
             && now - last_save_attempt >= 5.0
-            && (ui.screen != Screen::Play || ui.paused || game.phase != Phase::Playing)
+            && (ui.screen != Screen::Play || ui.paused || game.stage != Stage::Playing)
         {
             last_save_attempt = now;
             match path.as_ref().map(|p| profile.save(p)).transpose() {
@@ -561,14 +561,14 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         }
         steam.presence(ui.screen == Screen::Play, &game);
         let show_cursor = ui.device == Device::KeyboardMouse
-            && (ui.screen != Screen::Play || ui.paused || game.phase != Phase::Playing);
+            && (ui.screen != Screen::Play || ui.paused || game.stage != Stage::Playing);
         if cursor_visible != show_cursor {
             show_mouse(show_cursor);
             cursor_visible = show_cursor;
         }
         perf.refresh(now, game.collision_caps);
         let draw_start = get_time();
-        let actual_phase = game.phase;
+        let actual_stage = game.stage;
         let actual_screen = ui.screen;
         let actual_pause = ui.paused;
         let measured = if perf_test { 3899 } else { 660 };
@@ -582,10 +582,10 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             match frames {
                 30 => ui.screen = Screen::Title,
                 150 => ui.paused = true,
-                160 => game.phase = Phase::GameOver,
+                160 => game.stage = Stage::GameOver,
                 180 => {
-                    game.phase = Phase::Cleared;
-                    game.summary.medals = 7;
+                    game.stage = Stage::Cleared;
+                    game.summary.medals = Medals::ALL;
                     game.summary.ticks = 18240;
                     game.summary.bonus = 2000;
                 }
@@ -596,8 +596,8 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                         250 => ui.screen = Screen::Title,
                         260 => ui.paused = true,
                         270 => ui.screen = Screen::Sectors,
-                        280 => game.phase = Phase::Cleared,
-                        _ => game.phase = Phase::Ready,
+                        280 => game.stage = Stage::Cleared,
+                        _ => game.stage = Stage::Ready,
                     }
                 }
                 _ => {}
@@ -613,7 +613,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         if let Some((size, p)) = layout_capture {
             renderer.capture_at((&game, &ui, &profile), size, &p);
         }
-        game.phase = actual_phase;
+        game.stage = actual_stage;
         ui.screen = actual_screen;
         ui.paused = actual_pause;
         perf.draw((get_time() - draw_start) * 1000.0);

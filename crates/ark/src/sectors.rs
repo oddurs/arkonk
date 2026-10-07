@@ -5,8 +5,8 @@
 //! empty, `1`–`3` a brick with that many hit points, and `R` a one-hit relay
 //! core. A malformed row is a build error, not a runtime surprise.
 use crate::{
+    Power,
     field::{CELLS, COLS, Cell, CellSet, ROWS},
-    game::Power,
 };
 
 /// Sectors in the journey.
@@ -48,7 +48,7 @@ impl SectorId {
         &SECTORS[self.index()]
     }
     /// Every sector in journey order.
-    pub fn all() -> impl Iterator<Item = Self> {
+    pub fn all() -> impl DoubleEndedIterator<Item = Self> {
         (0..SECTOR_COUNT as u8).map(Self)
     }
 }

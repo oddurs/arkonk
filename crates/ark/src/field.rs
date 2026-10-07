@@ -71,7 +71,7 @@ impl Cell {
         self.index() % COLS
     }
     /// Every cell, row by row.
-    pub fn all() -> impl Iterator<Item = Self> {
+    pub fn all() -> impl DoubleEndedIterator<Item = Self> {
         (0..CELLS as u8).map(Self)
     }
     /// The orthogonal neighbours a relay reaches, in the order it reaches

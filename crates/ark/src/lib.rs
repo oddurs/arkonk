@@ -3,8 +3,10 @@
 //! clock; the application drives it one tick at a time.
 pub mod clock;
 pub mod field;
-pub mod game;
 pub mod geom;
 pub mod profile;
 pub mod sectors;
+mod sim;
 pub mod tuning;
+
+pub use sim::*;

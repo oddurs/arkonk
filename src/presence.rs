@@ -1,9 +1,6 @@
 //! What friends see in their Steam list. Tokens must match the localization file
 //! uploaded to Steam, `docs/steam/rich_presence.vdf`.
-use ark::{
-    game::{Game, Mode},
-    sectors::SectorId,
-};
+use ark::{Game, Mode, sectors::SectorId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Presence {

@@ -5,8 +5,8 @@
 //! every sector covered. Under `cargo test` (no `--bench` argument) it runs a
 //! shorter workload with the same assertions.
 use ark::{
-    field::{BALL_RADIUS, CELLS, FIELD, PADDLE_Y},
-    game::*,
+    Ball, Capsule, Game, Input, Mode, Particle, Power, Stage,
+    field::{BALL_RADIUS, CELLS, CellSet, FIELD, PADDLE_Y},
     geom::V2,
     sectors::{SECTOR_COUNT, SectorId},
 };
@@ -57,10 +57,7 @@ fn setup(stress: bool, relays: bool, sector: SectorId) -> Game {
         ..Default::default()
     });
     if relays {
-        g.bricks.fill(1);
-        g.cores.fill(true);
-        g.remaining = CELLS;
-        g.initial_bricks = g.remaining;
+        g.board.reset([1; CELLS], CellSet::ALL);
         for power in [
             Power::Anchor,
             Power::Phase,
@@ -85,14 +82,14 @@ fn setup(stress: bool, relays: bool, sector: SectorId) -> Game {
             g.balls[0].previous = g.balls[0].pos;
             g.balls[0].velocity = V2::new(0.0, 12000.0);
         }
-        g.particles.fill(Particle {
+        g.effects.particles.fill(Particle {
             pos: V2::new(400.0, 400.0),
             velocity: V2::new(100.0, 100.0),
             life: 10.0,
             hue: 0,
         });
-        for (i, d) in g.drops.iter_mut().enumerate() {
-            *d = Drop {
+        for (i, d) in g.capsules.iter_mut().enumerate() {
+            *d = Capsule {
                 pos: V2::new(120.0 + i as f32 * 60.0, 300.0),
                 power: Power::Multi,
                 active: true,
@@ -135,8 +132,8 @@ fn run(load: &Load, stress: bool, relays: bool) {
         let start = Instant::now();
         for _ in 0..BATCH {
             if tick % load.sector_ticks == 0
-                || matches!(game.phase, Phase::GameOver | Phase::Victory)
-                || (stress && (tick % 240 == 0 || game.phase != Phase::Playing))
+                || matches!(game.stage, Stage::GameOver | Stage::Victory)
+                || (stress && (tick % 240 == 0 || game.stage != Stage::Playing))
             {
                 score += u64::from(game.score);
                 caps += game.collision_caps;
@@ -159,9 +156,9 @@ fn run(load: &Load, stress: bool, relays: bool) {
                     }
                     ball.velocity = ball.velocity.normalized() * 12000.0;
                 }
-                for (i, drop) in game.drops.iter_mut().enumerate() {
+                for (i, drop) in game.capsules.iter_mut().enumerate() {
                     if !drop.active {
-                        *drop = Drop {
+                        *drop = Capsule {
                             pos: V2::new(120.0 + i as f32 * 60.0, 300.0),
                             power: if relays {
                                 [
@@ -195,7 +192,7 @@ fn run(load: &Load, stress: bool, relays: bool) {
             phase_hits += u64::from(game.events.phase_hit);
             catches += u64::from(game.events.caught);
             if stress {
-                for p in &mut game.particles {
+                for p in &mut game.effects.particles {
                     p.life = 1.0;
                 }
             }
@@ -215,7 +212,7 @@ fn run(load: &Load, stress: bool, relays: bool) {
         if relays {
             "Relay stress (84 cores, 3 fast balls, all five powers, full pools)"
         } else if stress {
-            "Stress (3 balls @ 12k px/s, 384 particles, 12 drops)"
+            "Stress (3 balls @ 12k px/s, 384 particles, 12 capsules)"
         } else {
             "Gameplay (autopaddle, all levels)"
         },

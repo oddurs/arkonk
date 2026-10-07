@@ -1,6 +1,7 @@
 //! The version-1 save file, byte for byte. Players' existing files must keep
 //! loading and must be rewritten exactly as before.
 use ark::{
+    Medals,
     profile::{Checkpoint, Profile, Record},
     sectors::SectorId,
 };
@@ -16,11 +17,11 @@ fn encoded_layout() {
         ..Profile::default()
     };
     p.records[0] = Record {
-        medals: 7,
+        medals: Medals::ALL,
         best_ticks: 15400,
     };
     p.records[5] = Record {
-        medals: 3,
+        medals: Medals::CLEAR | Medals::CLEAN,
         best_ticks: 30001,
     };
     p.checkpoint = Some(Checkpoint {

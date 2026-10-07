@@ -2,7 +2,7 @@
 //! tracks with the pointer, sometimes steers with keys, sometimes lets go,
 //! and presses launch at random moments.
 use super::splitmix::SplitMix64;
-use ark::game::Input;
+use ark::Input;
 
 #[derive(Clone, Copy)]
 enum Style {

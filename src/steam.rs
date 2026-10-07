@@ -8,7 +8,7 @@ mod imp {
         achievements::{self, Achievement, MEDALS_STAT},
         presence::Presence,
     };
-    use ark::{game::Game, profile::Profile};
+    use ark::{Game, profile::Profile};
     use steamworks::{AppId, CallbackResult, Client, SteamAPIInitError};
 
     /// The one place the Steam app id lives. 480 is Valve's shared Spacewar test
@@ -175,7 +175,7 @@ mod imp {
 
 #[cfg(not(feature = "steam"))]
 mod imp {
-    use ark::{game::Game, profile::Profile};
+    use ark::{Game, profile::Profile};
 
     pub fn restart_through_steam() -> bool {
         false

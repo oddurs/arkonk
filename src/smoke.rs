@@ -5,8 +5,8 @@ use crate::{
     ui::{Controls, Screen, Ui},
 };
 use ark::{
-    field::{BALL_RADIUS as RADIUS, CELLS, Cell, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
-    game::*,
+    Capsule, Game, Input, Medals, Mode, Particle, Power, Stage,
+    field::{BALL_RADIUS as RADIUS, CELLS, Cell, CellSet, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
     geom::V2,
     profile::Profile,
     sectors::SectorId,
@@ -36,7 +36,7 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
             keys.pause = true;
         }
         3 | 20 => {
-            assert_eq!(game.phase, Phase::Playing);
+            assert_eq!(game.stage, Stage::Playing);
             assert!(
                 game.mode
                     == if frame == 3 {
@@ -45,29 +45,28 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
                         Mode::Practice
                     }
             );
-            game.bricks.fill(0);
-            game.remaining = 0;
+            game.board.reset([0; CELLS], CellSet::EMPTY);
         }
         4 | 21 => {
-            assert_eq!(game.phase, Phase::Cleared);
+            assert_eq!(game.stage, Stage::Cleared);
             assert!(profile.unlocked >= 2);
             assert_eq!(profile.checkpoint.unwrap().sector.index(), 1);
-            game.phase_ticks = ADVANCE_DELAY_TICKS;
+            game.stage_ticks = ADVANCE_DELAY_TICKS;
         }
         26 => keys.focus_lost = true,
         27 => assert!(ui.paused),
         29 => {
             assert!(!ui.paused);
-            assert_eq!(game.phase, Phase::Playing);
+            assert_eq!(game.stage, Stage::Playing);
         }
         31 => keys.restart = true,
         32 => {
             assert!(ui.screen == Screen::Play && !ui.paused);
-            assert_eq!(game.phase, Phase::Ready);
+            assert_eq!(game.stage, Stage::Ready);
             assert_eq!(game.sector.index(), 1);
             assert_eq!(game.score, profile.checkpoint.unwrap().score);
-            assert_eq!(profile.records[0].medals, 7);
-            assert_eq!(profile.records[1].medals, 7);
+            assert_eq!(profile.records[0].medals, Medals::ALL);
+            assert_eq!(profile.records[1].medals, Medals::ALL);
             println!(
                 "UI flow passed: new journey, clear, checkpoint, home, continue, practice, focus pause, resume, retry"
             );
@@ -76,12 +75,12 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         34 => {
             game.apply_power(Power::Anchor);
             game.apply_power(Power::Phase);
-            game.balls[0].pos = V2::new(game.paddle_x + 25.0, PADDLE_Y - RADIUS - 0.5);
+            game.balls[0].pos = V2::new(game.paddle.x + 25.0, PADDLE_Y - RADIUS - 0.5);
             game.balls[0].velocity = V2::new(0.0, 400.0);
         }
         35 => {
             assert!(game.balls[0].held);
-            assert_eq!(game.anchor_charges, 2);
+            assert_eq!(game.powers.anchor_charges, 2);
             game.apply_power(Power::Wide);
             game.apply_power(Power::Slow);
             game.apply_power(Power::Multi);
@@ -93,20 +92,20 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         }
         40 => {
             assert!(!game.balls[0].held);
-            assert_eq!(game.balls[0].phase_hits, 3);
+            assert_eq!(game.balls[0].phase_charges, 3);
             *game = Game::start(SectorId::clamped(8), Mode::Practice);
             game.step(&Input {
                 launch: true,
                 ..Input::default()
             });
             game.apply_power(Power::Phase);
-            let core = Cell::all().find(|c| game.cores[c.index()]).unwrap();
+            let core = Cell::all().find(|&c| game.board.is_core(c)).unwrap();
             let r = cell_rect(core);
             game.balls[0].pos = V2::new(r.x - RADIUS - 1.0, r.y + r.h / 2.0);
             game.balls[0].velocity = V2::new(500.0, 0.0);
         }
         45 => {
-            assert!(game.relay_flash.iter().any(|&f| f > 0));
+            assert!(game.effects.relay_flash.iter().any(|&f| f > 0));
             assert_eq!(game.collision_caps, 0);
         }
         50 => println!(
@@ -132,7 +131,7 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         }
         56 | 58 => {
             assert!(ui.screen == Screen::Play && !ui.paused);
-            assert_eq!(game.phase, Phase::Ready);
+            assert_eq!(game.stage, Stage::Ready);
             assert!(game.sector.index() == 8 && game.mode == Mode::Practice);
             if frame == 56 {
                 keys = pad_controls(start, None, false);
@@ -154,9 +153,7 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
 pub fn effects(game: &mut Game, frame: u32) {
     if frame.is_multiple_of(90) {
         *game = Game::start(SectorId::clamped(10), Mode::Practice);
-        game.bricks.fill(1);
-        game.cores.fill(true);
-        game.remaining = CELLS;
+        game.board.reset([1; CELLS], CellSet::ALL);
         game.step(&Input {
             launch: true,
             ..Input::default()
@@ -176,7 +173,7 @@ pub fn effects(game: &mut Game, frame: u32) {
             ball.velocity = V2::new(80.0, -900.0);
         }
     }
-    for (i, p) in game.particles.iter_mut().enumerate() {
+    for (i, p) in game.effects.particles.iter_mut().enumerate() {
         if p.life < 0.2 {
             *p = Particle {
                 pos: V2::new(
@@ -189,9 +186,9 @@ pub fn effects(game: &mut Game, frame: u32) {
             };
         }
     }
-    for (i, d) in game.drops.iter_mut().enumerate() {
+    for (i, d) in game.capsules.iter_mut().enumerate() {
         if !d.active {
-            *d = Drop {
+            *d = Capsule {
                 pos: V2::new(125.0 + i as f32 * 62.0, 470.0),
                 power: [
                     Power::Wide,
