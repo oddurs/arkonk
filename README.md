@@ -41,24 +41,31 @@ Native macOS is verified locally. Windows and Linux have CI build coverage.
 On Linux, install the native libraries first (Debian/Ubuntu):
 
 ```sh
-sudo apt-get install libasound2-dev libx11-dev libxi-dev libgl1-mesa-dev
+sudo apt-get install libasound2-dev libx11-dev libxi-dev libgl1-mesa-dev libudev-dev
 ```
 
-| Control | Action |
-| --- | --- |
-| Mouse / A, D / Left, Right | Move paddle |
-| Space / Enter / Left click | Select a menu action or serve |
-| P / Escape | Pause or resume |
-| Arrows / W, S | Navigate menus |
-| R in pause / results | Retry from the sector checkpoint |
-| Escape in sector select / results | Main menu |
-| M | Mute sound |
-| [ / ] | Lower / raise volume |
-| F | Toggle fullscreen |
-| F3 | Performance overlay |
-| Q / Close window | Quit |
+| Action | Keyboard / mouse | Gamepad |
+| --- | --- | --- |
+| Move paddle | Mouse / A, D / Left, Right | Left stick / D-pad |
+| Select a menu action, serve, or release Anchor | Space / Enter / Left click | A |
+| Pause or resume | P / Escape | Start (B also resumes) |
+| Navigate menus and the sector grid | Arrows / W, S | D-pad / left stick |
+| Retry from the sector checkpoint (pause / results) | R | X |
+| Back to the main menu (sector select / results) | Escape | B |
+| Mute sound | M | |
+| Lower / raise volume | [ / ] | |
+| Toggle fullscreen | F | |
+| Performance overlay | F3 | |
+| Quit | Q / Close window | |
 
-Keyboard input takes control until the mouse moves again. Hit the ball with the
+Keyboard input takes control until the mouse moves again. The stick is analog:
+a light push moves the paddle slowly, and a small radial deadzone ignores drift.
+Holding a direction in a menu repeats it. On-screen prompts and the mouse cursor
+follow whichever device you used last; the cursor hides while a gamepad is in
+use. Gamepads use the Xbox layout and labels, which Steam Deck and Steam Input
+present; other pads map by position. Disconnecting the controller in use pauses
+play, and controllers can be plugged in at any time. Gamepad input is ignored
+while the window is in the background. Hit the ball with the
 paddle's edges to steer it; a centered hit sends it straight up. Catch falling
 capsules:
 
@@ -67,7 +74,7 @@ capsules:
 | **W — Wide** | A wider paddle for 14 seconds. |
 | **S — Slow** | Slower balls for 12 seconds. |
 | **M — Multi** | Split into up to three balls. |
-| **A — Anchor** | Three sticky catches. Reposition, then click or press Space to release. |
+| **A — Anchor** | Three sticky catches. Reposition, then click or press Space or A to release. |
 | **P — Phase** | Each ball passes through its next three brick contacts, damaging each. |
 
 Anchor holds one ball at a time while the others keep moving. It has no release
@@ -208,8 +215,8 @@ window/fullscreen setup before treating frame pacing as finished.
 The released Miniquad Metal path needed fixes for offscreen attachment formats,
 Retina clipping, resizing, and GPU buffer reuse. The narrow, vendored patch and its
 limits are documented in [vendor/miniquad/ARKONK.md](vendor/miniquad/ARKONK.md).
-Native desktop runtime testing on Windows/Linux, controller support, Steam
-integration, and packaging remain release work; CI build coverage is not runtime
+Native desktop runtime testing on Windows/Linux, testing on physical controllers,
+Steam integration, and packaging remain release work; CI build coverage is not runtime
 or Steam Deck certification.
 
 ## Development
@@ -233,19 +240,26 @@ Both graphical checks need a desktop session and leave your saved progress alone
 `--flow-test` drives the real menu input handlers through new journey, sector clear,
 checkpoint restore, practice, focus pause, resume, and retry, with assertions at
 transition boundaries. It also checks sticky catches with combined powers,
-pause/resume while holding, explicit release, Phase contacts, and relay ignition.
+pause/resume while holding, explicit release, Phase contacts, and relay ignition,
+then pauses, resumes, navigates, and retries with gamepad buttons through the same
+mapping a controller uses. Test runs never open gamepads, so a controller on the
+desk cannot steer them. The OpenGL smoke test also writes `target/*-pad.png`
+captures of every screen with gamepad prompts.
 `--effects-test` exercises repeated full-board cascades, full pools, and resizing.
 
 `src/physics.rs` contains context-free geometry; `src/game.rs` contains the pure
 fixed-step simulation. `src/levels.rs` authors the journey, `src/profile.rs` persists it, and
 `src/timing.rs` schedules ticks. `src/main.rs` handles application transitions; `src/render.rs`,
 `src/audio.rs`, and `src/perf.rs` handle presentation, `src/ui.rs` holds menu
-layout and input, and `src/pixel_font.rs` contains the original bitmap type.
+layout and keyboard/mouse input, `src/input.rs` merges gamepads (via
+[gilrs](https://crates.io/crates/gilrs)) into the same controls and tracks the
+active device, and `src/pixel_font.rs` contains the original bitmap type.
 Collision tests cover high
 speed tunneling, rounded corners, departing/parallel trajectories, moving
 paddle interception, bounce steering, life loss, powers, and level transitions.
 Additional tests cover medals, checkpoint isolation, malformed saves, replacing
-save files, drop cadence, anti-stall behavior, and timing at 30–360 Hz.
+save files, drop cadence, anti-stall behavior, timing at 30–360 Hz, and the
+gamepad mapping: stick deadzone, menu repeat, device switching, and axis merging.
 GitHub Actions runs formatting, Clippy, tests, release builds, and allocation
 benchmarks on macOS, Linux, and Windows.
 

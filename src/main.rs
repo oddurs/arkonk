@@ -1,4 +1,5 @@
 mod audio;
+mod input;
 mod perf;
 mod pixel_font;
 mod render;
@@ -7,6 +8,7 @@ mod ui;
 
 use arkonk::{game::*, profile::Profile, timing::FixedClock};
 use audio::Audio;
+use input::{Device, Gamepads};
 use macroquad::prelude::*;
 use perf::Perf;
 use render::{Renderer, View};
@@ -124,6 +126,7 @@ async fn main() {
     let mut frames = 0;
     let subscriber = macroquad::input::utils::register_input_subscriber();
     let mut focus = Focus::default();
+    let mut pads = Gamepads::new(!smoke);
     loop {
         let now = get_time();
         let frame_time = Instant::now();
@@ -170,6 +173,18 @@ async fn main() {
         }
         last_mouse = mouse;
         let pointer = vec2(mouse.x, mouse.y);
+        // Asked every frame: the macOS minimize event also fires when the window moves.
+        #[cfg(target_os = "macos")]
+        let focused = miniquad::native::macos::window_has_focus();
+        #[cfg(not(target_os = "macos"))]
+        let focused = focus.focused;
+        let pad = pads.poll(
+            frame_seconds,
+            focused,
+            ui.paused || matches!(game.phase, Phase::GameOver | Phase::Victory),
+            moved || input::pointer_pressed(),
+        );
+        ui.device = pads.device;
         let Controls {
             click,
             confirm,
@@ -184,9 +199,9 @@ async fn main() {
         } = if flow {
             smoke::flow(frames, &mut game, &ui, &profile)
         } else {
-            Controls::read()
+            input::merge(Controls::read(), pad.controls)
         };
-        focus.lost |= focus_lost;
+        focus.lost |= focus_lost || pad.lost;
         if effects {
             smoke::effects(&mut game, frames);
         }
@@ -348,8 +363,11 @@ async fn main() {
         if changed {
             pending_launch = false;
         }
-        let axis = (is_key_down(KeyCode::D) || is_key_down(KeyCode::Right)) as u8 as f32
-            - (is_key_down(KeyCode::A) || is_key_down(KeyCode::Left)) as u8 as f32;
+        let axis = input::merge_axis(
+            (is_key_down(KeyCode::D) || is_key_down(KeyCode::Right)) as u8 as f32
+                - (is_key_down(KeyCode::A) || is_key_down(KeyCode::Left)) as u8 as f32,
+            pad.axis,
+        );
         if axis != 0.0 {
             mouse_control = false;
         }
@@ -421,7 +439,8 @@ async fn main() {
                 }
             }
         }
-        let show_cursor = ui.screen != Screen::Play || ui.paused || game.phase != Phase::Playing;
+        let show_cursor = ui.device == Device::KeyboardMouse
+            && (ui.screen != Screen::Play || ui.paused || game.phase != Phase::Playing);
         if cursor_visible != show_cursor {
             show_mouse(show_cursor);
             cursor_visible = show_cursor;
@@ -443,6 +462,16 @@ async fn main() {
                     game.summary.bonus = 2000;
                 }
                 190 => ui.screen = Screen::Sectors,
+                250 | 260 | 270 | 280 | 290 => {
+                    ui.device = Device::Gamepad;
+                    match frames {
+                        250 => ui.screen = Screen::Title,
+                        260 => ui.paused = true,
+                        270 => ui.screen = Screen::Sectors,
+                        280 => game.phase = Phase::Cleared,
+                        _ => game.phase = Phase::Ready,
+                    }
+                }
                 _ => {}
             }
         }
@@ -467,6 +496,11 @@ async fn main() {
                 180 => Some("target/clear.png"),
                 190 => Some("target/sectors.png"),
                 230 => Some("target/resized.png"),
+                250 => Some("target/attract-pad.png"),
+                260 => Some("target/paused-pad.png"),
+                270 => Some("target/sectors-pad.png"),
+                280 => Some("target/clear-pad.png"),
+                290 => Some("target/ready-pad.png"),
                 _ => None,
             };
             if let Some(p) = capture {
@@ -505,7 +539,7 @@ async fn main() {
                 "target/relay.png"
             });
         }
-        if flow && frames >= 50 {
+        if flow && frames >= 58 {
             break;
         }
         frames += 1;
