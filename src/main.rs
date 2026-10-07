@@ -4,15 +4,17 @@ mod perf;
 mod pixel_font;
 mod render;
 mod smoke;
+mod steam;
 mod ui;
 
-use arkonk::{game::*, profile::Profile, timing::FixedClock};
+use arkonk::{game::*, presence::Presence, profile::Profile, timing::FixedClock};
 use audio::Audio;
 use input::{Device, Gamepads};
 use macroquad::prelude::*;
 use perf::Perf;
 use render::{Renderer, View};
 use std::{path::PathBuf, time::Instant};
+use steam::Steam;
 use ui::{Controls, Screen, Ui};
 
 fn config() -> Conf {
@@ -92,8 +94,14 @@ fn home(ui: &mut Ui, profile: &Profile) {
     ui.paused = false;
     ui.choice = usize::from(profile.checkpoint.is_none());
 }
-#[macroquad::main(config)]
-async fn main() {
+fn main() {
+    // Before any window exists: Steam is launching another copy of the game.
+    if steam::restart_through_steam() {
+        return;
+    }
+    macroquad::Window::from_config(config(), run());
+}
+async fn run() {
     prevent_quit();
     let flow = std::env::args().any(|a| a == "--flow-test");
     let perf_test = std::env::args().any(|a| a == "--perf-test");
@@ -103,6 +111,12 @@ async fn main() {
     let mut profile = path
         .as_ref()
         .map_or_else(Profile::default, |p| Profile::load(p));
+    // Test runs must not unlock achievements or show presence.
+    let mut steam = if smoke {
+        Steam::off()
+    } else {
+        Steam::init(&profile)
+    };
     let mut dirty = false;
     let mut last_save_attempt = -5.0;
     let mut game = Game::new();
@@ -141,6 +155,7 @@ async fn main() {
         }
         perf.frame(frame_seconds * 1000.0);
         macroquad::input::utils::repeat_all_miniquad_input(&mut focus, subscriber);
+        steam.run_callbacks();
         if is_key_pressed(KeyCode::Q) || is_quit_requested() {
             break;
         }
@@ -202,6 +217,7 @@ async fn main() {
             input::merge(Controls::read(), pad.controls)
         };
         focus.lost |= focus_lost || pad.lost;
+        focus.lost |= steam.overlay_opened();
         if effects {
             smoke::effects(&mut game, frames);
         }
@@ -403,6 +419,7 @@ async fn main() {
                 events.merge(game.events);
                 if game.events.clear {
                     profile.finish(&game);
+                    steam.cleared(&game, &profile);
                     dirty = true;
                     ui.choice = 0;
                 }
@@ -439,6 +456,7 @@ async fn main() {
                 }
             }
         }
+        steam.presence(Presence::of(ui.screen == Screen::Play, &game));
         let show_cursor = ui.device == Device::KeyboardMouse
             && (ui.screen != Screen::Play || ui.paused || game.phase != Phase::Playing);
         if cursor_visible != show_cursor {

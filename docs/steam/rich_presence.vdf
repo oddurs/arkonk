@@ -1,0 +1,10 @@
+"lang"
+{
+	"Language"	"english"
+	"Tokens"
+	{
+		"#Menus"	"In menus"
+		"#Journey"	"Sector %sector% · %name%"
+		"#Practice"	"Practicing Sector %sector% · %name%"
+	}
+}
