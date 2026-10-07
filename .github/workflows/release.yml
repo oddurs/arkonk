@@ -1,0 +1,134 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+  # Changes to the release path rehearse it as a dry run before merging.
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/release-notes.sh
+      - scripts/steam-upload.sh
+  # A manual run is a dry run too: it builds and checks every package but
+  # publishes no GitHub Release. It uploads to Steam only when asked.
+  workflow_dispatch:
+    inputs:
+      steam:
+        description: Upload this build to Steam
+        type: boolean
+        default: false
+      steam_branch:
+        description: "Steam branch to set it live on (default: the STEAM_BRANCH variable)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    uses: ./.github/workflows/package.yml
+    with:
+      sign: true
+    secrets: inherit
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arkonk-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          mkdir -p dist/steam
+          find dist -maxdepth 1 -name '*-steam.zip' -exec mv {} dist/steam/ \;
+          cd dist
+          sha256sum arkonk-*.zip >SHA256SUMS
+          cat SHA256SUMS
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pkgid=$(cargo pkgid)
+          version=${pkgid##*[#@]}
+          if [ "$GITHUB_REF_TYPE" != tag ]; then
+            scripts/release-notes.sh Unreleased >notes.md
+            echo "::notice::Dry run from $GITHUB_REF_NAME: built arkonk $version; no release published."
+            exit 0
+          fi
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match Cargo.toml version $version."
+            exit 1
+          fi
+          scripts/release-notes.sh "$version" >notes.md
+          gh release create "$GITHUB_REF_NAME" dist/arkonk-*.zip dist/SHA256SUMS \
+            --verify-tag --title "ARKONK $version" --notes-file notes.md
+
+  steam:
+    needs: publish
+    if: github.ref_type == 'tag' || inputs.steam
+    runs-on: ubuntu-latest
+    env:
+      STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+      STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
+      STEAM_TOTP_SECRET: ${{ secrets.STEAM_TOTP_SECRET }}
+      STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+      STEAM_APP_ID: ${{ vars.STEAM_APP_ID }}
+      STEAM_DEPOT_WINDOWS: ${{ vars.STEAM_DEPOT_WINDOWS }}
+      STEAM_DEPOT_MACOS: ${{ vars.STEAM_DEPOT_MACOS }}
+      STEAM_DEPOT_LINUX: ${{ vars.STEAM_DEPOT_LINUX }}
+      STEAM_BRANCH: ${{ inputs.steam_branch || vars.STEAM_BRANCH }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arkonk-*
+          path: dist
+          merge-multiple: true
+      - name: Check Steam configuration
+        id: ready
+        run: |
+          missing=
+          for name in STEAM_USERNAME STEAM_APP_ID STEAM_DEPOT_WINDOWS STEAM_DEPOT_MACOS STEAM_DEPOT_LINUX; do
+            if [ -z "$(printenv "$name")" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::notice::Steam upload skipped: not configured:$missing (see docs/RELEASING.md)."
+            echo "upload=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "upload=true" >>"$GITHUB_OUTPUT"
+          fi
+      - name: Install steamcmd
+        if: steps.ready.outputs.upload == 'true'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y lib32gcc-s1
+          mkdir -p "$HOME/steamcmd"
+          curl -sSfL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz |
+            tar -xz -C "$HOME/steamcmd"
+          if [ -n "$STEAM_CONFIG_VDF" ]; then
+            mkdir -p "$HOME/steamcmd/config"
+            printf '%s' "$STEAM_CONFIG_VDF" | base64 --decode >"$HOME/steamcmd/config/config.vdf"
+          fi
+          # The first run updates steamcmd itself; keep that out of the upload log.
+          "$HOME/steamcmd/steamcmd.sh" +quit
+      - name: Upload to Steam
+        if: steps.ready.outputs.upload == 'true'
+        run: |
+          set --
+          if [ -n "$STEAM_BRANCH" ]; then
+            set -- --branch "$STEAM_BRANCH"
+          fi
+          STEAMCMD=$HOME/steamcmd/steamcmd.sh scripts/steam-upload.sh "$@"

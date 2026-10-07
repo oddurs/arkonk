@@ -1,3 +1,6 @@
+// Release builds use the GUI subsystem so Windows opens no console window
+// beside the game. Debug builds keep the console for development output.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 mod audio;
 mod input;
 mod perf;
@@ -94,7 +97,35 @@ fn home(ui: &mut Ui, profile: &Profile) {
     ui.paused = false;
     ui.choice = usize::from(profile.checkpoint.is_none());
 }
+/// A GUI-subsystem process starts without a console. When launched from a
+/// terminal (`--version`, smoke and perf tests), borrow the parent's console so
+/// the output is visible. Redirected or piped handles are already valid and
+/// are left alone.
+#[cfg(windows)]
+fn attach_parent_console() {
+    unsafe extern "system" {
+        fn GetStdHandle(id: u32) -> *mut std::ffi::c_void;
+        fn AttachConsole(process: u32) -> i32;
+    }
+    const STD_OUTPUT_HANDLE: u32 = -11i32 as u32;
+    const ATTACH_PARENT_PROCESS: u32 = u32::MAX;
+    // SAFETY: both calls take plain integers and only touch process-wide
+    // console state, before any other thread exists.
+    unsafe {
+        if GetStdHandle(STD_OUTPUT_HANDLE).is_null() {
+            // Failure means there is no parent console (Explorer or Steam
+            // launched the game), so there is nowhere to show output anyway.
+            AttachConsole(ATTACH_PARENT_PROCESS);
+        }
+    }
+}
 fn main() {
+    #[cfg(windows)]
+    attach_parent_console();
+    if std::env::args().skip(1).any(|a| a == "--version") {
+        println!("arkonk {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
     // Before any window exists: Steam is launching another copy of the game.
     if steam::restart_through_steam() {
         return;

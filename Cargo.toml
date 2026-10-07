@@ -6,6 +6,7 @@ rust-version = "1.88"
 default-run = "arkonk"
 description = "A compact, fixed-timestep Rust brick breaker"
 license = "MIT"
+repository = "https://github.com/oddurs/arkonk"
 
 [features]
 # Opt-in so development, CI tests and the benchmark never need a Steam client;
@@ -16,6 +17,10 @@ steam = ["dep:steamworks"]
 gilrs = "0.11.2"
 macroquad = { version = "0.4.16", features = ["audio"] }
 steamworks = { version = "0.13.1", optional = true }
+
+# Embeds the icon and version resource. Host-gated: only Windows builds use it.
+[target.'cfg(windows)'.build-dependencies]
+winresource = { version = "0.1.31", default-features = false }
 
 [profile.release]
 lto = "thin"

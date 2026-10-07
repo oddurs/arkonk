@@ -1,0 +1,99 @@
+name: Package
+on:
+  workflow_call:
+    inputs:
+      sign:
+        description: Sign and notarize the macOS app when the signing secrets exist
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: package (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+          - platform: macos
+            os: macos-latest
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - platform: linux
+            os: ubuntu-latest
+            # Steam Runtime 3 SDK: the binary links against the glibc and
+            # libraries that Steam's Linux runtime container provides.
+            container: registry.gitlab.steamos.cloud/steamrt/sniper/sdk:latest
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.targets }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: package
+      - uses: taiki-e/install-action@v2
+        if: ${{ !matrix.container }}
+        with:
+          tool: cargo-about@0.9.2
+      - name: Install cargo-about in the Steam Runtime container
+        # install-action needs jq from apt, and the image's Debian 11 security
+        # pool no longer serves the packages its index lists.
+        if: matrix.container
+        run: |
+          archive=$RUNNER_TEMP/cargo-about.tar.gz
+          curl -sSfL -o "$archive" \
+            https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.2/cargo-about-0.9.2-x86_64-unknown-linux-musl.tar.gz
+          echo "9099a59e820c38a68b9d65f300662a567d56562f9a10f6aa4c7e86c17c2566af  $archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          install "$RUNNER_TEMP/cargo-about-0.9.2-x86_64-unknown-linux-musl/cargo-about" "$HOME/.cargo/bin/"
+      - name: Import macOS signing identity
+        if: inputs.sign && matrix.platform == 'macos'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER }}
+        run: |
+          set -eu
+          if [ -z "$MACOS_CERTIFICATE" ] || [ -z "$MACOS_SIGN_IDENTITY" ]; then
+            echo "::notice::macOS signing skipped: MACOS_CERTIFICATE and MACOS_SIGN_IDENTITY secrets are not set."
+            exit 0
+          fi
+          keychain=$RUNNER_TEMP/signing.keychain-db
+          password=$(openssl rand -hex 16)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$MACOS_CERTIFICATE" | base64 --decode >"$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          echo "MACOS_SIGN_IDENTITY=$MACOS_SIGN_IDENTITY" >>"$GITHUB_ENV"
+          if [ -n "$APPLE_NOTARY_KEY" ]; then
+            printf '%s' "$APPLE_NOTARY_KEY" >"$RUNNER_TEMP/notary.p8"
+            {
+              echo "NOTARY_KEY_PATH=$RUNNER_TEMP/notary.p8"
+              echo "NOTARY_KEY_ID=$APPLE_NOTARY_KEY_ID"
+              echo "NOTARY_ISSUER=$APPLE_NOTARY_ISSUER"
+            } >>"$GITHUB_ENV"
+          fi
+      - run: scripts/package.sh
+      - run: scripts/package.sh --steam
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arkonk-${{ matrix.platform }}
+          path: dist/*.zip
+          if-no-files-found: error

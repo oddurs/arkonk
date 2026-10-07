@@ -29,10 +29,12 @@ For a native macOS app launch:
 open target/ARKONK.app
 ```
 
-This builds a local app bundle with a development signature and
-[Game Mode support](https://developer.apple.com/documentation/bundleresources/information-property-list/lssupportsgamemode)
-metadata. Distribution signing/notarization remains release work. The bundle is
-built for the current Mac architecture.
+This builds a universal (Apple silicon and Intel) app bundle with the ARKONK
+icon and [Game Mode support](https://developer.apple.com/documentation/bundleresources/information-property-list/lssupportsgamemode)
+metadata. It needs both Rust targets
+(`rustup target add aarch64-apple-darwin x86_64-apple-darwin`). Without signing
+credentials the app gets an ad-hoc signature that runs on this Mac only;
+[docs/RELEASING.md](docs/RELEASING.md) covers Developer ID signing and notarization.
 
 No downloaded assets or working-directory-dependent resource files are needed.
 The original 5×7 pixel alphabet is packed into an atlas at startup; artwork is
@@ -215,9 +217,9 @@ window/fullscreen setup before treating frame pacing as finished.
 The released Miniquad Metal path needed fixes for offscreen attachment formats,
 Retina clipping, resizing, and GPU buffer reuse. The narrow, vendored patch and its
 limits are documented in [vendor/miniquad/ARKONK.md](vendor/miniquad/ARKONK.md).
-Native desktop runtime testing on Windows/Linux, testing on physical controllers,
-and packaging remain release work; CI build coverage is not runtime or Steam Deck
-certification.
+Native desktop runtime testing on Windows/Linux and testing on physical
+controllers remain release work; CI build and packaging coverage is not runtime
+or Steam Deck certification.
 
 ## Steam
 
@@ -233,18 +235,14 @@ A `steam` build unlocks achievements from saved medals and sector results
 presence, and pauses when the Steam overlay opens. Progress syncs through Steam
 Auto-Cloud with no game code. Without a running Steam client the game logs one
 line and plays on. The app id is `APP_ID` in `src/steam.rs`, Valve's test app
-480 until the real one replaces it. Shipping a `steam` build needs the Steam API
-library beside the executable. [docs/steam](docs/steam/README.md) covers the app
+480 until the real one replaces it. `scripts/package.sh --steam` puts the Steam
+API library beside the executable. [docs/steam](docs/steam/README.md) covers the app
 id, packaging, and the exact partner-site configuration.
 
 ## Development
 
 ```sh
-cargo fmt --all -- --check
-cargo clippy --locked --all-targets -- -D warnings
-cargo clippy --locked --all-targets --all-features -- -D warnings
-cargo test --locked --all-targets
-cargo build --locked --release
+scripts/task check
 cargo run --locked --release --bin arkonk -- --smoke-test
 cargo run --locked --release --bin arkonk -- --flow-test
 ```
@@ -281,7 +279,14 @@ paddle interception, bounce steering, life loss, powers, and level transitions.
 Additional tests cover medals, checkpoint isolation, malformed saves, replacing
 save files, drop cadence, anti-stall behavior, timing at 30–360 Hz, and the
 gamepad mapping: stick deadzone, menu repeat, device switching, and axis merging.
-GitHub Actions runs formatting, Clippy, tests, release builds (with and without
-`steam`), and allocation benchmarks on macOS, Linux, and Windows.
+`scripts/task` is the one entry point for checks: `fmt`, `fmt:check`, `lint`
+(Clippy over all features, `steam` included, with warnings denied), `test`,
+`build`, and `check`, which runs the format check, lint, tests, release build,
+and allocation benchmark in turn.
+GitHub Actions runs `scripts/task check` on macOS, Linux, and Windows, and
+packages every platform on each pull request with the same workflow a release
+uses. `scripts/package.sh` builds this platform's release zip into `dist/`;
+[docs/RELEASING.md](docs/RELEASING.md) covers cutting a release, signing, and
+uploading to Steam.
 
 MIT licensed.
