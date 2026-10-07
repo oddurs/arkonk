@@ -7,9 +7,15 @@ default-run = "arkonk"
 description = "A compact, fixed-timestep Rust brick breaker"
 license = "MIT"
 
+[features]
+# Opt-in so development, CI tests and the benchmark never need a Steam client;
+# see docs/steam/README.md.
+steam = ["dep:steamworks"]
+
 [dependencies]
 gilrs = "0.11.2"
 macroquad = { version = "0.4.16", features = ["audio"] }
+steamworks = { version = "0.13.1", optional = true }
 
 [profile.release]
 lto = "thin"

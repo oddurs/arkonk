@@ -216,14 +216,33 @@ The released Miniquad Metal path needed fixes for offscreen attachment formats,
 Retina clipping, resizing, and GPU buffer reuse. The narrow, vendored patch and its
 limits are documented in [vendor/miniquad/ARKONK.md](vendor/miniquad/ARKONK.md).
 Native desktop runtime testing on Windows/Linux, testing on physical controllers,
-Steam integration, and packaging remain release work; CI build coverage is not runtime
-or Steam Deck certification.
+and packaging remain release work; CI build coverage is not runtime or Steam Deck
+certification.
+
+## Steam
+
+Steamworks is opt-in through the `steam` cargo feature, so default builds, tests
+and the benchmark never need Steam:
+
+```sh
+cargo run --locked --release --features steam
+```
+
+A `steam` build unlocks achievements from saved medals and sector results
+(re-synced at startup, so earlier medals count), shows the current sector as rich
+presence, and pauses when the Steam overlay opens. Progress syncs through Steam
+Auto-Cloud with no game code. Without a running Steam client the game logs one
+line and plays on. The app id is `APP_ID` in `src/steam.rs`, Valve's test app
+480 until the real one replaces it. Shipping a `steam` build needs the Steam API
+library beside the executable. [docs/steam](docs/steam/README.md) covers the app
+id, packaging, and the exact partner-site configuration.
 
 ## Development
 
 ```sh
 cargo fmt --all -- --check
 cargo clippy --locked --all-targets -- -D warnings
+cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --all-targets
 cargo build --locked --release
 cargo run --locked --release --bin arkonk -- --smoke-test
@@ -254,13 +273,15 @@ fixed-step simulation. `src/levels.rs` authors the journey, `src/profile.rs` per
 layout and keyboard/mouse input, `src/input.rs` merges gamepads (via
 [gilrs](https://crates.io/crates/gilrs)) into the same controls and tracks the
 active device, and `src/pixel_font.rs` contains the original bitmap type.
+`src/steam.rs` is the only Steamworks caller; `src/achievements.rs` and
+`src/presence.rs` decide what it reports.
 Collision tests cover high
 speed tunneling, rounded corners, departing/parallel trajectories, moving
 paddle interception, bounce steering, life loss, powers, and level transitions.
 Additional tests cover medals, checkpoint isolation, malformed saves, replacing
 save files, drop cadence, anti-stall behavior, timing at 30–360 Hz, and the
 gamepad mapping: stick deadzone, menu repeat, device switching, and axis merging.
-GitHub Actions runs formatting, Clippy, tests, release builds, and allocation
-benchmarks on macOS, Linux, and Windows.
+GitHub Actions runs formatting, Clippy, tests, release builds (with and without
+`steam`), and allocation benchmarks on macOS, Linux, and Windows.
 
 MIT licensed.

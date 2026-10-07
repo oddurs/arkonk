@@ -26,3 +26,11 @@ jobs:
       - name: Package native Mac app
         if: runner.os == 'macOS'
         run: ./scripts/build-macos.sh
+      # Steamworks is opt-in; build it last so the steps above use default builds.
+      - name: Clippy with Steam
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - name: Release build with Steam
+        run: cargo build --locked --release --features steam
+      - name: Steam library resolves beside the executable
+        if: runner.os == 'Linux'
+        run: readelf -d target/release/arkonk | grep -E '(RUNPATH|RPATH).*\$ORIGIN'
