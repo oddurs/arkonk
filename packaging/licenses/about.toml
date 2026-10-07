@@ -1,0 +1,12 @@
+# Licenses the shipped binary may contain. A new dependency under any other
+# license fails packaging until it is reviewed and added here.
+accepted = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "Zlib", "ISC", "Unicode-3.0"]
+# Every shipped platform, so the notice is the same whichever host generates it.
+targets = [
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
