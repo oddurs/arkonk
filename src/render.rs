@@ -1,4 +1,5 @@
 use crate::{
+    input::Device,
     perf::Perf,
     pixel_font::{PixelFont, glyph},
     ui::{self, Screen, Ui},
@@ -61,6 +62,7 @@ pub struct View {
     pub x: f32,
     pub y: f32,
     font: Option<PixelFont>,
+    device: Device,
 }
 impl View {
     pub fn new() -> Self {
@@ -73,6 +75,7 @@ impl View {
             x: snap((screen_width() - WIDTH * scale) / 2.0),
             y: snap((screen_height() - HEIGHT * scale) / 2.0),
             font: None,
+            device: Device::KeyboardMouse,
         }
     }
     pub fn mouse(&self) -> V2 {
@@ -89,12 +92,13 @@ impl View {
             ..Default::default()
         }
     }
-    fn scene(font: &PixelFont) -> Self {
+    fn scene(font: &PixelFont, device: Device) -> Self {
         Self {
             scale: 1.0,
             x: 0.0,
             y: 0.0,
             font: Some(font.clone()),
+            device,
         }
     }
     fn font(&self) -> &PixelFont {
@@ -184,6 +188,48 @@ impl View {
         };
         self.centered(label, r.y + r.h / 2.0 + 7.0, 14.0, color);
     }
+    fn glyph_width(&self, glyph: Glyph, size: f32) -> f32 {
+        let pixel = self.font().pixel(size);
+        match glyph {
+            Glyph::Start => self.font().width("START", size) + 6.0 * pixel,
+            _ => 11.0 * pixel,
+        }
+    }
+    /// A filled button cap, centered on the cap height of text at `baseline`.
+    fn glyph(&self, glyph: Glyph, x: f32, baseline: f32, size: f32) {
+        let pixel = self.font().pixel(size);
+        let (label, fill) = match glyph {
+            Glyph::A => ("A", PALETTE[3]),
+            Glyph::B => ("B", RED),
+            Glyph::X => ("X", Color::new(0.30, 0.56, 1.0, 1.0)),
+            Glyph::Start => ("START", DIM),
+        };
+        let w = self.glyph_width(glyph, size);
+        let h = 11.0 * pixel;
+        self.rounded(x, baseline - 9.0 * pixel, w, h, h / 2.0, fill);
+        self.center_at(label, x + w / 2.0, baseline, size, BG);
+    }
+    fn prompt(&self, parts: &[Part], center: f32, baseline: f32, size: f32, color: Color) {
+        let width = |part: &Part| match *part {
+            Part::Text(text) => self.font().width(text, size),
+            Part::Pad(glyph) => self.glyph_width(glyph, size),
+        };
+        let mut x = center - parts.iter().map(width).sum::<f32>() / 2.0;
+        for part in parts {
+            match *part {
+                Part::Text(text) => self.text(text, x, baseline, size, color),
+                Part::Pad(glyph) => self.glyph(glyph, x, baseline, size),
+            }
+            x += width(part);
+        }
+    }
+    /// Names the keys or the buttons of whichever device the player is using.
+    fn hint(&self, keys: &str, pad: &[Part], baseline: f32, size: f32, color: Color) {
+        match self.device {
+            Device::KeyboardMouse => self.centered(keys, baseline, size, color),
+            Device::Gamepad => self.prompt(pad, WIDTH / 2.0, baseline, size, color),
+        }
+    }
     fn logo(&self, x: f32, y: f32, cell: f32) {
         for (letter, character) in "ARKONK".chars().enumerate() {
             let color = if character == 'O' { CYAN } else { INK };
@@ -203,6 +249,21 @@ impl View {
         }
     }
 }
+
+/// Xbox face-button names; Steam Deck and Steam Input present this layout.
+#[derive(Clone, Copy)]
+enum Glyph {
+    A,
+    B,
+    X,
+    Start,
+}
+#[derive(Clone, Copy)]
+enum Part {
+    Text(&'static str),
+    Pad(Glyph),
+}
+use Part::{Pad, Text};
 
 #[derive(Clone, Copy, Default)]
 struct Popup {
@@ -342,7 +403,7 @@ impl Renderer {
         self.font.density = screen.scale * screen_dpi_scale();
         set_camera(&screen.camera());
         clear_background(BG);
-        let v = View::scene(&self.font);
+        let v = View::scene(&self.font, ui.device);
         self.scene(&v, game, ui, profile, alpha, perf);
         // Translucent shapes also blend into framebuffer alpha. Restore an
         // opaque frame so the compositor never shows anything through it.
@@ -409,7 +470,13 @@ impl Renderer {
         }
         if !ui.paused && game.phase == Phase::Playing {
             if game.balls.iter().any(|b| b.active && b.held) {
-                v.centered("CLICK OR SPACE TO RELEASE", 720.0, 11.0, CYAN);
+                v.hint(
+                    "CLICK OR SPACE TO RELEASE",
+                    &[Pad(Glyph::A), Text(" TO RELEASE")],
+                    720.0,
+                    11.0,
+                    CYAN,
+                );
             }
             if game.notice_ticks > 0
                 && let Some(power) = game.notice
@@ -424,7 +491,24 @@ impl Renderer {
             v.centered("PAUSED", 346.0, 22.0, INK);
             self.menu(v, ui.choice, ["RESUME", "RETRY SECTOR", "MAIN MENU"], None);
             v.centered("RETRY RESTARTS FROM THE CHECKPOINT", 584.0, 11.0, DIM);
-            self.options(v, profile, 610.0);
+            if v.device == Device::Gamepad {
+                v.prompt(
+                    &[
+                        Pad(Glyph::A),
+                        Text(" SELECT   "),
+                        Pad(Glyph::B),
+                        Text(" RESUME   "),
+                        Pad(Glyph::X),
+                        Text(" RETRY"),
+                    ],
+                    WIDTH / 2.0,
+                    610.0,
+                    11.0,
+                    MUTED,
+                );
+            } else {
+                self.options(v, profile, 610.0);
+            }
         } else {
             match game.phase {
                 Phase::Ready => self.ready(v, game),
@@ -768,7 +852,13 @@ impl Renderer {
         v.centered(&self.scratch, 548.0, 11.0, sector_color(0, level.chapter));
         v.centered(level.name, 584.0, 22.0, INK);
         v.centered(level.tip, 614.0, 11.0, DIM);
-        v.centered("CLICK OR SPACE TO SERVE", 664.0, 13.0, CYAN);
+        v.hint(
+            "CLICK OR SPACE TO SERVE",
+            &[Pad(Glyph::A), Text(" TO SERVE")],
+            664.0,
+            13.0,
+            CYAN,
+        );
         let start = game.balls[0].pos;
         let direction = game.launch_velocity().normalized();
         for i in 1..=5 {
@@ -781,12 +871,16 @@ impl Renderer {
     }
     fn options(&mut self, v: &View, profile: &Profile, y: f32) {
         self.scratch.clear();
-        let _ = write!(
-            self.scratch,
-            "M SOUND {}   [ ] VOLUME {}   F FULLSCREEN",
-            if profile.muted { "OFF" } else { "ON" },
-            profile.volume
-        );
+        let sound = if profile.muted { "OFF" } else { "ON" };
+        // The shortcuts are keyboard-only; a pad player still sees the levels.
+        let _ = match v.device {
+            Device::KeyboardMouse => write!(
+                self.scratch,
+                "M SOUND {sound}   [ ] VOLUME {}   F FULLSCREEN",
+                profile.volume
+            ),
+            Device::Gamepad => write!(self.scratch, "SOUND {sound}   VOLUME {}", profile.volume),
+        };
         v.centered(&self.scratch, y, 11.0, MUTED);
     }
     fn menu(&self, v: &View, selected: usize, labels: [&str; 3], disabled: Option<usize>) {
@@ -833,8 +927,15 @@ impl Renderer {
             v.center_at(&self.scratch, x, 702.0, 13.0, INK);
         }
 
-        v.centered(
+        v.hint(
             "MOUSE OR ARROWS TO MOVE   SPACE OR CLICK TO SERVE   ESC TO PAUSE",
+            &[
+                Text("STICK OR D-PAD TO MOVE   "),
+                Pad(Glyph::A),
+                Text(" SERVE   "),
+                Pad(Glyph::Start),
+                Text(" PAUSE"),
+            ],
             832.0,
             11.0,
             DIM,
@@ -844,13 +945,13 @@ impl Renderer {
     fn sectors(&mut self, v: &View, ui: &Ui, profile: &Profile) {
         let back = ui::back_rect();
         v.rounded(back.x, back.y, back.w, back.h, 8.0, RAISED);
-        v.center_at(
-            "< BACK",
-            back.x + back.w / 2.0,
-            back.y + back.h / 2.0 + 4.0,
-            11.0,
-            DIM,
-        );
+        let (center, baseline) = (back.x + back.w / 2.0, back.y + back.h / 2.0 + 4.0);
+        match v.device {
+            Device::KeyboardMouse => v.center_at("< BACK", center, baseline, 11.0, DIM),
+            Device::Gamepad => {
+                v.prompt(&[Pad(Glyph::B), Text(" BACK")], center, baseline, 11.0, DIM)
+            }
+        }
         v.centered("SECTORS", 74.0, 22.0, INK);
         v.centered("PRACTICE RUNS NEVER CHANGE YOUR JOURNEY", 104.0, 11.0, DIM);
         for (chapter, title) in CHAPTERS.iter().enumerate() {
@@ -968,8 +1069,15 @@ impl Renderer {
             self.scratch.push_str("CLEAR THE PREVIOUS SECTOR");
         }
         v.button(ui::play_rect(), &self.scratch, true, open);
-        v.centered(
+        v.hint(
             "ARROWS TO BROWSE   ENTER TO PLAY   ESC TO GO BACK",
+            &[
+                Text("D-PAD TO BROWSE   "),
+                Pad(Glyph::A),
+                Text(" PLAY   "),
+                Pad(Glyph::B),
+                Text(" BACK"),
+            ],
             858.0,
             11.0,
             MUTED,
@@ -1021,7 +1129,13 @@ impl Renderer {
             true,
             true,
         );
-        v.centered("ENTER OR CLICK", 600.0, 11.0, MUTED);
+        v.hint(
+            "ENTER OR CLICK",
+            &[Text("PRESS "), Pad(Glyph::A)],
+            600.0,
+            11.0,
+            MUTED,
+        );
     }
 }
 

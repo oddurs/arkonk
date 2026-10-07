@@ -31,7 +31,7 @@ impl PixelFont {
             density: 1.0,
         }
     }
-    fn pixel(&self, size: f32) -> f32 {
+    pub fn pixel(&self, size: f32) -> f32 {
         let cell = if size >= 28.0 {
             4.0
         } else if size >= 20.0 {

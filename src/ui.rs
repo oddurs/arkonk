@@ -1,3 +1,4 @@
+use crate::input::Device;
 use macroquad::prelude::{Rect, Vec2};
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
@@ -11,6 +12,8 @@ pub struct Ui {
     pub choice: usize,
     pub sector: usize,
     pub save_error: bool,
+    /// What the player touched last; prompts and the cursor follow it.
+    pub device: Device,
 }
 impl Default for Ui {
     fn default() -> Self {
@@ -20,6 +23,7 @@ impl Default for Ui {
             choice: 1,
             sector: 0,
             save_error: false,
+            device: Device::KeyboardMouse,
         }
     }
 }

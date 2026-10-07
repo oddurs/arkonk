@@ -1,8 +1,24 @@
 //! Graphical integration driver: inputs go through the real application handlers.
-use crate::ui::{Controls, Screen, Ui};
+use crate::{
+    input::{Dir, Presses, pad_controls},
+    ui::{Controls, Screen, Ui},
+};
 use arkonk::{game::*, physics::V2, profile::Profile};
 pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls {
     let mut keys = Controls::default();
+    let none = Presses::default();
+    let (south, east, west, start) = (
+        Presses {
+            south: true,
+            ..none
+        },
+        Presses { east: true, ..none },
+        Presses { west: true, ..none },
+        Presses {
+            start: true,
+            ..none
+        },
+    );
     match frame {
         1 | 2 | 5 | 9 | 10 | 14 | 17 | 18 | 19 | 22 | 24 | 25 | 28 => keys.confirm = true,
         7 | 8 | 12 | 13 | 15 | 16 => keys.down = true,
@@ -87,6 +103,38 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         50 => println!(
             "Mechanics flow passed: Anchor hold, combined powers, pause/resume, release, Phase, relay ignition"
         ),
+        // Gamepad buttons, mapped exactly as a connected controller's would be.
+        51 => keys = pad_controls(start, None, false),
+        52 => {
+            assert!(ui.paused);
+            keys = pad_controls(east, None, true);
+        }
+        53 => {
+            assert!(!ui.paused);
+            keys = pad_controls(start, None, false);
+        }
+        54 => {
+            assert!(ui.paused);
+            keys = pad_controls(none, Some(Dir::Down), true);
+        }
+        55 => {
+            assert_eq!(ui.choice, 1);
+            keys = pad_controls(south, None, true);
+        }
+        56 | 58 => {
+            assert!(ui.screen == Screen::Play && !ui.paused);
+            assert_eq!(game.phase, Phase::Ready);
+            assert!(game.level == 8 && game.mode == Mode::Practice);
+            if frame == 56 {
+                keys = pad_controls(start, None, false);
+            } else {
+                println!("Gamepad flow passed: Start pause, B resume, d-pad, A retry, X retry");
+            }
+        }
+        57 => {
+            assert!(ui.paused);
+            keys = pad_controls(west, None, true);
+        }
         _ => {}
     }
     keys
