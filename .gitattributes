@@ -1,1 +1,6 @@
 vendor/miniquad/** linguist-vendored -whitespace
+# Shell scripts and SteamPipe templates must keep LF endings on Windows checkouts.
+scripts/** text eol=lf
+packaging/steam/** text eol=lf
+*.ico binary
+*.icns binary
