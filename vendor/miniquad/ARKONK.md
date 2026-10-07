@@ -1,7 +1,9 @@
 # ARKONK macOS backend patch
 
 Base: crates.io `miniquad` **0.4.11**, unchanged rendering API.
-One macOS focus-query helper initializes diagnostics accurately after startup. Upstream:
+One macOS focus-query helper initializes diagnostics accurately after startup, and
+one minimum-content-size helper keeps the window large enough for legible text;
+programmatic window resizes respect that minimum too. Upstream:
 https://github.com/not-fl3/miniquad . Both original licenses are included.
 Only the Apple graphics backend and one unused-function annotation differ;
 Windows/Linux retain the released backend implementation.

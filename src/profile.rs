@@ -1,6 +1,9 @@
 //! Versioned local progress. Disk access happens at menu/sector boundaries.
 use crate::game::{Game, LEVEL_COUNT, Mode, Phase};
-use std::{fs, io, path::Path};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Record {
@@ -31,6 +34,8 @@ pub struct Profile {
     pub checkpoint: Option<Checkpoint>,
     pub muted: bool,
     pub volume: u8,
+    /// Restored at launch; the app loop applies changes on the next frame.
+    pub fullscreen: bool,
 }
 impl Default for Profile {
     fn default() -> Self {
@@ -41,6 +46,7 @@ impl Default for Profile {
             checkpoint: None,
             muted: false,
             volume: 6,
+            fullscreen: false,
         }
     }
 }
@@ -77,11 +83,13 @@ impl Profile {
             };
         }
     }
-    pub fn decode(text: &str) -> Self {
+    /// `None` when the text is not a version-1 profile. Malformed lines inside a
+    /// valid profile are skipped so one damaged record cannot discard the rest.
+    pub fn decode(text: &str) -> Option<Self> {
         let mut p = Self::default();
         let mut lines = text.lines();
-        if lines.next() != Some("ARKONK 1") {
-            return p;
+        if lines.next()?.trim_end() != "ARKONK 1" {
+            return None;
         }
         for line in lines {
             let mut words = line.split_whitespace();
@@ -97,6 +105,7 @@ impl Profile {
                     p.muted = *mute != 0;
                     p.volume = (*volume).min(10) as u8;
                 }
+                ("display", [fullscreen]) => p.fullscreen = *fullscreen == 1,
                 ("record", [i, medals, ticks]) if (*i as usize) < LEVEL_COUNT => {
                     p.records[*i as usize] = Record {
                         medals: (*medals as u8) & 7,
@@ -120,16 +129,17 @@ impl Profile {
         if p.checkpoint.is_some_and(|c| c.level >= p.unlocked) {
             p.checkpoint = None;
         }
-        p
+        Some(p)
     }
     pub fn encode(&self) -> String {
         use std::fmt::Write;
         let mut out = format!(
-            "ARKONK 1\nbest {}\nunlocked {}\nsettings {} {}\n",
+            "ARKONK 1\nbest {}\nunlocked {}\nsettings {} {}\ndisplay {}\n",
             self.best_score,
             self.unlocked,
             u8::from(self.muted),
-            self.volume
+            self.volume,
+            u8::from(self.fullscreen)
         );
         for (i, r) in self.records.iter().enumerate() {
             let _ = writeln!(out, "record {i} {} {}", r.medals, r.best_ticks);
@@ -143,16 +153,46 @@ impl Profile {
         }
         out
     }
-    pub fn load(path: &Path) -> Self {
-        if let Ok(text) = fs::read_to_string(path) {
-            return Self::decode(&text);
+    /// Loads progress, falling back to the last-known-good backup. A file that
+    /// exists but cannot be decoded is never treated as absent: it is moved
+    /// aside, or, if that fails, saving is blocked so it cannot be overwritten.
+    pub fn load(path: &Path) -> Loaded {
+        let backup = backup_path(path);
+        let mut loaded = Loaded {
+            profile: Self::default(),
+            origin: Origin::New,
+            set_aside: Vec::new(),
+            blocked: None,
+        };
+        let main = read(path);
+        if let Read::Valid(p) = main {
+            loaded.profile = p;
+            loaded.origin = Origin::Saved;
+            return loaded;
         }
-        let mut p = Self::default();
-        if let Ok(text) = fs::read_to_string(path.with_file_name("best.txt")) {
-            p.best_score = text.trim().parse().unwrap_or(0);
+        if let Read::Invalid(why) = &main {
+            loaded.quarantine(path, why.clone());
         }
-        p
+        match read(&backup) {
+            Read::Valid(p) => {
+                loaded.profile = p;
+                loaded.origin = Origin::Backup;
+            }
+            Read::Invalid(why) => loaded.quarantine(&backup, why),
+            Read::Missing if matches!(main, Read::Missing) => {
+                if let Ok(text) = fs::read_to_string(path.with_file_name("best.txt"))
+                    && let Ok(best) = text.trim().parse()
+                {
+                    loaded.profile.best_score = best;
+                    loaded.origin = Origin::Legacy;
+                }
+            }
+            Read::Missing => {}
+        }
+        loaded
     }
+    /// Writes through a synced temporary file. The previous save becomes the
+    /// backup only if it still decodes, so the backup is always last-known-good.
     pub fn save(&self, path: &Path) -> io::Result<()> {
         use std::io::Write;
         if let Some(parent) = path.parent() {
@@ -163,8 +203,85 @@ impl Profile {
         file.write_all(self.encode().as_bytes())?;
         file.sync_all()?;
         drop(file);
+        if matches!(read(path), Read::Valid(_)) {
+            fs::rename(path, backup_path(path))?;
+        }
         fs::rename(temp, path)
     }
+}
+
+/// Where launch progress came from.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Origin {
+    Saved,
+    Backup,
+    Legacy,
+    New,
+}
+#[derive(Debug)]
+pub struct Loaded {
+    pub profile: Profile,
+    pub origin: Origin,
+    /// Unreadable files moved out of the way, with the reason each failed.
+    pub set_aside: Vec<(PathBuf, String)>,
+    /// Set when saving would overwrite a file that could not be read or moved.
+    pub blocked: Option<String>,
+}
+impl Loaded {
+    fn quarantine(&mut self, file: &Path, why: String) {
+        match set_aside(file) {
+            Ok(moved) => self.set_aside.push((moved, why)),
+            Err(e) => {
+                self.blocked = Some(format!(
+                    "{} is unreadable ({why}) and could not be moved aside ({e})",
+                    file.display()
+                ))
+            }
+        }
+    }
+}
+
+/// Real profiles are a few hundred bytes; anything larger is not one of ours
+/// and must not stall startup.
+const READ_LIMIT: u64 = 64 * 1024;
+enum Read {
+    Missing,
+    Valid(Profile),
+    Invalid(String),
+}
+fn read(path: &Path) -> Read {
+    use std::io::Read as _;
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Read::Missing,
+        Err(e) => return Read::Invalid(e.to_string()),
+    };
+    let mut bytes = Vec::new();
+    if let Err(e) = file.take(READ_LIMIT + 1).read_to_end(&mut bytes) {
+        return Read::Invalid(e.to_string());
+    }
+    if bytes.len() as u64 > READ_LIMIT {
+        return Read::Invalid("larger than 64 KiB".into());
+    }
+    // Invalid UTF-8 only spoils the lines it touches; decode skips those.
+    match Profile::decode(&String::from_utf8_lossy(&bytes)) {
+        Some(p) => Read::Valid(p),
+        None => Read::Invalid("not an ARKONK 1 profile".into()),
+    }
+}
+fn backup_path(path: &Path) -> PathBuf {
+    path.with_extension("bak")
+}
+fn set_aside(path: &Path) -> io::Result<PathBuf> {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let name = path
+        .file_name()
+        .map_or_else(|| "progress".into(), |n| n.to_string_lossy().into_owned());
+    let target = path.with_file_name(format!("unreadable-{stamp}-{name}"));
+    fs::rename(path, &target)?;
+    Ok(target)
 }
 #[cfg(test)]
 mod tests {
@@ -176,6 +293,7 @@ mod tests {
             best_score: 24600,
             muted: true,
             volume: 3,
+            fullscreen: true,
             ..Profile::default()
         };
         p.records[5] = Record {
@@ -183,22 +301,24 @@ mod tests {
             best_ticks: 15400,
         };
         p.begin(&Game::at(6, Mode::Journey));
-        assert_eq!(Profile::decode(&p.encode()), p);
+        assert_eq!(Profile::decode(&p.encode()), Some(p));
     }
     #[test]
     fn corrupt_values_cannot_unlock_invalid_sectors_or_lives() {
         let p = Profile::decode(
             "ARKONK 1\nunlocked 999\nsettings 0 1 300\ncheckpoint 20 0 90 0\nrecord 500 7 0\nrecord 0 255 25\nbest nonsense",
-        );
+        )
+        .unwrap();
         assert_eq!(p.unlocked, LEVEL_COUNT);
         assert_eq!(p.volume, 10);
         assert_eq!(p.checkpoint, None);
         assert_eq!(p.records[0].medals, 7);
-        assert_eq!(Profile::decode("unknown version"), Profile::default());
+        assert_eq!(Profile::decode("unknown version"), None);
+        assert_eq!(Profile::decode(""), None);
     }
     #[test]
     fn legacy_settings_keep_sound_and_volume() {
-        let p = Profile::decode("ARKONK 1\nsettings 1 0 4\n");
+        let p = Profile::decode("ARKONK 1\nsettings 1 0 4\n").unwrap();
         assert!(p.muted);
         assert_eq!(p.volume, 4);
     }
@@ -227,19 +347,143 @@ mod tests {
         );
         assert_eq!(p.unlocked, 2);
     }
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("arkonk-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir.join("progress.txt")
+    }
+    fn sample() -> Profile {
+        let mut p = Profile {
+            unlocked: 5,
+            best_score: 24600,
+            ..Profile::default()
+        };
+        p.records[0].medals = 7;
+        p.records[3].medals = 1;
+        p
+    }
+    fn set_aside_files(path: &Path) -> Vec<Vec<u8>> {
+        let mut files: Vec<_> = fs::read_dir(path.parent().unwrap())
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .filter(|p| {
+                p.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with("unreadable-")
+            })
+            .collect();
+        files.sort();
+        files.iter().map(|p| fs::read(p).unwrap()).collect()
+    }
     #[test]
     fn saving_replaces_existing_profile() {
-        let dir = std::env::temp_dir().join(format!(
-            "arkonk-profile-{}-{:?}",
-            std::process::id(),
-            std::thread::current().id()
-        ));
-        let path = dir.join("progress.txt");
+        let path = scratch("replace");
         let mut p = Profile::default();
         p.save(&path).unwrap();
         p.best_score = 123;
         p.save(&path).unwrap();
-        assert_eq!(Profile::load(&path), p);
+        let loaded = Profile::load(&path);
+        assert_eq!((loaded.profile, loaded.origin), (p, Origin::Saved));
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn previous_save_becomes_the_backup() {
+        let path = scratch("rotate");
+        let first = sample();
+        first.save(&path).unwrap();
+        let mut second = first.clone();
+        second.best_score = 30000;
+        second.save(&path).unwrap();
+        assert_eq!(read_valid(&backup_path(&path)), first);
+        assert_eq!(read_valid(&path), second);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    fn read_valid(path: &Path) -> Profile {
+        match read(path) {
+            Read::Valid(p) => p,
+            _ => panic!("{} is not a valid profile", path.display()),
+        }
+    }
+    #[test]
+    fn one_corrupted_byte_keeps_everything_else() {
+        let path = scratch("byte");
+        let p = sample();
+        let mut bytes = p.encode().into_bytes();
+        // Damage only the record line for sector 4.
+        let at = p.encode().find("record 3").unwrap() + 2;
+        bytes[at] = 0xff;
+        fs::write(&path, bytes).unwrap();
+        let loaded = Profile::load(&path);
+        assert_eq!(loaded.origin, Origin::Saved);
+        let mut expected = p;
+        expected.records[3] = Record::default();
+        assert_eq!(loaded.profile, expected);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn corrupt_main_recovers_from_backup_and_is_preserved() {
+        let path = scratch("recover");
+        let good = sample();
+        fs::write(backup_path(&path), good.encode()).unwrap();
+        fs::write(&path, b"\0\0garbage\xff").unwrap();
+        let loaded = Profile::load(&path);
+        assert_eq!(loaded.origin, Origin::Backup);
+        assert_eq!(loaded.profile, good);
+        assert_eq!(loaded.blocked, None);
+        assert_eq!(set_aside_files(&path), [b"\0\0garbage\xff".to_vec()]);
+        // The next save must not rotate anything unreadable into the backup.
+        let mut next = good.clone();
+        next.best_score += 1;
+        next.save(&path).unwrap();
+        assert_eq!(read_valid(&backup_path(&path)), good);
+        assert_eq!(read_valid(&path), next);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn missing_main_recovers_from_backup() {
+        // A crash between the two renames in `save` leaves only the backup.
+        let path = scratch("missing");
+        fs::write(backup_path(&path), sample().encode()).unwrap();
+        let loaded = Profile::load(&path);
+        assert_eq!((loaded.profile, loaded.origin), (sample(), Origin::Backup));
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn both_corrupt_start_fresh_without_destroying_either() {
+        let path = scratch("both");
+        fs::write(&path, "ARKONK 9\nbest 1").unwrap();
+        fs::write(backup_path(&path), vec![b'x'; READ_LIMIT as usize + 1]).unwrap();
+        let loaded = Profile::load(&path);
+        assert_eq!(loaded.origin, Origin::New);
+        assert_eq!(loaded.profile, Profile::default());
+        assert_eq!(loaded.set_aside.len(), 2);
+        Profile::default().save(&path).unwrap();
+        Profile::default().save(&path).unwrap();
+        let preserved = set_aside_files(&path);
+        assert!(preserved.contains(&b"ARKONK 9\nbest 1".to_vec()));
+        assert!(preserved.iter().any(|f| f.len() == READ_LIMIT as usize + 1));
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn unreadable_file_that_cannot_move_blocks_saving() {
+        use std::os::unix::fs::PermissionsExt;
+        let path = scratch("blocked");
+        let dir = path.parent().unwrap();
+        // A directory in place of the file cannot be read as a profile.
+        fs::create_dir(&path).unwrap();
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o555)).unwrap();
+        let loaded = Profile::load(&path);
+        let saved = Profile::default().save(&path);
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(loaded.blocked.is_some());
+        assert_eq!(loaded.origin, Origin::New);
+        assert!(
+            saved.is_err(),
+            "a read-only data directory reports an error"
+        );
         fs::remove_dir_all(dir).unwrap();
     }
 }

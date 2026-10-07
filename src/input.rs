@@ -158,7 +158,7 @@ impl Gamepads {
             match Gilrs::new() {
                 Ok(gilrs) => Some(gilrs),
                 Err(e) => {
-                    eprintln!("Gamepads unavailable: {e}");
+                    crate::diagnostics::error(format_args!("Gamepads unavailable: {e}"));
                     None
                 }
             }

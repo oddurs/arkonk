@@ -92,11 +92,17 @@ impl MacosDisplay {
     }
     fn set_window_size(&mut self, new_width: u32, new_height: u32) {
         let mut frame: NSRect = unsafe { msg_send![self.window, frame] };
+        // AppKit applies the minimum only to user resizing.
+        let min: NSSize = unsafe { msg_send![self.window, minSize] };
+        let (new_width, new_height) = (
+            (new_width as f64).max(min.width),
+            (new_height as f64).max(min.height),
+        );
         frame.origin.y += frame.size.height;
-        frame.origin.y -= new_height as f64;
+        frame.origin.y -= new_height;
         frame.size = NSSize {
-            width: new_width as f64,
-            height: new_height as f64,
+            width: new_width,
+            height: new_height,
         };
         let () = unsafe { msg_send![self.window, setFrame:frame display:true animate:true] };
     }
@@ -987,6 +993,27 @@ pub fn window_has_focus() -> bool {
     unsafe {
         let window: ObjcId = msg_send![view, window];
         msg_send![window, isKeyWindow]
+    }
+}
+
+/// Smallest content size, in points, for user and programmatic resizes.
+/// Call on the window thread, like other AppKit window operations.
+pub fn set_content_min_size(width: f64, height: f64) {
+    let view = native_display().lock().unwrap().view;
+    if view.is_null() {
+        return;
+    }
+    unsafe {
+        let window: ObjcId = msg_send![view, window];
+        let size = NSSize { width, height };
+        let () = msg_send![window, setContentMinSize: size];
+        // `set_window_size` sets frames, so it clamps to the frame minimum.
+        let content = NSRect {
+            origin: NSPoint { x: 0.0, y: 0.0 },
+            size,
+        };
+        let frame: NSRect = msg_send![window, frameRectForContentRect: content];
+        let () = msg_send![window, setMinSize: frame.size];
     }
 }
 

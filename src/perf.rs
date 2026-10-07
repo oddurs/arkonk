@@ -122,7 +122,7 @@ impl FrameTrace {
         };
         match std::fs::write(&output, csv) {
             Ok(()) => println!("Frame trace: {}", output.display()),
-            Err(e) => eprintln!("Could not write frame trace: {e}"),
+            Err(e) => crate::diagnostics::error(format_args!("Could not write frame trace: {e}")),
         }
         println!(
             "Foreground check: {} unfocused frames (all retained in results)",

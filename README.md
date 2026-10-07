@@ -123,12 +123,32 @@ unlocked layouts and improve medals without replacing your journey checkpoint or
 journey high score. New Journey replaces the current checkpoint while keeping
 unlocks, medals, times, and the personal best.
 
-The playfield keeps its proportions when resized. Progress and settings live under
-`~/Library/Application Support/arkonk` on macOS, `%LOCALAPPDATA%/arkonk` on Windows,
-or `$XDG_DATA_HOME/arkonk` (falling back to `~/.local/share/arkonk`) on Linux.
-The versioned `progress.txt` is written through a temporary file at
-menu/sector boundaries; legacy `best.txt` scores are imported automatically.
-No account, network connection, or asset download is used during play.
+The playfield keeps its proportions when resized, and the window cannot shrink
+below 480×450 physical pixels, where text would lose its layout. **F** switches
+between a window and fullscreen (a macOS fullscreen Space, a borderless window
+covering the primary monitor on Windows, the window manager's fullscreen state on
+Linux); the choice is saved and restored at launch. Play holds, without pausing, while the
+window is resized or changes mode, so a transition can neither drain a ball nor
+read as a stall.
+
+Progress and settings live under `~/Library/Application Support/arkonk` on macOS,
+`%LOCALAPPDATA%/arkonk` on Windows, or `$XDG_DATA_HOME/arkonk` (falling back to
+`~/.local/share/arkonk`) on Linux; `ARKONK_DATA_DIR` overrides the location.
+The versioned `progress.txt` is written through a synced temporary file at
+menu/sector boundaries, and the previous save is kept as `progress.bak` only if it
+still reads as a valid profile. A damaged line is skipped without discarding the
+rest. If `progress.txt` cannot be read at all, the game restores the backup, and
+the unreadable file is renamed `unreadable-<time>-progress.txt` rather than being
+overwritten; if it cannot be moved either, saving is disabled for that session and
+the menu says so. Legacy `best.txt` scores are imported automatically.
+
+`logs/arkonk.log` in the same folder records startup details, recovered errors
+(save failures, progress recovery, audio loss), and automatic pauses. It rotates to
+`arkonk.1.log` past 256 KiB, and one session writes at most that much. A crash
+writes `logs/crash-<UTC time>.txt` with the panic message, location, backtrace,
+version, OS, and graphics backend; the newest ten are kept. On Windows and Linux a
+missing or failed audio device leaves the game running muted. No account, network
+connection, or asset download is used during play.
 
 ## Presentation
 
@@ -155,7 +175,15 @@ fixed pools in the renderer. A restart reuses them.
 - Fixed arrays for three balls, 384 particles, and twelve power-up drops.
 - Eight collision resolutions per ball per tick. If exhausted, the ball stays
   at its last safe position; it never advances unchecked through bricks.
-- Single-threaded simulation and batched geometry through Macroquad.
+- Single-threaded simulation. Shapes sample a white cell of the font atlas, so
+  geometry and text share one texture and the whole scene is one Macroquad draw
+  call. On Metal every draw call is a full-framebuffer render pass; a frame is
+  now three (Macroquad's clear, the scene, the opaque-alpha pass) instead of
+  8–20, which cut Metal GPU time by a fifth to a third and memory by about 40 MB.
+- Shape meshes are built in fixed arrays. Drawing a frame makes one heap
+  allocation, inside Macroquad (custom-material uniforms), down from 33.
+- A window resize or display-mode switch holds the simulation until the size
+  has been steady for half a second (a mode switch for one second).
 - macOS Metal uses two fenced frame slots instead of waiting for GPU completion
   after every submission; vertex, index, and uniform storage are safe to reuse.
 - Foreground macOS input/render work uses interactive thread priority; background
@@ -208,6 +236,30 @@ and focused; run graphics comparisons sequentially.
 The report counts unfocused frames and retains them in its timings so background
 throttling cannot silently produce a misleading foreground comparison.
 
+Measured on a 16-inch MacBook Pro (**M4 Pro**, macOS 26.5.2), built-in Liquid
+Retina XDR display (3456×2234, ProMotion up to 120 Hz), `--perf-test
+--effects-test`, focused, while other builds kept load averages between 5 and 14.
+"Before" is the previous renderer; ranges are repeated runs:
+
+| Backend, mode, refresh | FPS | p95 | p99 | Worst | > 16.7 ms | GPU / frame | Passes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Metal window, 120 Hz, before | 118.4 | 9.08 | 13.18 | 58.5 | 21 | 0.96–1.22 ms | 16–20 |
+| Metal window, 120 Hz, after | 118.6–118.8 | 8.77–9.26 | 11.9–13.0 | 55–56 | 17–20 | 0.79–0.94 ms | 3 |
+| Metal fullscreen, 120 Hz, before | 85.0–85.3 | 16.8 | 23.6–24.8 | 46–59 | 553–556 | 1.68–2.0 ms | 17–20 |
+| Metal fullscreen, 120 Hz, after | 66–90 | 16.8–17.0 | 24.6–25.0 | 47–71 | 439–1021 | 1.13–1.43 ms | 3 |
+| OpenGL window, 120 Hz, before / after | 118.4 / 117.8 | 9.99 / 9.23 | 12.5 / 14.0 | 61 / 69 | 22 / 24 | – | – |
+| OpenGL fullscreen, 120 Hz, before / after | 118.3 / 118.3 | 9.19 / 9.22 | 12.9 / 12.6 | 59 / 62 | 23 / 22 | – | – |
+| Metal window, fixed 60 Hz, before / after | 59.7 / 59.7 | 17.8 / 17.5 | 23.9 / 20.7 | 68 / 65 | > 25 ms: 29 / 20 | 1.26 / 0.74 ms | 18 / 3 |
+| Metal fullscreen, fixed 60 Hz, after | 58.8 | 17.9 | 33.3 | 80 | > 25 ms: 108 | 1.18 ms | 3 |
+
+GPU time and pass counts came from a temporary command-buffer probe in the Metal
+backend, not from the shipped build. Windowed play is display-bound either way.
+Metal in a fullscreen Space on ProMotion alternates 8.3 ms and 16.7 ms frames
+before and after this change, while OpenGL holds 120 Hz: drawables come back at
+roughly 60 Hz there, so the display, not the GPU, sets the pace. Neither an MTKView
+frame-rate preference, a `CADisplayLink` frame-rate hint, nor dropping the
+CVDisplayLink wait fixed it; that remains open.
+
 Use a focused run to assess foreground pacing. Background/space-transition
 frames are retained in the trace and flagged; those runs are diagnostic data,
 not a foreground performance acceptance result. Metal display synchronization
@@ -253,7 +305,11 @@ and exits automatically. On OpenGL it also writes `target/smoke-test.png` and
 presentation captures. Metal texture readback is not implemented by Miniquad;
 use macOS window capture for Metal screenshots. To check Metal correctness, run the smoke/effects and flow tests
 with `MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1`; disable validation for timings.
-Both graphical checks need a desktop session and leave your saved progress alone.
+Both graphical checks need a desktop session and leave your saved progress and
+logs alone.
+The OpenGL smoke test also renders play, title, and sector screens offscreen at
+1280×800 (Steam Deck), 1920×1080, 2560×1440, 3440×1440, and 1024×768 into
+`target/layout-*.png`, then checks that a 10×10 window request is refused.
 `--flow-test` drives the real menu input handlers through new journey, sector clear,
 checkpoint restore, practice, focus pause, resume, and retry, with assertions at
 transition boundaries. It also checks sticky catches with combined powers,
