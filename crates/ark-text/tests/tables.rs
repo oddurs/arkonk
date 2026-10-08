@@ -146,8 +146,8 @@ fn arguments_follow_each_languages_word_order() {
         "セクター 03・スリップストリーム・2,450"
     );
     assert_eq!(
-        format(Locale::Fr, TextId::BestTime, &[Arg::Clock(83)]),
-        "Record 01:23"
+        format(Locale::Ja, TextId::SwiftWithin, &[Arg::Clock(83)]),
+        "01:23 以内にクリア"
     );
 }
 

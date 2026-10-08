@@ -149,15 +149,29 @@ pub fn next_rect() -> Rect {
 pub fn back_rect() -> Rect {
     Rect::new(56.0, 46.0, 150.0, 36.0)
 }
+/// The panel under the sector grid that describes the selected sector.
+pub fn detail_rect() -> Rect {
+    Rect::new(96.0, 520.0, 768.0, 296.0)
+}
+/// The panel's padding, and the width of its action column.
+pub const DETAIL_PAD: f32 = 32.0;
+pub const DETAIL_ACTION: f32 = 288.0;
+/// Play, in the panel's action column, above two lines of footnote.
 pub fn play_rect() -> Rect {
-    Rect::new(310.0, 768.0, 340.0, 46.0)
+    let panel = detail_rect();
+    Rect::new(
+        panel.x + panel.w - DETAIL_PAD - DETAIL_ACTION,
+        panel.y + 176.0,
+        DETAIL_ACTION,
+        ROW,
+    )
 }
 pub fn sector_rect(index: usize) -> Rect {
     Rect::new(
         96.0 + (index / 4) as f32 * 260.0,
-        196.0 + (index % 4) as f32 * 112.0,
+        152.0 + (index % 4) as f32 * 88.0,
         248.0,
-        104.0,
+        80.0,
     )
 }
 pub fn hover_sector(mouse: Vec2) -> Option<SectorId> {
@@ -239,5 +253,17 @@ mod tests {
             assert_eq!(menu.hover(Vec2::new(480.0, below.y + below.h + 1.0)), None);
         }
         assert_eq!(title_menu(true).rect(0).h, TALL_ROW);
+    }
+    #[test]
+    fn play_sits_in_the_detail_panel_below_the_grid() {
+        let panel = detail_rect();
+        let play = play_rect();
+        assert!(play.x >= panel.x + DETAIL_PAD && play.right() <= panel.right() - DETAIL_PAD);
+        assert!(play.y > panel.y && play.bottom() < panel.bottom() - DETAIL_PAD);
+        for s in SectorId::all() {
+            let card = sector_rect(s.index());
+            assert!(card.bottom() < panel.y, "{s:?} overlaps the panel");
+            assert_eq!(hover_sector(card.center()), Some(s));
+        }
     }
 }

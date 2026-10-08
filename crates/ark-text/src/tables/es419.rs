@@ -11,7 +11,6 @@ pub(super) fn text(id: TextId) -> &'static str {
         KeysContinue => "Enter o clic para continuar",
         PadMove => "Stick o pad direccional para moverte",
         PadBrowse => "Pad direccional para recorrer",
-        MedalSwiftHow => "Supera el tiempo objetivo",
         _ => es::text(id),
     }
 }

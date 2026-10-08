@@ -54,8 +54,10 @@ const PALETTE: [Color; 7] = [
 /// The spacing scale, in scene units. Layouts step by these and nothing in
 /// between, so related things always sit visibly closer than unrelated ones.
 const S8: f32 = 8.0;
+const S12: f32 = 12.0;
 const S16: f32 = 16.0;
 const S24: f32 = 24.0;
+const S32: f32 = 32.0;
 const S48: f32 = 48.0;
 /// A label and its value, or a name and its detail.
 const PAIR: f32 = S8;
@@ -63,6 +65,8 @@ const PAIR: f32 = S8;
 const GROUP: f32 = S24;
 /// Between the sections of a screen.
 const SECTION: f32 = S48;
+/// Inside a panel's edge.
+const PAD: f32 = S32;
 
 /// The height of a role's capitals in scene units, as laid out. Gaps on
 /// the spacing scale run from one line's baseline to the next line's
@@ -77,6 +81,11 @@ const MARGIN: f32 = 64.0;
 const FULL: f32 = WIDTH - 2.0 * MARGIN;
 /// Baseline-to-baseline for body text.
 const LINE: f32 = 26.0;
+/// Baseline-to-baseline for wrapped lines of `role`: 1.3 em, so body text
+/// steps by `LINE`.
+fn leading(role: Role) -> f32 {
+    spec::style(role).0 * 1.3
+}
 /// The footer's last baseline; rows stack upward from it.
 const FOOTER: f32 = 872.0;
 /// Baseline-to-baseline distance between footer rows: captions are smaller
@@ -608,22 +617,18 @@ impl Scene<'_> {
     /// Sets `id` across up to `max` lines from baseline `slot.y`, wrapping
     /// at word (or, in Chinese and Japanese, character) boundaries.
     /// Returns the lines used; more than `max` is reported.
-    fn paragraph(&self, id: TextId, role: Role, slot: Slot, max: usize, color: Color) -> usize {
-        self.format(id, &[], Form::Full, |text| {
-            let (_, weight, tracking) = spec::style(role);
-            let ppem = match self.face(role, text) {
-                Face::Noto(ppem) => ppem,
-                // The pixel font does not wrap; one line, reported if long.
-                Face::Pixel(_) => {
-                    self.put(text, role, slot, color);
-                    return 1;
-                }
-            };
-            let tracking = self.fonts.tracking(tracking, ppem);
-            let room = slot.w * self.density;
+    fn paragraph(
+        &self,
+        (id, args): (TextId, &[Arg]),
+        role: Role,
+        slot: Slot,
+        max: usize,
+        color: Color,
+    ) -> usize {
+        self.format(id, args, Form::Full, |text| {
             let mut lines = 0;
-            self.fonts.wrap(text, weight, ppem, tracking, room, |line| {
-                let y = slot.y + lines as f32 * LINE;
+            let mut line = |line: &str| {
+                let y = slot.y + lines as f32 * leading(role);
                 if lines < max {
                     self.put(line, role, Slot { y, ..slot }, color);
                 } else if let Some(log) = self.misfits {
@@ -635,7 +640,33 @@ impl Scene<'_> {
                     });
                 }
                 lines += 1;
-            });
+            };
+            match self.face(role, text) {
+                Face::Noto(ppem) => {
+                    let (_, weight, tracking) = spec::style(role);
+                    let tracking = self.fonts.tracking(tracking, ppem);
+                    let room = slot.w * self.density;
+                    self.fonts.wrap(text, weight, ppem, tracking, room, line);
+                }
+                // The pixel font spells only Latin, so spaces are the breaks.
+                Face::Pixel(_) => {
+                    let mut rest = text.trim();
+                    while !rest.is_empty() {
+                        let fits = |end: usize| self.measure(&rest[..end], role) <= slot.w;
+                        let end = if fits(rest.len()) {
+                            rest.len()
+                        } else {
+                            rest.match_indices(' ')
+                                .map(|(i, _)| i)
+                                .take_while(|&i| fits(i))
+                                .last()
+                                .unwrap_or(rest.len())
+                        };
+                        line(&rest[..end]);
+                        rest = rest[end..].trim_start();
+                    }
+                }
+            }
             lines.min(max)
         })
     }
@@ -1264,7 +1295,7 @@ fn scene(
         );
         menu(v, &ui::pause_menu(), ui.choice, None);
         let note = Slot::centered(WIDTH / 2.0, PANEL, 576.0);
-        v.paragraph(TextId::RetryNote, Role::Body, note, 2, DIM);
+        v.paragraph((TextId::RetryNote, &[]), Role::Body, note, 2, DIM);
         match v.device {
             Device::Gamepad => {
                 let items = [
@@ -1664,7 +1695,7 @@ fn ready(v: &Scene, game: &Game) {
         INK,
     );
     let tip = Slot::centered(WIDTH / 2.0, 720.0, 622.0);
-    let lines = v.paragraph(TextId::SectorTip(id), Role::Body, tip, 2, DIM);
+    let lines = v.paragraph((TextId::SectorTip(id), &[]), Role::Body, tip, 2, DIM);
     let y = 622.0 + lines as f32 * LINE + 22.0;
     match v.device {
         Device::KeyboardMouse => v.say(TextId::KeysServe, &[], Role::Body, Slot::line(y), CYAN),
@@ -1852,16 +1883,9 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
         Slot::centered(WIDTH / 2.0, 480.0, 80.0),
         INK,
     );
-    v.say(
-        TextId::PracticeNote,
-        &[],
-        Role::Body,
-        Slot::line(114.0),
-        DIM,
-    );
     for chapter in Chapter::ALL {
         let r = ui::sector_rect(chapter.first_sector().index());
-        let slot = Slot::left(r.x + 2.0, r.w, r.y - 14.0);
+        let slot = Slot::left(r.x, r.w, r.y - S12);
         v.say(
             TextId::ChapterName(chapter),
             &[],
@@ -1871,166 +1895,9 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
         );
     }
     for id in SectorId::all() {
-        let (i, level) = (id.index(), id.sector());
-        let r = ui::sector_rect(i);
-        let unlocked = i < profile.progress.unlocked_count();
-        let selected = id == ui.sector;
-        if selected {
-            v.rounded(
-                r.x - 1.5,
-                r.y - 1.5,
-                r.w + 3.0,
-                r.h + 3.0,
-                9.5,
-                if unlocked { CYAN } else { MUTED },
-            );
-        }
-        v.rounded(
-            r.x,
-            r.y,
-            r.w,
-            r.h,
-            8.0,
-            if selected { RAISED } else { SURFACE },
-        );
-        // The card's place in its chapter column and the "Play sector 03"
-        // button already carry the number; the name gets the full width.
-        let name = Slot::left(r.x + 14.0, r.w - 28.0, r.y + 27.0);
-        v.say(
-            TextId::SectorName(id),
-            &[],
-            Role::Body,
-            name,
-            if unlocked { INK } else { MUTED },
-        );
-        for cell in FieldCell::all() {
-            if level.layout.hp[cell.index()] > 0 {
-                v.rect(
-                    r.x + 14.0 + cell.col() as f32 * 9.0,
-                    r.y + 40.0 + cell.row() as f32 * 7.0,
-                    7.0,
-                    4.0,
-                    if !unlocked {
-                        opacity(MUTED, 0.45)
-                    } else if level.layout.cores.contains(cell) {
-                        AMBER
-                    } else {
-                        shade(sector_color(cell.row(), level.chapter), 0.8)
-                    },
-                );
-            }
-        }
-        if unlocked {
-            let record = profile.progress.record(id);
-            for (j, medal) in MEDAL_ORDER.into_iter().enumerate() {
-                v.circle(
-                    V2::new(r.x + 164.0 + j as f32 * 16.0, r.y + 54.0),
-                    4.0,
-                    if record.medals.contains(medal) {
-                        AMBER
-                    } else {
-                        MUTED
-                    },
-                );
-            }
-            let time = Slot::left(r.x + 156.0, r.w - 166.0, r.y + 86.0);
-            if record.best_ticks > 0 {
-                let t = Figures::of(|f| write!(f, "{}", Clock(record.best_ticks)));
-                v.put(t.as_str(), Role::Body, time, INK);
-            } else {
-                v.say(TextId::NoTime, &[], Role::Body, time, MUTED);
-            }
-        } else {
-            v.padlock(r.x + 180.0, r.y + 64.0, MUTED);
-        }
+        sector_card(v, id, id == ui.sector, profile);
     }
-
-    let level = ui.sector.sector();
-    let record = profile.progress.record(ui.sector);
-    let name = Item {
-        cap: None,
-        id: TextId::SectorName(ui.sector),
-        arg: None,
-    };
-    let swift = Item {
-        cap: None,
-        id: TextId::SwiftTarget,
-        arg: Some(Arg::Clock(level.par_seconds)),
-    };
-    let best = Item {
-        cap: None,
-        id: TextId::BestTime,
-        arg: Some(Arg::Clock(record.best_ticks / TICK_HZ)),
-    };
-    let detail: &[Item] = if record.best_ticks > 0 {
-        &[name, swift, best]
-    } else {
-        &[name, swift]
-    };
-    let legend = [
-        (TextId::MedalClear, TextId::MedalClearHow),
-        (TextId::MedalClean, TextId::MedalCleanHow),
-        (TextId::MedalSwift, TextId::MedalSwiftHow),
-    ];
-    let mut y = 676.0;
-    let lines = v.pack(detail, Role::Body, |line, w| {
-        v.hint_line(line, w, y, INK, Role::Body);
-        y += LINE;
-    });
-    let mut legend_lines = 0;
-    let widths = legend.map(|(medal, how)| {
-        v.width_of(medal, &[], Role::Label) + 8.0 + v.width_of(how, &[], Role::Body)
-    });
-    let mut start = 0;
-    while start < legend.len() {
-        let mut width = widths[start];
-        let mut end = start + 1;
-        while end < legend.len() && width + GROUP + widths[end] <= FULL {
-            width += GROUP + widths[end];
-            end += 1;
-        }
-        let mut x = WIDTH / 2.0 - width / 2.0;
-        for (k, &(medal, how)) in legend[start..end].iter().enumerate() {
-            let label = v.width_of(medal, &[], Role::Label);
-            v.say(medal, &[], Role::Label, Slot::left(x, label, y), AMBER);
-            let text = widths[start + k] - label - 8.0;
-            v.say(
-                how,
-                &[],
-                Role::Body,
-                Slot::left(x + label + 8.0, text, y),
-                DIM,
-            );
-            x += widths[start + k] + GROUP;
-        }
-        y += LINE;
-        legend_lines += 1;
-        start = end;
-    }
-    if lines + legend_lines > 4
-        && let Some(log) = v.misfits
-    {
-        log.borrow_mut().push(Misfit {
-            text: "sector details".into(),
-            need: (lines + legend_lines) as f32,
-            room: 4.0,
-            missing: None,
-        });
-    }
-    let play = ui::play_rect();
-    if ui.sector.index() < profile.progress.unlocked_count() {
-        v.button(
-            play,
-            TextId::PlaySector,
-            &[Arg::Sector(ui.sector)],
-            (true, true),
-            None,
-        );
-    } else {
-        let baseline = play.y + play.h / 2.0 + v.cap(Role::Body) / 2.0;
-        let slot = Slot::centered(WIDTH / 2.0, play.w, baseline);
-        v.say(TextId::ClearPreviousFirst, &[], Role::Body, slot, DIM);
-    }
+    sector_detail(v, ui.sector, profile);
     let hints = match v.device {
         Device::KeyboardMouse => [
             hint(TextId::KeysBrowse),
@@ -2044,6 +1911,190 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
         ],
     };
     v.footer(&[&hints], ui.save_error);
+}
+/// A card in the sector grid: the name, the layout in miniature, and a pip
+/// per medal; a padlock instead of pips while locked. Times live in the
+/// detail panel, next to the medal they decide.
+fn sector_card(v: &Scene, id: SectorId, selected: bool, profile: &Profile) {
+    let (r, level) = (ui::sector_rect(id.index()), id.sector());
+    let unlocked = profile.progress.is_unlocked(id);
+    v.rounded(
+        r.x,
+        r.y,
+        r.w,
+        r.h,
+        8.0,
+        if selected { RAISED } else { SURFACE },
+    );
+    if selected {
+        let edge = if unlocked { CYAN } else { MUTED };
+        v.outline(r, 8.0, 1.5, edge);
+    }
+    let inner = r.x + S16;
+    let name = r.y + S12 + cap_height(Role::Body);
+    v.say(
+        TextId::SectorName(id),
+        &[],
+        Role::Body,
+        Slot::left(inner, r.w - 2.0 * S16, name),
+        if unlocked { INK } else { DIM },
+    );
+    // Bricks at their field proportions, on a 9 by 5 pitch, bottom-aligned
+    // with the card's padding.
+    let top = r.y + r.h - S12 - 33.0;
+    for cell in FieldCell::all() {
+        if level.layout.hp[cell.index()] > 0 {
+            v.rect(
+                inner + cell.col() as f32 * 9.0,
+                top + cell.row() as f32 * 5.0,
+                7.0,
+                3.0,
+                if !unlocked {
+                    opacity(MUTED, 0.45)
+                } else if level.layout.cores.contains(cell) {
+                    AMBER
+                } else {
+                    shade(sector_color(cell.row(), level.chapter), 0.8)
+                },
+            );
+        }
+    }
+    let cy = top + 16.5;
+    let right = r.x + r.w - S16;
+    if unlocked {
+        let record = profile.progress.record(id);
+        for (j, medal) in MEDAL_ORDER.into_iter().enumerate() {
+            let earned = record.medals.contains(medal);
+            let x = right - 4.0 - (2 - j) as f32 * 16.0;
+            v.circle(V2::new(x, cy), 4.0, if earned { AMBER } else { MUTED });
+        }
+    } else {
+        v.padlock(right - 8.0, cy, MUTED);
+    }
+}
+/// The selected sector: where it sits, its name and tip, the medals and
+/// how to earn them, and Play, or what unlocks it.
+fn sector_detail(v: &Scene, id: SectorId, profile: &Profile) {
+    let panel = ui::detail_rect();
+    v.panel(panel.x, panel.y, panel.w, panel.h);
+    let (level, record) = (id.sector(), profile.progress.record(id));
+    let x = panel.x + PAD;
+    let w = panel.w - 2.0 * PAD;
+    let eyebrow = panel.y + PAD + cap_height(Role::Label);
+    let args = [
+        Arg::Text(TextId::ChapterName(level.chapter)),
+        Arg::Sector(id),
+    ];
+    let hue = sector_color(0, level.chapter);
+    v.say(
+        TextId::ReadyEyebrow,
+        &args,
+        Role::Label,
+        Slot::left(x, w, eyebrow),
+        hue,
+    );
+    let name = eyebrow + PAIR + cap_height(Role::Body);
+    v.say(
+        TextId::SectorName(id),
+        &[],
+        Role::Body,
+        Slot::left(x, w, name),
+        INK,
+    );
+    // A tip may open with a capsule chip, which stands taller than capitals.
+    let tip = name + S12 + cap_height(Role::Body);
+    let tip_slot = Slot::left(x, w, tip);
+    v.paragraph((TextId::SectorTip(id), &[]), Role::Body, tip_slot, 2, DIM);
+
+    // The medals as a checklist: chip, then what earns it. Rows start a
+    // group below the tip's second line, whether or not it wraps.
+    let table = w - ui::DETAIL_ACTION - S32;
+    let medals = [
+        (TextId::MedalClear, TextId::MedalClearHow),
+        (TextId::MedalClean, TextId::MedalCleanHow),
+        (TextId::MedalSwift, TextId::SwiftWithin),
+    ];
+    let chip = medals
+        .iter()
+        .map(|&(medal, _)| v.width_of(medal, &[], Role::Label) + 2.0 * S12)
+        .fold(0.0, f32::max);
+    let text = Slot::left(x + chip + S16, table - chip - S16, 0.0);
+    let par = [Arg::Clock(level.par_seconds)];
+    let rows = tip + LINE + GROUP;
+    for (i, (medal, how)) in medals.into_iter().enumerate() {
+        let earned = record.medals.contains(MEDAL_ORDER[i]);
+        let top = rows + i as f32 * S32;
+        let tone = if earned { AMBER } else { MUTED };
+        v.rounded(x, top, chip, S24, S12, opacity(tone, 0.16));
+        let cy = top + S12;
+        let label = Slot::centered(x + chip / 2.0, chip - S8, cy + v.cap(Role::Label) / 2.0);
+        v.say(medal, &[], Role::Label, label, tone);
+        let args: &[Arg] = if how == TextId::SwiftWithin {
+            &par
+        } else {
+            &[]
+        };
+        let baseline = cy + v.cap(Role::Body) / 2.0;
+        v.say(
+            how,
+            args,
+            Role::Body,
+            Slot {
+                y: baseline,
+                ..text
+            },
+            DIM,
+        );
+    }
+    // The best time sits under the target it is measured against.
+    if record.best_ticks > 0 {
+        let cy = rows + 3.0 * S32 + S12;
+        let label = Slot::centered(x + chip / 2.0, chip, cy + v.cap(Role::Label) / 2.0);
+        v.say(TextId::StatBest, &[], Role::Label, label, DIM);
+        let t = Figures::of(|f| write!(f, "{}", Clock(record.best_ticks)));
+        let baseline = cy + v.cap(Role::Body) / 2.0;
+        v.put(
+            t.as_str(),
+            Role::Body,
+            Slot {
+                y: baseline,
+                ..text
+            },
+            INK,
+        );
+    }
+
+    let play = ui::play_rect();
+    let column = |y| Slot::centered(play.x + play.w / 2.0, play.w, y);
+    if profile.progress.is_unlocked(id) {
+        v.button(
+            play,
+            TextId::PlaySector,
+            &[Arg::Sector(id)],
+            (true, true),
+            None,
+        );
+        // The footnote qualifies Play, so it sits right under it.
+        let note = play.y + play.h + PAIR + cap_height(Role::Caption);
+        v.paragraph(
+            (TextId::PracticeNote, &[]),
+            Role::Caption,
+            column(note),
+            2,
+            DIM,
+        );
+    } else {
+        let before = [Arg::Sector(SectorId::clamped(id.index().saturating_sub(1)))];
+        v.padlock(play.x + play.w / 2.0, play.y + 4.0, MUTED);
+        let hint = play.y + S24 + cap_height(Role::Body);
+        v.paragraph(
+            (TextId::UnlockHint, &before),
+            Role::Body,
+            column(hint),
+            2,
+            DIM,
+        );
+    }
 }
 /// Distance between the sector-clear columns, and the widest a medal chip
 /// grows: three chips at most 136 wide leave at least 14 between them.

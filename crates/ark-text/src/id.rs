@@ -74,21 +74,17 @@ text_ids! {
     // Sector select.
     SectorsHeading,
     PracticeNote,
-    /// A best time that has not been set.
-    NoTime,
-    /// `{0}` the Swift medal's target time.
-    SwiftTarget,
-    /// `{0}` a time.
-    BestTime,
     MedalClear,
     MedalClean,
     MedalSwift,
     MedalClearHow,
     MedalCleanHow,
-    MedalSwiftHow,
+    /// How to earn Swift: `{0}` the sector's target time.
+    SwiftWithin,
     /// `{0}` sector number.
     PlaySector,
-    ClearPreviousFirst,
+    /// What opens a locked sector: `{0}` the number of the sector before it.
+    UnlockHint,
 
     // Play.
     Score,
@@ -157,9 +153,8 @@ impl TextId {
         match self {
             ContinueDetail => 3,
             Fraction | ReadyEyebrow => 2,
-            Volume | SwiftTarget | BestTime | PlaySector | SectorNumber | PracticeNumber | Plus => {
-                1
-            }
+            Volume | SwiftWithin | PlaySector | UnlockHint | SectorNumber | PracticeNumber
+            | Plus => 1,
             _ => 0,
         }
     }
@@ -176,7 +171,7 @@ impl TextId {
             | KeysContinue | PadMove | PadBrowse | ActionServe | ActionPause | ActionRelease
             | ActionSelect | ActionResume | ActionRetry | ActionPlay | ActionBack
             | ActionContinue | SoundOn | SoundOff | Volume | Fullscreen | SaveFailed
-            | ContinueDetail => Role::Caption,
+            | ContinueDetail | PracticeNote => Role::Caption,
             _ => Role::Body,
         }
     }
