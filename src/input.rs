@@ -118,6 +118,9 @@ pub struct Presses {
     pub east: bool,
     pub west: bool,
     pub start: bool,
+    /// The shoulder buttons page sector select by chapter.
+    pub lb: bool,
+    pub rb: bool,
 }
 
 /// Xbox layout: A confirms and serves, B backs out, X retries, Start pauses.
@@ -130,8 +133,8 @@ pub fn pad_controls(pressed: Presses, step: Option<Dir>, menu_open: bool) -> Con
         restart: pressed.west,
         up: step == Some(Dir::Up),
         down: step == Some(Dir::Down),
-        left: step == Some(Dir::Left),
-        right: step == Some(Dir::Right),
+        left: step == Some(Dir::Left) || pressed.lb,
+        right: step == Some(Dir::Right) || pressed.rb,
         ..Controls::default()
     }
 }
@@ -215,6 +218,8 @@ impl Gamepads {
                         Button::East => pressed.east = true,
                         Button::West => pressed.west = true,
                         Button::Start => pressed.start = true,
+                        Button::LeftTrigger => pressed.lb = true,
+                        Button::RightTrigger => pressed.rb = true,
                         // A tap shorter than a frame is gone from the held state.
                         Button::DPadUp => tapped = Some(Dir::Up),
                         Button::DPadDown => tapped = Some(Dir::Down),
@@ -401,6 +406,11 @@ mod tests {
         let c = pad_controls(none, Some(Dir::Left), false);
         assert!(c.left && !c.right && !c.up && !c.down);
         assert!(!c.click && !c.focus_lost);
+        // The shoulders page left and right.
+        let c = pad_controls(Presses { lb: true, ..none }, None, false);
+        assert!(c.left && !c.right);
+        let c = pad_controls(Presses { rb: true, ..none }, None, false);
+        assert!(c.right && !c.left);
     }
 
     #[test]
