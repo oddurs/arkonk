@@ -246,7 +246,8 @@ coverage without depending on the autopaddle completing the journey. Results var
 by hardware and load.
 
 F3 shows recent frame-time p95/p99, simulation time, CPU draw preparation time,
-discarded ticks, and collision-budget counts. Draw timing excludes GPU execution
+discarded ticks, collision-budget counts, and the vertices and draw calls the last
+frame sent to the GPU, with the most of each since the overlay opened. Draw timing excludes GPU execution
 and presentation. Headless tick timings cannot establish smooth frame pacing.
 
 Use the separate whole-run test for that:
@@ -358,6 +359,16 @@ The OpenGL smoke test also renders play, title, and sector screens offscreen at
 1280×800 (Steam Deck), 1920×1080, 2560×1440, 3440×1440 and 1024×768, the
 Small layout at 480×450 and the Compact one at 240×240 and 160×128, into
 `target/layout-*.png`, then checks that a 10×10 window request is refused.
+Last, it stages moments of play by stepping the simulation (the three chapters'
+glass, the busiest sector with every capsule and both power drains, Anchor
+holding, a relay chain going off, hits with a break and a wall bounce) and
+renders them at 1920×1800 in the standard, reduced-effects and high-contrast
+looks, and in the Small and Compact layouts, into
+`target/pieces-<class>-<look>-<moment>.png`. These are stepped, not played, so
+they are byte-stable between runs.
+
+`--reduced-effects` and `--high-contrast` start the game with Settings' Effects
+set to Reduced and Contrast to High, for checking those looks.
 
 `--frame-preview WxH` is a development aid for the Small and Compact layouts,
 which a desktop window cannot always reach: the game lays out and draws as if

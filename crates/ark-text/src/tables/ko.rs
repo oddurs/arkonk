@@ -59,6 +59,11 @@ pub(super) fn text(id: TextId) -> &'static str {
         DisplayWindow => "창 모드",
         LanguageSystem => "시스템",
         ActionAdjust => "조정",
+        SettingEffects => "효과",
+        SettingContrast => "대비",
+        LookStandard => "표준",
+        EffectsReduced => "줄임",
+        ContrastHigh => "높음",
         KeySpace => "스페이스",
         KeyEsc => "Esc",
         SectorsOf => "{1}개 섹터 중 {0}개",
@@ -128,6 +133,11 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
         ExtraLife => Some("생명 +1"),
         SectorName(s) => Some(SHORT_NAMES[s.index()]),
         ReadyEyebrow => Some("섹터 {1}"),
+        SettingEffects => Some("효과"),
+        SettingContrast => Some("대비"),
+        LookStandard => Some("표준"),
+        EffectsReduced => Some("줄임"),
+        ContrastHigh => Some("높음"),
         _ => None,
     }
 }

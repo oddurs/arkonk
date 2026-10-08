@@ -11,6 +11,7 @@ mod display;
 mod input;
 mod locale;
 mod perf;
+mod pictogram;
 mod pixel_font;
 #[cfg(any(feature = "steam", test))]
 mod presence;
@@ -228,6 +229,8 @@ fn main() {
     }
     let (mut profile, path, save_blocked) = load_progress(data.map(|d| d.join("progress.txt")));
     profile.settings.fullscreen |= flag("--fullscreen");
+    profile.settings.reduced_effects |= flag("--reduced-effects");
+    profile.settings.high_contrast |= flag("--high-contrast");
     // Tests run on a desktop someone is using; `--show` is for watching one.
     #[cfg(target_os = "macos")]
     if smoke && !flag("--show") {
@@ -830,11 +833,33 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         if let Some((size, p)) = layout_capture {
             renderer.capture_at((&game, &ui, &profile), size, &p);
         }
+        let shot = (layouts && frames >= measured + smoke::LAYOUT_FRAMES)
+            .then(|| smoke::SHOTS.get((frames - measured - smoke::LAYOUT_FRAMES) as usize))
+            .flatten();
+        if let Some(shot) = shot {
+            // A staged game draws with its own trails and flashes.
+            let live = renderer.swap_fx(render::Fx::default());
+            let staged = smoke::stage(shot.screen, |g, e| renderer.record(g, e));
+            let mut look = profile.clone();
+            look.settings.reduced_effects = shot.variant == "reduced";
+            look.settings.high_contrast = shot.variant == "contrast";
+            let path = format!(
+                "target/pieces-{}-{}-{}.png",
+                shot.class, shot.variant, shot.screen
+            );
+            let mut play = ui.clone();
+            (play.screen, play.paused, play.settings, play.preview) =
+                (Screen::Play, false, None, None);
+            renderer.capture_at((&staged, &play, &look), shot.size, &path);
+            renderer.swap_fx(live);
+        }
         ui.preview = None;
         ui.screen = actual_screen;
         ui.paused = actual_pause;
         ui.settings = actual_settings;
         perf.draw((get_time() - draw_start) * 1000.0);
+        let tally = renderer.tally();
+        perf.geometry(tally.vertices, tally.calls);
         if smoke && !flow && !perf_test {
             let capture = match frames {
                 30 => Some("target/attract.png"),
@@ -886,7 +911,8 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 println!("{line}");
             }
         }
-        if smoke && !flow && frames >= measured + if layouts { smoke::LAYOUT_FRAMES } else { 0 } {
+        let staged_frames = smoke::LAYOUT_FRAMES + smoke::SHOTS.len() as u32;
+        if smoke && !flow && frames >= measured + if layouts { staged_frames } else { 0 } {
             break;
         }
         if effects && !perf_test && frames == 330 {

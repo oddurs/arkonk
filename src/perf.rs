@@ -36,9 +36,13 @@ pub struct Perf {
     frames: Samples,
     simulation: Samples,
     draw: Samples,
-    pub lines: [String; 6],
+    pub lines: [String; 7],
     pub dropped_ticks: u64,
     last_report: f64,
+    /// The last frame's vertices and draw calls, and the most of each
+    /// since the overlay was reset.
+    geometry: (u32, u32),
+    worst: (u32, u32),
 }
 impl Perf {
     pub fn new() -> Self {
@@ -49,7 +53,14 @@ impl Perf {
             lines: std::array::from_fn(|_| String::with_capacity(96)),
             dropped_ticks: 0,
             last_report: -1.0,
+            geometry: (0, 0),
+            worst: (0, 0),
         }
+    }
+    /// What a frame sent to the GPU: `vertices` in `calls` draw calls.
+    pub fn geometry(&mut self, vertices: u32, calls: u32) {
+        self.geometry = (vertices, calls);
+        self.worst = (self.worst.0.max(vertices), self.worst.1.max(calls));
     }
     pub fn frame(&mut self, ms: f64) {
         self.frames.push(ms);
@@ -84,7 +95,12 @@ impl Perf {
             "Dropped ticks {} / collision caps {caps}",
             self.dropped_ticks
         );
-        self.lines[5].push_str("F3 close / draw time excludes GPU & present");
+        let ((v, c), (wv, wc)) = (self.geometry, self.worst);
+        let _ = write!(
+            self.lines[5],
+            "Geometry {v} vtx / {c} calls, worst {wv} / {wc}"
+        );
+        self.lines[6].push_str("F3 close / draw time excludes GPU & present");
     }
 }
 

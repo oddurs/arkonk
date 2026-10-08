@@ -313,7 +313,14 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
             veteran(0),
         ));
     }
-    for (row, paused, screen) in [(0, false, Screen::Title), (3, true, Screen::Play)] {
+    // The last row: a Compact page too short for every row scrolls to it,
+    // and the reduced and high looks name their values.
+    let last = crate::settings::ROWS.len() - 1;
+    for (row, paused, screen) in [
+        (0, false, Screen::Title),
+        (3, true, Screen::Play),
+        (last, true, Screen::Play),
+    ] {
         let ui = Ui {
             screen,
             paused,
@@ -322,6 +329,8 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
         };
         let mut profile = veteran(3);
         profile.settings.fullscreen = paused;
+        profile.settings.reduced_effects = row == last;
+        profile.settings.high_contrast = row == last;
         out.push((format!("settings {row}"), held.clone(), ui, profile));
     }
     let profiles = [Profile::default(), veteran(3)];
@@ -748,6 +757,310 @@ fn arabic_sheets_mirror() {
                 label.right() < row.center().x,
                 "{locale:?}: label not at the left"
             );
+        }
+        settings_rows_mirror(locale, &fonts, &atlas);
+    }
+}
+
+/// The Effects and Contrast rows of the Settings sheet, in a regular window
+/// and on a Compact page: the name leads the row and the value ends it, so
+/// in Arabic the name is at the right and the value at the left.
+fn settings_rows_mirror(locale: Locale, fonts: &Fonts, atlas: &Atlas) {
+    let rtl = locale == Locale::Ar;
+    let last = crate::settings::ROWS.len() - 1;
+    let ui = Ui {
+        screen: Screen::Play,
+        paused: true,
+        settings: Some(last),
+        ..Ui::default()
+    };
+    let mut profile = Profile::default();
+    profile.settings.reduced_effects = true;
+    profile.settings.high_contrast = true;
+    let rows = [
+        (TextId::SettingEffects, TextId::EffectsReduced),
+        (TextId::SettingContrast, TextId::ContrastHigh),
+    ];
+    for (w, h) in [(1920.0, 1080.0), (240.0, 240.0)] {
+        let view = View::fit(w, h, 1.0).unwrap();
+        let log = RefCell::new(Log::default());
+        let v = Scene::new(
+            None,
+            (atlas, fonts, locale),
+            &view,
+            &ui,
+            String::new(),
+            Some(&log),
+        );
+        scene(&v, &Fx::default(), &Game::new(), &ui, &profile, 1.0, None);
+        let hits = v.hits.into_inner();
+        let placed = log.into_inner().placed;
+        // The sheet sets each string full or short, whichever fits.
+        let find = |id: TextId, row: Rect| {
+            [Form::Full, Form::Short]
+                .into_iter()
+                .find_map(|form| {
+                    let mut s = String::new();
+                    ark_text::write(&mut s, locale, form, id, &[]).unwrap();
+                    placed
+                        .iter()
+                        .find(|p| p.text == s && contains(row, p.rect, 0.5))
+                })
+                .unwrap_or_else(|| panic!("{locale:?} {w}: {id:?} not drawn in its row"))
+                .rect
+        };
+        let mut checked = 0;
+        for (i, (name, value)) in rows.into_iter().enumerate() {
+            let row = hits.rows()[ROWS_BEFORE + i];
+            // A Compact page too short for every row leaves earlier ones off.
+            if row.w == 0.0 {
+                continue;
+            }
+            let (name, value) = (find(name, row), find(value, row));
+            if rtl {
+                assert!(value.right() < name.x, "{locale:?} {w}: value not left");
+                assert!(name.x > row.center().x, "{locale:?} {w}: name not right");
+            } else {
+                assert!(name.right() < value.x, "{locale:?} {w}: value not right");
+                assert!(
+                    name.right() < row.center().x,
+                    "{locale:?} {w}: name not left"
+                );
+            }
+            checked += 1;
+        }
+        assert!(checked > 0, "{locale:?} {w}: no look row drawn");
+    }
+}
+
+/// The settings rows ahead of Effects and Contrast.
+const ROWS_BEFORE: usize = 4;
+
+/// A sector at its busiest: every brick live, three balls in flight, one
+/// phased and one held, all twelve capsules falling, Wide, Slow and
+/// Anchor running, and every particle slot alive.
+fn busiest(sector: usize, fill: Option<u8>) -> Game {
+    use ark::{Particle, field::CellSet, tuning::MAX_CAPSULES};
+    let mut game = Game::start(SectorId::clamped(sector), Mode::Practice);
+    game.step(Input {
+        launch: true,
+        ..Input::default()
+    });
+    let mut sandbox = game.sandbox();
+    if let Some(hp) = fill {
+        sandbox.fill_board(hp, CellSet::ALL);
+    }
+    for power in [Power::Wide, Power::Slow, Power::Anchor, Power::Phase] {
+        sandbox.grant(power);
+    }
+    for i in 0..MAX_BALLS {
+        let pos = V2::new(200.0 + i as f32 * 240.0, 600.0);
+        sandbox.place_ball(i, pos, V2::new(80.0, -500.0));
+    }
+    for i in 0..MAX_CAPSULES {
+        let pos = V2::new(125.0 + i as f32 * 62.0, 470.0);
+        sandbox.spawn_capsule(i, pos, Power::ALL[i % Power::ALL.len()]);
+    }
+    for (i, p) in sandbox.effects().particles.iter_mut().enumerate() {
+        *p = Particle {
+            pos: V2::new(
+                100.0 + (i % 60) as f32 * 12.0,
+                200.0 + (i % 17) as f32 * 17.0,
+            ),
+            velocity: V2::new(20.0, 80.0),
+            life: 0.5,
+            hue: i % 7,
+        };
+    }
+    sandbox.effects().relay_flash.fill(20);
+    game
+}
+
+/// What one frame of `game` in play sends to the GPU at 1920 × 1800, with
+/// every trail full and every brick just hit.
+fn tally(game: &Game, profile: &Profile) -> Tally {
+    let fonts = ark_glyphs::fonts(Locale::En).unwrap();
+    let atlas = Atlas::build(&fonts).unwrap();
+    let view = View::fit(1920.0, 1800.0, 1.0).unwrap();
+    let ui = Ui {
+        screen: Screen::Play,
+        ..Ui::default()
+    };
+    let v = Scene::new(
+        None,
+        (&atlas, &fonts, Locale::En),
+        &view,
+        &ui,
+        String::new(),
+        None,
+    );
+    let mut fx = Fx {
+        trail_len: [12; MAX_BALLS],
+        brick_age: [0.03; CELLS],
+        brick_was: [3; CELLS],
+        ..Fx::default()
+    };
+    for (i, ball) in game.balls().iter().enumerate() {
+        fx.trails[i] = [ball.pos; 12];
+    }
+    scene(&v, &fx, game, &ui, profile, 1.0, None);
+    v.tally.get()
+}
+
+/// The design's budget: at most 20,000 vertices a frame for the busiest
+/// authored sector with three balls, twelve capsules and full particle
+/// pools, which fits in two of Macroquad's batches.
+#[test]
+fn the_busiest_sector_stays_inside_the_vertex_budget() {
+    let mut worst = (0, Tally::default());
+    for sector in 0..SECTOR_COUNT {
+        let t = tally(&busiest(sector, None), &Profile::default());
+        if t.vertices > worst.1.vertices {
+            worst = (sector, t);
+        }
+    }
+    let (sector, t) = worst;
+    println!(
+        "worst authored: sector {sector}, {} vertices, {} draw calls",
+        t.vertices, t.calls
+    );
+    assert!(t.vertices <= 20_000, "sector {sector}: {t:?}");
+    assert!(t.calls <= 2, "sector {sector}: {t:?}");
+    // The effects test's board, denser than any sector: every cell a
+    // core going off, in high contrast.
+    let mut profile = Profile::default();
+    profile.settings.high_contrast = true;
+    let stress = tally(&busiest(10, Some(3)), &profile);
+    println!(
+        "stress board: {} vertices, {} draw calls",
+        stress.vertices, stress.calls
+    );
+    assert!(stress.vertices <= 20_000, "{stress:?}");
+}
+
+/// High contrast keeps every hue it draws at 3:1 or better against the
+/// field: bricks of every chapter, cores, and capsules.
+#[test]
+fn high_contrast_hues_read_at_three_to_one_on_the_field() {
+    fn luminance(c: Color) -> f32 {
+        let lin = |v: f32| {
+            if v <= 0.04045 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
+    }
+    let field = luminance(pieces::FIELD);
+    for hue in PALETTE.iter().chain(&[AMBER]).copied() {
+        let lifted = pieces::lifted(hue);
+        let ratio = (luminance(lifted) + 0.05) / (field + 0.05);
+        assert!(ratio >= 3.0, "{hue:?} at {ratio:.2}:1");
+    }
+    for power in Power::ALL {
+        let ratio = (luminance(pieces::lifted(power_color(power))) + 0.05) / (field + 0.05);
+        assert!(ratio >= 3.0, "{power:?} at {ratio:.2}:1");
+    }
+}
+
+/// The simulation reports that a ball bounced off a wall, not where; the
+/// renderer lights the wall beside the ball that did.
+#[test]
+fn a_wall_bounce_lights_the_wall_where_the_ball_struck() {
+    let mut game = Game::start(SectorId::clamped(0), Mode::Practice);
+    game.step(Input {
+        launch: true,
+        ..Input::default()
+    });
+    game.sandbox().place_ball(
+        0,
+        V2::new(LEFT + RADIUS + 1.0, 500.0),
+        V2::new(-400.0, -100.0),
+    );
+    let mut fx = Fx::default();
+    let mut lit = None;
+    for _ in 0..10 {
+        let events = game.step(Input::default());
+        fx.record(&game, events);
+        if events.wall {
+            lit = fx.walls.iter().find(|f| f.age == 0.0).copied();
+            break;
+        }
+    }
+    let flash = lit.expect("the bounce lit a wall");
+    assert_eq!(flash.wall, Wall::Left);
+    assert!((flash.along - 500.0).abs() < 6.0, "{flash:?}");
+}
+
+/// A flat piece's one-pixel parts, such as the Compact seam's charge pips,
+/// land on whole pixels at their full size wherever they start; rounding
+/// each edge on its own once rounded them away.
+#[test]
+fn one_pixel_parts_of_flat_pieces_never_round_away() {
+    let fonts = ark_glyphs::fonts(Locale::En).unwrap();
+    let atlas = Atlas::build(&fonts).unwrap();
+    let view = View::fit(240.0, 240.0, 1.0).unwrap();
+    assert_eq!(view.class, Class::Compact);
+    let ui = Ui::default();
+    let v = Scene::new(
+        None,
+        (&atlas, &fonts, Locale::En),
+        &view,
+        &ui,
+        String::new(),
+        None,
+    );
+    let px = 1.0 / view.density;
+    for k in 0..40 {
+        let at = 700.0 + k as f32 * px / 8.0;
+        let r = pieces::place(&v, Rect::new(at, at, px, px), true);
+        assert!((r.w - px).abs() < 1e-4 && (r.h - px).abs() < 1e-4, "{r:?}");
+        let on_grid = |x: f32| ((x * view.density).round() - x * view.density).abs() < 1e-3;
+        assert!(on_grid(r.x) && on_grid(r.y), "{r:?}");
+    }
+}
+
+/// A relay chain breaks a run of neighbouring bricks a few ticks apart;
+/// their points must not float up as a stack of overlapping figures, and
+/// none of the points may go missing.
+#[test]
+fn a_relay_chains_popups_never_overlap() {
+    let at = |row: usize, col: usize| FieldCell::new(row * ark::field::COLS + col).unwrap();
+    let chain = [
+        (1, 1, 750),
+        (2, 1, 125),
+        (2, 0, 825),
+        (2, 2, 125),
+        (3, 1, 125),
+        (0, 1, 125),
+        (1, 2, 125),
+        (1, 0, 125),
+    ];
+    for gap in [0, 1, 4, 12, 40] {
+        let mut fx = Fx::default();
+        let mut total = 0;
+        for &(row, col, points) in &chain {
+            for _ in 0..gap {
+                fx.age_popups();
+            }
+            fx.spawn_popup(at(row, col), points);
+            total += points;
+            let live: Vec<_> = fx.popups.iter().filter(|p| p.life > 0.0).collect();
+            for (i, p) in live.iter().enumerate() {
+                for q in &live[..i] {
+                    assert!(!p.overlaps(q), "{gap} ticks apart: {p:?} over {q:?}");
+                }
+            }
+        }
+        if gap * chain.len() < (POPUP_LIFE / DT) as usize {
+            let shown: u32 = fx
+                .popups
+                .iter()
+                .filter(|p| p.life > 0.0)
+                .map(|p| p.value)
+                .sum();
+            assert_eq!(shown, total, "{gap} ticks apart");
         }
     }
 }

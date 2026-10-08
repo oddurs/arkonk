@@ -15,6 +15,10 @@ pub struct Settings {
     pub fullscreen: bool,
     /// The player's language choice; `None` follows Steam or the system.
     pub locale: Option<Locale>,
+    /// Effects: no glow, breathing or pulsing, softer flashes, fewer shards.
+    pub reduced_effects: bool,
+    /// Contrast: untinted glass, full-hue rims, lifted dim hues.
+    pub high_contrast: bool,
 }
 
 impl Default for Settings {
@@ -24,6 +28,8 @@ impl Default for Settings {
             volume: 6,
             fullscreen: false,
             locale: None,
+            reduced_effects: false,
+            high_contrast: false,
         }
     }
 }
@@ -42,6 +48,8 @@ impl Settings {
                     s.volume = (*volume).min(u32::from(MAX_VOLUME)) as u8;
                 }
                 ("display", [fullscreen]) => s.fullscreen = *fullscreen == 1,
+                ("effects", [reduced]) => s.reduced_effects = *reduced == 1,
+                ("contrast", [high]) => s.high_contrast = *high == 1,
                 _ => {}
             }
         }
@@ -54,11 +62,17 @@ impl Settings {
         writeln!(out, "settings {} {}", u8::from(self.muted), self.volume)?;
         writeln!(out, "display {}", u8::from(self.fullscreen))?;
         // Only an explicit choice is written, so saves without one stay
-        // byte-identical to earlier versions, which skip this line.
-        match self.locale {
-            Some(locale) => writeln!(out, "locale {}", locale.tag()),
-            None => Ok(()),
+        // byte-identical to earlier versions, which skip these lines.
+        if let Some(locale) = self.locale {
+            writeln!(out, "locale {}", locale.tag())?;
         }
+        if self.reduced_effects {
+            writeln!(out, "effects 1")?;
+        }
+        if self.high_contrast {
+            writeln!(out, "contrast 1")?;
+        }
+        Ok(())
     }
 }
 
@@ -70,10 +84,19 @@ pub enum Row {
     Volume,
     Display,
     Language,
+    Effects,
+    Contrast,
 }
 
 /// The Settings sheet, top to bottom.
-pub const ROWS: &[Row] = &[Row::Sound, Row::Volume, Row::Display, Row::Language];
+pub const ROWS: &[Row] = &[
+    Row::Sound,
+    Row::Volume,
+    Row::Display,
+    Row::Language,
+    Row::Effects,
+    Row::Contrast,
+];
 
 /// How a row shows its value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,6 +118,8 @@ impl Row {
             Row::Volume => TextId::SettingVolume,
             Row::Display => TextId::SettingDisplay,
             Row::Language => TextId::SettingLanguage,
+            Row::Effects => TextId::SettingEffects,
+            Row::Contrast => TextId::SettingContrast,
         }
     }
     /// What the help line calls changing it: a choice from a list is
@@ -118,6 +143,16 @@ impl Row {
                 Some(locale) => Value::Native(locale.native_name()),
                 None => Value::Text(TextId::LanguageSystem),
             },
+            Row::Effects => Value::Text(if s.reduced_effects {
+                TextId::EffectsReduced
+            } else {
+                TextId::LookStandard
+            }),
+            Row::Contrast => Value::Text(if s.high_contrast {
+                TextId::ContrastHigh
+            } else {
+                TextId::LookStandard
+            }),
         }
     }
     /// Moves the value one step forward or back; switches and lists wrap,
@@ -126,6 +161,8 @@ impl Row {
         match self {
             Row::Sound => s.muted = !s.muted,
             Row::Display => s.fullscreen = !s.fullscreen,
+            Row::Effects => s.reduced_effects = !s.reduced_effects,
+            Row::Contrast => s.high_contrast = !s.high_contrast,
             Row::Volume if forward => s.volume = (s.volume + 1).min(MAX_VOLUME),
             Row::Volume => s.volume = s.volume.saturating_sub(1),
             Row::Language => {
@@ -211,6 +248,45 @@ mod tests {
                 .unwrap()
                 .all(|e| e.key() != "locale")
         );
+    }
+
+    #[test]
+    fn effects_and_contrast_round_trip_and_old_saves_keep_the_defaults() {
+        // A save from before these settings reads as standard.
+        let old = decode(b"ARKONK 1\nsettings 0 6\ndisplay 1\nlocale de\n");
+        assert!(!old.reduced_effects && !old.high_contrast);
+        assert!(old.fullscreen);
+        // Standard writes nothing new, so such a save stays byte-identical.
+        let mut file = String::from("ARKONK 1\n");
+        Settings::default().encode(&mut file).unwrap();
+        assert!(!file.contains("effects") && !file.contains("contrast"));
+        for (reduced_effects, high_contrast) in [(true, false), (false, true), (true, true)] {
+            let s = Settings {
+                reduced_effects,
+                high_contrast,
+                ..Settings::default()
+            };
+            let mut file = String::from("ARKONK 1\n");
+            s.encode(&mut file).unwrap();
+            assert_eq!(decode(file.as_bytes()), s, "{file}");
+        }
+        // Damaged lines are no choice.
+        let s = decode(b"ARKONK 1\neffects 7\ncontrast\n");
+        assert!(!s.reduced_effects && !s.high_contrast);
+    }
+
+    #[test]
+    fn effects_and_contrast_rows_switch() {
+        let mut s = Settings::default();
+        assert_eq!(Row::Effects.value(&s), Value::Text(TextId::LookStandard));
+        assert_eq!(Row::Contrast.value(&s), Value::Text(TextId::LookStandard));
+        Row::Effects.step(&mut s, true, |_| true);
+        Row::Contrast.step(&mut s, false, |_| true);
+        assert_eq!(Row::Effects.value(&s), Value::Text(TextId::EffectsReduced));
+        assert_eq!(Row::Contrast.value(&s), Value::Text(TextId::ContrastHigh));
+        assert!(s.reduced_effects && s.high_contrast);
+        Row::Effects.step(&mut s, false, |_| true);
+        assert!(!s.reduced_effects);
     }
 
     #[test]

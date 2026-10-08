@@ -59,6 +59,11 @@ pub(super) fn text(id: TextId) -> &'static str {
         DisplayWindow => "ウインドウ",
         LanguageSystem => "システム",
         ActionAdjust => "調整",
+        SettingEffects => "エフェクト",
+        SettingContrast => "コントラスト",
+        LookStandard => "標準",
+        EffectsReduced => "控えめ",
+        ContrastHigh => "高",
         KeySpace => "スペース",
         KeyEsc => "Esc",
         SectorsOf => "{0} / {1} セクター",
@@ -128,6 +133,11 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
         ExtraLife => Some("ライフ +1"),
         SectorName(s) => Some(SHORT_NAMES[s.index()]),
         ReadyEyebrow => Some("セクター {1}"),
+        SettingEffects => Some("効果"),
+        SettingContrast => Some("コントラスト"),
+        LookStandard => Some("標準"),
+        EffectsReduced => Some("控えめ"),
+        ContrastHigh => Some("高"),
         _ => None,
     }
 }

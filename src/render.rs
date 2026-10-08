@@ -7,18 +7,18 @@ use crate::{
     ui::{self, Action, Hits, Menu, Pressed, Screen, Ui},
 };
 use ark::{
-    Events, Game, Medals, Mode, Power, SectorSummary, Stage,
+    Events, Game, Medals, Mode, PARTICLES, Power, SectorSummary, Stage,
     clock::{DT, TICK_HZ},
     field::{
-        BALL_RADIUS as RADIUS, BOTTOM, CELL_H, CELL_W, CELLS, Cell as FieldCell, LEFT, PADDLE_Y,
-        RIGHT, TOP, cell_rect,
+        BALL_RADIUS as RADIUS, BOTTOM, CELL_H, CELLS, Cell as FieldCell, LEFT, PADDLE_Y, RIGHT,
+        TOP, cell_rect,
     },
     geom::V2,
     sectors::{Chapter, SECTOR_COUNT, SectorId},
     tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
 use ark_glyphs::{Fonts, ICON_EM, spec, spec::Weight};
-use ark_text::{Arg, Form, Locale, Role, Script, TextId, capsule, icon_power};
+use ark_text::{Arg, Form, Locale, Role, Script, TextId, icon_power};
 use macroquad::models::Vertex;
 use macroquad::prelude::*;
 use std::{
@@ -40,19 +40,18 @@ const INK: Color = hex(0xedf2fa);
 const DIM: Color = hex(0x8794ab);
 /// Only for what is unavailable.
 const MUTED: Color = hex(0x4a5469);
+/// The player.
 const CYAN: Color = hex(0x54def5);
-/// Achievements only.
+/// Relay cores and medals, nothing else.
 const AMBER: Color = hex(0xffc24d);
-const RED: Color = Color::new(1.0, 0.25, 0.33, 1.0);
-const PALETTE: [Color; 7] = [
-    RED,
-    Color::new(1.0, 0.49, 0.22, 1.0),
-    AMBER,
-    Color::new(0.35, 0.94, 0.60, 1.0),
-    CYAN,
-    Color::new(0.49, 0.51, 1.0, 1.0),
-    Color::new(0.95, 0.39, 0.78, 1.0),
-];
+/// The drain, and a Daybreak brick; never an interface colour.
+const RED: Color = hex(0xff4054);
+const EMBER: Color = hex(0xff7d38);
+const MINT: Color = hex(0x59f099);
+const INDIGO: Color = hex(0x7d82ff);
+const ORCHID: Color = hex(0xf263c7);
+/// The chapter hues, in the order the sector rows index them.
+const PALETTE: [Color; 7] = [RED, EMBER, AMBER, MINT, CYAN, INDIGO, ORCHID];
 
 /// The spacing scale, in scene units (4, 8, 12, 16, 24, 32, 48, 64).
 /// Layouts step by these and nothing in between, so related things always
@@ -133,9 +132,6 @@ const FULL: f32 = WIDTH - 2.0 * MARGIN;
 fn opacity(c: Color, alpha: f32) -> Color {
     Color::new(c.r, c.g, c.b, alpha)
 }
-fn shade(c: Color, value: f32) -> Color {
-    Color::new(c.r * value, c.g * value, c.b * value, c.a)
-}
 fn mix(a: Color, b: Color, t: f32) -> Color {
     Color::new(
         a.r + (b.r - a.r) * t,
@@ -156,7 +152,7 @@ const fn hex(rgb: u32) -> Color {
 
 /// A vertical colour ramp: `top` at the top edge to `bottom` at the
 /// bottom, through `mid` at a fraction of the height when there is one.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Fill {
     top: Color,
     mid: Option<(f32, Color)>,
@@ -192,27 +188,43 @@ impl Fill {
 }
 
 /// The edge of a rectangle with rounded corners, clockwise from the
-/// top-left corner. Every path has the same number of points, so two of
-/// them pair up into an outline or a halo.
+/// top-left corner. Paths with the same steps have the same number of
+/// points, so two of them pair up into an outline or a halo.
 #[derive(Clone, Copy)]
 struct Path {
     rect: Rect,
     /// Top-left, top-right, bottom-right, bottom-left.
     radii: [f32; 4],
+    /// Segments per corner.
+    steps: usize,
 }
 impl Path {
+    /// Segments per corner; small corners, a brick's among them, take
+    /// fewer, which pays for the pieces' extra layers.
     const STEPS: usize = 6;
+    const FEW: usize = 3;
+    /// The most points a path has.
     const LEN: usize = 4 * (Self::STEPS + 1);
     fn new(rect: Rect, radii: [f32; 4]) -> Self {
         let most = (rect.w.min(rect.h) / 2.0).max(0.0);
-        Self {
-            rect,
-            radii: radii.map(|r| r.clamp(0.0, most)),
-        }
+        let radii = radii.map(|r| r.clamp(0.0, most));
+        let steps = if radii.iter().all(|&r| r <= 4.0) {
+            Self::FEW
+        } else {
+            Self::STEPS
+        };
+        Self { rect, radii, steps }
+    }
+    fn with_steps(self, steps: usize) -> Self {
+        Self { steps, ..self }
+    }
+    fn len(&self) -> usize {
+        4 * (self.steps + 1)
     }
     fn points(&self) -> impl Iterator<Item = Vec2> {
         let Rect { x, y, w, h } = self.rect;
         let [a, b, c, d] = self.radii;
+        let steps = self.steps;
         [
             (x + a, y + a, a, 2.0),
             (x + w - b, y + b, b, 3.0),
@@ -220,9 +232,9 @@ impl Path {
             (x + d, y + h - d, d, 1.0),
         ]
         .into_iter()
-        .flat_map(|(cx, cy, r, start)| {
-            (0..=Self::STEPS).map(move |i| {
-                let a = (start + i as f32 / Self::STEPS as f32) * FRAC_PI_2;
+        .flat_map(move |(cx, cy, r, start)| {
+            (0..=steps).map(move |i| {
+                let a = (start + i as f32 / steps as f32) * FRAC_PI_2;
                 vec2(cx, cy) + Vec2::from_angle(a) * r
             })
         })
@@ -311,6 +323,51 @@ enum Face {
     Pixel(f32),
 }
 
+/// The player's look settings, as the pieces read them.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct Look {
+    /// No glow, no breathing or pulsing, flashes at 40 % for 120 ms, half
+    /// the shards.
+    reduced: bool,
+    /// Untinted glass, full-hue rims, white marks, lifted dim hues.
+    high: bool,
+}
+
+/// How the pieces are built: lit glass as designed, or flat, in whole
+/// pixels, on a Compact screen. The one seam between the two looks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PieceStyle {
+    Glass,
+    Flat,
+}
+
+/// What one frame sent to the GPU: its vertices, and its draw calls as
+/// Macroquad batches them, for the F3 overlay and the budget tests.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Tally {
+    pub vertices: u32,
+    pub calls: u32,
+    /// The open batch's vertices and indices.
+    batch: (usize, usize),
+}
+/// Macroquad's batch size, set at start-up: a draw call holds at most
+/// this many vertices and indices.
+const BATCH_VERTICES: usize = 10_000;
+const BATCH_INDICES: usize = 25_000;
+impl Tally {
+    /// Counts one mesh, opening a new draw call where Macroquad would.
+    fn add(&mut self, vertices: usize, indices: usize) {
+        let (v, i) = self.batch;
+        if self.calls == 0 || v + vertices >= BATCH_VERTICES || i + indices >= BATCH_INDICES {
+            self.calls += 1;
+            self.batch = (0, 0);
+        }
+        self.batch.0 += vertices;
+        self.batch.1 += indices;
+        self.vertices += vertices as u32;
+    }
+}
+
 /// One frame's drawing context: geometry and text in scene units, batched
 /// into the shared atlas texture. Meshes are built in fixed arrays and text
 /// is formatted into a reused buffer, so drawing allocates nothing.
@@ -341,6 +398,8 @@ struct Scene<'a> {
     /// Opacity and downward offset for what is being drawn: a sheet fades
     /// and rises into place. Alpha and translation only.
     motion: Shared<(f32, f32)>,
+    look: Shared<Look>,
+    tally: Shared<Tally>,
 }
 
 impl<'a> Scene<'a> {
@@ -370,6 +429,15 @@ impl<'a> Scene<'a> {
             within: Shared::new((0, Rect::new(0.0, 0.0, WIDTH, HEIGHT))),
             hits: RefCell::default(),
             motion: Shared::new((1.0, 0.0)),
+            look: Shared::default(),
+            tally: Shared::default(),
+        }
+    }
+    fn style(&self) -> PieceStyle {
+        if self.class == Class::Compact {
+            PieceStyle::Flat
+        } else {
+            PieceStyle::Glass
         }
     }
     /// Records a layout problem for the tests; free in a normal frame.
@@ -384,6 +452,9 @@ impl<'a> Scene<'a> {
         self.within.set((layer, r));
     }
     fn mesh(&self, vertices: &[Vertex], indices: &[u16]) {
+        let mut tally = self.tally.get();
+        tally.add(vertices.len(), indices.len());
+        self.tally.set(tally);
         let Some(texture) = self.texture else { return };
         // SAFETY: main-thread draw recording between frames, as Macroquad's own
         // shape functions do; no other borrow of the context is live.
@@ -445,6 +516,38 @@ impl<'a> Scene<'a> {
         };
         let vertices = corners.map(|(p, uv)| Vertex::new(p.x, p.y + lift, 0.0, uv.x, uv.y, color));
         self.mesh(&vertices, &[0, 1, 2, 0, 2, 3]);
+    }
+    /// An atlas region stretched over `r`, in scene units, tinted `color`.
+    fn textured(&self, r: Rect, cell: Cell, color: Color) {
+        let (x, y, w, h) = (
+            f32::from(cell.x),
+            f32::from(cell.y),
+            f32::from(cell.w),
+            f32::from(cell.h),
+        );
+        let (u0, u1) = (self.uv(x, y), self.uv(x + w, y + h));
+        let (alpha, lift) = self.motion.get();
+        let color = Color {
+            a: color.a * alpha,
+            ..color
+        };
+        let corners = [
+            (vec2(r.x, r.y), vec2(u0.x, u0.y)),
+            (vec2(r.x + r.w, r.y), vec2(u1.x, u0.y)),
+            (vec2(r.x + r.w, r.y + r.h), vec2(u1.x, u1.y)),
+            (vec2(r.x, r.y + r.h), vec2(u0.x, u1.y)),
+        ];
+        let vertices = corners.map(|(p, uv)| Vertex::new(p.x, p.y + lift, 0.0, uv.x, uv.y, color));
+        self.mesh(&vertices, &[0, 1, 2, 0, 2, 3]);
+    }
+    /// The atlas glow stretched over `r` and tinted: the soft light a
+    /// piece casts, in the frame's one batch. None under reduced effects or
+    /// on a Compact screen, where the rims alone carry the look.
+    fn glow(&self, r: Rect, color: Color) {
+        if self.look.get().reduced || self.style() == PieceStyle::Flat || color.a <= 0.0 {
+            return;
+        }
+        self.textured(r, self.atlas.glow, color);
     }
     /// Non-overlapping pieces, so translucent fills stay even at the corners.
     fn rounded(&self, x: f32, y: f32, w: f32, h: f32, r: f32, color: Color) {
@@ -540,6 +643,7 @@ impl<'a> Scene<'a> {
     /// another and translucent fills stay even.
     fn shape(&self, r: Rect, radii: [f32; 4], fill: Fill) {
         let path = Path::new(r, radii);
+        let n = path.len();
         let colour = |p: Vec2| fill.at((p.y - r.y) / r.h);
         let centre = r.center();
         let zero = self.vertex(centre, colour(centre));
@@ -547,15 +651,19 @@ impl<'a> Scene<'a> {
         let mut indices = [0_u16; 3 * Path::LEN];
         for (i, p) in path.points().enumerate() {
             vertices[i + 1] = self.vertex(p, colour(p));
-            let next = (i + 1) % Path::LEN + 1;
+            let next = (i + 1) % n + 1;
             indices[i * 3..i * 3 + 3].copy_from_slice(&[0, i as u16 + 1, next as u16]);
         }
-        self.mesh(&vertices, &indices);
+        self.mesh(&vertices[..1 + n], &indices[..3 * n]);
     }
     /// The area between two rounded paths of the same corners, with a
     /// colour for each: an outline when both are opaque, a soft halo when
     /// the outer one is transparent.
     fn between(&self, outer: Path, inner: Path, outer_fill: Fill, inner_fill: Fill) {
+        // Both edges take the finer corners, so their points pair up.
+        let steps = outer.steps.max(inner.steps);
+        let (outer, inner) = (outer.with_steps(steps), inner.with_steps(steps));
+        let n = outer.len();
         let at = |path: &Path, fill: Fill, p: Vec2| fill.at((p.y - path.rect.y) / path.rect.h);
         let zero = self.vertex(Vec2::ZERO, outer_fill.top);
         let mut vertices = [zero; 2 * Path::LEN];
@@ -563,10 +671,10 @@ impl<'a> Scene<'a> {
         for (i, (a, b)) in outer.points().zip(inner.points()).enumerate() {
             vertices[i * 2] = self.vertex(a, at(&outer, outer_fill, a));
             vertices[i * 2 + 1] = self.vertex(b, at(&inner, inner_fill, b));
-            let (k, next) = ((i * 2) as u16, ((i + 1) % Path::LEN * 2) as u16);
+            let (k, next) = ((i * 2) as u16, ((i + 1) % n * 2) as u16);
             indices[i * 6..i * 6 + 6].copy_from_slice(&[k, k + 1, next, next, k + 1, next + 1]);
         }
-        self.mesh(&vertices, &indices);
+        self.mesh(&vertices[..2 * n], &indices[..6 * n]);
     }
     /// The edge of `bounds` rounded by `r`, `t` thick, drawn inside it.
     fn outline(&self, bounds: Rect, r: f32, t: f32, color: Color) {
@@ -638,18 +746,23 @@ impl<'a> Scene<'a> {
     }
     /// A 20-sided fan, matching Macroquad's `draw_circle`.
     fn circle(&self, p: V2, r: f32, color: Color) {
-        const SIDES: usize = 20;
+        self.disc(p, r, 20, color);
+    }
+    /// A fan of `sides` (at most 20): small discs need fewer.
+    fn disc(&self, p: V2, r: f32, sides: usize, color: Color) {
+        const MOST: usize = 20;
+        let sides = sides.clamp(3, MOST);
         let center = vec2(p.x, p.y);
-        let mut vertices = [self.vertex(center, color); SIDES + 2];
-        let mut indices = [0_u16; SIDES * 3];
-        for i in 0..=SIDES {
-            let a = i as f32 / SIDES as f32 * TAU;
+        let mut vertices = [self.vertex(center, color); MOST + 2];
+        let mut indices = [0_u16; MOST * 3];
+        for i in 0..=sides {
+            let a = i as f32 / sides as f32 * TAU;
             vertices[i + 1] = self.vertex(center + vec2(a.cos(), a.sin()) * r, color);
-            if i < SIDES {
+            if i < sides {
                 indices[i * 3..i * 3 + 3].copy_from_slice(&[0, i as u16 + 1, i as u16 + 2]);
             }
         }
-        self.mesh(&vertices, &indices);
+        self.mesh(&vertices[..sides + 2], &indices[..sides * 3]);
     }
     /// A ring from `r` outward by `thickness`, 30 segments.
     fn ring(&self, p: V2, r: f32, thickness: f32, color: Color) {
@@ -668,28 +781,6 @@ impl<'a> Scene<'a> {
         }
         self.mesh(&vertices, &indices);
     }
-    /// Macroquad's `draw_rectangle_lines` at thickness 1: a half-unit outline.
-    fn frame(&self, x: f32, y: f32, w: f32, h: f32, color: Color) {
-        let t = 0.5;
-        let vertices = [
-            vec2(x, y),
-            vec2(x + w, y),
-            vec2(x + w, y + h),
-            vec2(x, y + h),
-            vec2(x + t, y + t),
-            vec2(x + w - t, y + t),
-            vec2(x + w - t, y + h - t),
-            vec2(x + t, y + h - t),
-        ]
-        .map(|p| self.vertex(p, color));
-        self.mesh(
-            &vertices,
-            &[
-                0, 1, 4, 1, 4, 5, 1, 5, 6, 1, 2, 6, 3, 7, 2, 2, 7, 6, 0, 4, 3, 3, 4, 7,
-            ],
-        );
-    }
-
     // Text.
 
     /// How `style` is set here: the baked strike for its size, raised to
@@ -902,32 +993,22 @@ impl<'a> Scene<'a> {
             }
         }
     }
-    /// A capsule in pixel-font text: its colour, and its letter in night,
-    /// on whole pixels from `x` on baseline `y`.
+    /// A capsule in pixel-font text, as it falls on a Compact screen: its
+    /// hue with a white centre, on whole pixels from `x` on baseline `y`.
     fn pixel_capsule(&self, power: Power, (x, y): (f32, f32), cell: f32) {
         let px = cell / self.density;
         let w = (pixel_font::advance(ark_text::icon(power)) - 1.0) * px;
         self.rect(x, y - 7.0 * px, w, 7.0 * px, power_color(power));
-        let (sx, sy) = pixel_font::cell(capsule(power));
-        let d = self.density;
-        self.sprite(
-            ((x + 2.0 * px) * d, (y - 7.0 * px) * d),
-            (sx as f32, sy as f32, 5.0, 7.0),
-            cell,
-            NIGHT,
-        );
+        let middle = ((w / px / 2.0).floor() * px, 3.0 * px);
+        self.rect(x + middle.0, y - 7.0 * px + middle.1, px, px, WHITE);
     }
     /// A capsule as the player sees it falling, `size` tall, sitting on the
-    /// capitals of `beside` text whose baseline is `baseline`.
+    /// capitals of `beside` text whose baseline is `baseline`: the same
+    /// glass pill and pictogram, so tips teach the mark they name.
     fn chip(&self, power: Power, x: f32, baseline: f32, size: f32, beside: Style) {
         let (w, cy) = (ICON_EM * size, baseline - self.cap(beside) / 2.0);
-        self.rounded(x, cy - size / 2.0, w, size, size / 2.0, power_color(power));
-        let mut letter = [0; 4];
-        let letter = capsule(power).encode_utf8(&mut letter);
-        let y = cy + self.cap(Role::Label) / 2.0;
-        // Drawn rather than put: the letter is part of the line it sits in.
-        let lx = x + (w - self.measure(letter, Role::Label)) / 2.0;
-        self.draw(letter, Role::Label, lx, y, NIGHT);
+        let r = self.snap_rect(Rect::new(x, cy - size / 2.0, w, size));
+        pieces::capsule_at(self, power, r);
     }
     /// Draws `text` aligned in `slot`; text wider than the slot is drawn
     /// anyway and reported to the layout tests.
@@ -1168,11 +1249,43 @@ fn pixel_lines<'t>(
     count
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 struct Popup {
     pos: V2,
     life: f32,
     value: u32,
+}
+/// Seconds a popup shows, and scene units a second it rises.
+const POPUP_LIFE: f32 = 0.65;
+const POPUP_RISE: f32 = 22.0;
+/// The room a popup's figures are centred in, and a row's height, so a
+/// line of them clears the next.
+const POPUP_W: f32 = 120.0;
+const POPUP_H: f32 = CELL_H;
+impl Popup {
+    /// Whether the two popups' rooms share any area.
+    fn overlaps(&self, other: &Popup) -> bool {
+        (self.pos.x - other.pos.x).abs() < POPUP_W && (self.pos.y - other.pos.y).abs() < POPUP_H
+    }
+}
+
+/// Seconds since an event long enough ago that nothing of it shows.
+const LONG_AGO: f32 = 1e3;
+
+/// One of the three walls a ball bounces off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Wall {
+    Left,
+    Right,
+    Top,
+}
+/// A bounce lighting the wall near it: which wall, where along it, and
+/// seconds since.
+#[derive(Clone, Copy, Debug)]
+struct WallFlash {
+    wall: Wall,
+    along: f32,
+    age: f32,
 }
 
 /// What the renderer remembers between ticks: trails, flashes, popups.
@@ -1180,7 +1293,10 @@ pub struct Fx {
     trails: [[V2; 12]; MAX_BALLS],
     trail_len: [usize; MAX_BALLS],
     cursor: usize,
-    brick_flash: [f32; CELLS],
+    /// Seconds since each cell last lost a hit point, and how many it had
+    /// before, so a hit knows which rim it took.
+    brick_age: [f32; CELLS],
+    brick_was: [u8; CELLS],
     previous_bricks: [u8; CELLS],
     popups: [Popup; 16],
     popup_cursor: usize,
@@ -1191,9 +1307,28 @@ pub struct Fx {
     /// Lives a tick ago, and how long a life just gained stays ringed.
     previous_lives: u8,
     life_gained: f32,
-    paddle_flash: f32,
-    wall_flash: f32,
-    pickup_flash: f32,
+    /// Seconds since a ball came off the paddle.
+    contact_age: f32,
+    /// The power last caught, and seconds since.
+    catch: (Power, f32),
+    /// Bounces lighting their walls, in a ring.
+    walls: [WallFlash; 4],
+    wall_cursor: usize,
+    /// Seconds each particle slot has been alive, and its life a tick ago,
+    /// which shows when the simulation reused the slot.
+    particle_age: [f32; PARTICLES],
+    particle_life: [f32; PARTICLES],
+    /// When Wide and Slow were last granted, so their drains stack oldest
+    /// first; the count of grants, and the timers a tick ago.
+    granted: [u32; 2],
+    grants: u32,
+    previous_timers: [f32; 2],
+    /// Where a ball last was, and where and how long ago the last ball
+    /// left the field.
+    last_ball_x: f32,
+    drain: (f32, f32),
+    /// The glass for the sector being drawn, mixed once.
+    palette: pieces::Palette,
 }
 impl Default for Fx {
     fn default() -> Self {
@@ -1201,7 +1336,8 @@ impl Default for Fx {
             trails: [[V2::default(); 12]; MAX_BALLS],
             trail_len: [0; MAX_BALLS],
             cursor: 0,
-            brick_flash: [0.0; CELLS],
+            brick_age: [LONG_AGO; CELLS],
+            brick_was: [0; CELLS],
             previous_bricks: [0; CELLS],
             popups: [Popup::default(); 16],
             popup_cursor: 0,
@@ -1210,9 +1346,181 @@ impl Default for Fx {
             entry_lives: 0,
             previous_lives: 0,
             life_gained: 0.0,
-            paddle_flash: 0.0,
-            wall_flash: 0.0,
-            pickup_flash: 0.0,
+            contact_age: LONG_AGO,
+            catch: (Power::Wide, LONG_AGO),
+            walls: [WallFlash {
+                wall: Wall::Top,
+                along: 0.0,
+                age: LONG_AGO,
+            }; 4],
+            wall_cursor: 0,
+            particle_age: [0.0; PARTICLES],
+            particle_life: [0.0; PARTICLES],
+            granted: [0; 2],
+            grants: 0,
+            previous_timers: [0.0; 2],
+            last_ball_x: WIDTH / 2.0,
+            drain: (WIDTH / 2.0, LONG_AGO),
+            palette: pieces::Palette::default(),
+        }
+    }
+}
+impl Fx {
+    /// Updates trails and flashes after one tick that raised `events`.
+    fn record(&mut self, game: &Game, events: Events) {
+        let fx = self;
+        if fx.previous_sector != Some(game.sector()) {
+            *fx = Fx::default();
+            fx.previous_sector = Some(game.sector());
+            fx.previous_bricks = hp_grid(game);
+            fx.previous_score = game.score();
+            fx.entry_lives = game.lives();
+            fx.previous_lives = game.lives();
+        }
+        fx.life_gained = (fx.life_gained - DT).max(0.0);
+        if game.lives() > fx.previous_lives {
+            fx.life_gained = 1.0;
+        }
+        fx.previous_lives = game.lives();
+        for (i, ball) in game.balls().iter().enumerate() {
+            if !ball.active || ball.held || game.stage() != Stage::Playing {
+                fx.trail_len[i] = 0;
+                continue;
+            }
+            fx.trails[i][fx.cursor] = ball.pos;
+            fx.trail_len[i] = (fx.trail_len[i] + 1).min(12);
+        }
+        fx.cursor = (fx.cursor + 1) % 12;
+        fx.contact_age += DT;
+        fx.catch.1 += DT;
+        fx.drain.1 += DT;
+        for flash in &mut fx.walls {
+            flash.age += DT;
+        }
+        if events.paddle {
+            fx.contact_age = 0.0;
+        }
+        if events.pickup
+            && let Some(power) = game.effects().notice
+        {
+            fx.catch = (power, 0.0);
+        }
+        if events.wall {
+            fx.spot_walls(game);
+        }
+        if events.lost {
+            fx.drain = (fx.last_ball_x, 0.0);
+        }
+        if let Some(ball) = game.balls().iter().find(|b| b.active) {
+            fx.last_ball_x = ball.pos.x;
+        }
+        for (i, p) in game.effects().particles.iter().enumerate() {
+            fx.particle_age[i] = if p.life > fx.particle_life[i] {
+                0.0
+            } else {
+                fx.particle_age[i] + DT
+            };
+            fx.particle_life[i] = p.life;
+        }
+        let powers = game.powers();
+        for (k, now) in [powers.wide_seconds, powers.slow_seconds]
+            .into_iter()
+            .enumerate()
+        {
+            // A grant, or a fresh one over a running timer.
+            if now > fx.previous_timers[k] {
+                fx.granted[k] = fx.grants;
+                fx.grants += 1;
+            }
+            fx.previous_timers[k] = now;
+        }
+        fx.age_popups();
+        // The tick's points float from the first brick it hit.
+        let mut first_hit = None;
+        for (cell, age) in FieldCell::all().zip(&mut fx.brick_age) {
+            let i = cell.index();
+            *age += DT;
+            if events.brick && game.board().hp(cell) < fx.previous_bricks[i] {
+                *age = 0.0;
+                fx.brick_was[i] = fx.previous_bricks[i];
+                first_hit = first_hit.or(Some(cell));
+            }
+        }
+        if let Some(cell) = first_hit
+            && game.score() > fx.previous_score
+        {
+            let bonus = if events.clear {
+                game.summary().bonus
+            } else {
+                0
+            };
+            fx.spawn_popup(
+                cell,
+                (game.score() - fx.previous_score).saturating_sub(bonus),
+            );
+        }
+        fx.previous_bricks = hp_grid(game);
+        fx.previous_score = game.score();
+    }
+    /// Floats every popup up a tick and fades it.
+    fn age_popups(&mut self) {
+        for popup in &mut self.popups {
+            popup.life = (popup.life - DT).max(0.0);
+            popup.pos.y -= POPUP_RISE * DT;
+        }
+    }
+    /// Floats `points` from the top of `cell`. Points landing where a live
+    /// popup still shows join its running total and keep it up for a full
+    /// life, so a chain reads as one rising figure rather than a stack.
+    /// Popups never move against each other, so none ever comes to overlap.
+    fn spawn_popup(&mut self, cell: FieldCell, points: u32) {
+        let r = cell_rect(cell);
+        let fresh = Popup {
+            pos: V2::new(r.x + r.w / 2.0, r.y),
+            life: POPUP_LIFE,
+            value: points,
+        };
+        if let Some(near) = self
+            .popups
+            .iter_mut()
+            .find(|p| p.life > 0.0 && p.overlaps(&fresh))
+        {
+            near.value = near.value.saturating_add(points);
+            near.life = POPUP_LIFE;
+            return;
+        }
+        self.popups[self.popup_cursor] = fresh;
+        self.popup_cursor = (self.popup_cursor + 1) % self.popups.len();
+    }
+    /// Lights the wall a bounce this tick came off, beside the ball that
+    /// made it; the simulation reports the bounce, not where it was.
+    fn spot_walls(&mut self, game: &Game) {
+        // A ball leaves a wall at up to a few units a tick.
+        const NEAR: f32 = 6.0;
+        for ball in game.balls().iter().filter(|b| b.active && !b.held) {
+            let p = ball.pos;
+            let nearest = [
+                (Wall::Left, p.x - RADIUS - LEFT, p.y),
+                (Wall::Right, RIGHT - RADIUS - p.x, p.y),
+                (Wall::Top, p.y - RADIUS - TOP, p.x),
+            ]
+            .into_iter()
+            .min_by(|a, b| a.1.total_cmp(&b.1));
+            let Some((wall, _, along)) = nearest.filter(|n| n.1 < NEAR) else {
+                continue;
+            };
+            let repeat = self
+                .walls
+                .iter()
+                .any(|f| f.wall == wall && f.age < 0.05 && (f.along - along).abs() < 24.0);
+            if !repeat {
+                self.walls[self.wall_cursor] = WallFlash {
+                    wall,
+                    along,
+                    age: 0.0,
+                };
+                self.wall_cursor = (self.wall_cursor + 1) % self.walls.len();
+            }
         }
     }
 }
@@ -1259,6 +1567,7 @@ pub struct Renderer {
     text: String,
     fx: Fx,
     hits: Hits,
+    tally: Tally,
 }
 impl Renderer {
     pub fn new(locale: Locale) -> Self {
@@ -1266,7 +1575,7 @@ impl Renderer {
             unsafe { get_internal_gl().quad_context.info().backend == miniquad::Backend::Metal };
         // Rounded shapes use about 2.5 indices per vertex; the default 5,000
         // indices would split a dense frame long before its 10,000 vertices.
-        macroquad::window::gl_set_drawcall_buffer_capacity(10_000, 25_000);
+        macroquad::window::gl_set_drawcall_buffer_capacity(BATCH_VERTICES, BATCH_INDICES);
         let mut renderer = Self {
             kind: Type::new(locale),
             texture: None,
@@ -1275,6 +1584,7 @@ impl Renderer {
             text: String::with_capacity(256),
             fx: Fx::default(),
             hits: Hits::default(),
+            tally: Tally::default(),
         };
         renderer.upload();
         renderer
@@ -1315,74 +1625,21 @@ impl Renderer {
     pub fn hits(&self) -> &Hits {
         &self.hits
     }
+    /// What the last frame sent to the GPU.
+    pub fn tally(&self) -> Tally {
+        self.tally
+    }
     pub fn reset(&mut self) {
         self.fx = Fx::default();
     }
+    /// Swaps in other trails and flashes, for drawing a staged game, and
+    /// returns the ones it replaced.
+    pub fn swap_fx(&mut self, fx: Fx) -> Fx {
+        std::mem::replace(&mut self.fx, fx)
+    }
     /// Updates trails and flashes after one tick that raised `events`.
     pub fn record(&mut self, game: &Game, events: Events) {
-        let fx = &mut self.fx;
-        if fx.previous_sector != Some(game.sector()) {
-            *fx = Fx::default();
-            fx.previous_sector = Some(game.sector());
-            fx.previous_bricks = hp_grid(game);
-            fx.previous_score = game.score();
-            fx.entry_lives = game.lives();
-            fx.previous_lives = game.lives();
-        }
-        fx.life_gained = (fx.life_gained - DT).max(0.0);
-        if game.lives() > fx.previous_lives {
-            fx.life_gained = 1.0;
-        }
-        fx.previous_lives = game.lives();
-        for (i, ball) in game.balls().iter().enumerate() {
-            if !ball.active || ball.held || game.stage() != Stage::Playing {
-                fx.trail_len[i] = 0;
-                continue;
-            }
-            fx.trails[i][fx.cursor] = ball.pos;
-            fx.trail_len[i] = (fx.trail_len[i] + 1).min(12);
-        }
-        fx.cursor = (fx.cursor + 1) % 12;
-        fx.paddle_flash = (fx.paddle_flash - DT).max(0.0);
-        fx.wall_flash = (fx.wall_flash - DT).max(0.0);
-        fx.pickup_flash = (fx.pickup_flash - DT).max(0.0);
-        if events.paddle {
-            fx.paddle_flash = 0.16;
-        }
-        if events.wall {
-            fx.wall_flash = 0.12;
-        }
-        if events.pickup {
-            fx.pickup_flash = 0.65;
-        }
-        for popup in &mut fx.popups {
-            popup.life = (popup.life - DT).max(0.0);
-            popup.pos.y -= 22.0 * DT;
-        }
-        let mut popup_spawned = false;
-        for (cell, flash) in FieldCell::all().zip(&mut fx.brick_flash) {
-            let i = cell.index();
-            *flash = (*flash - DT).max(0.0);
-            if events.brick && game.board().hp(cell) < fx.previous_bricks[i] {
-                *flash = 0.18;
-                if !popup_spawned && game.score() > fx.previous_score {
-                    let r = cell_rect(cell);
-                    fx.popups[fx.popup_cursor] = Popup {
-                        pos: V2::new(r.x + r.w / 2.0, r.y),
-                        life: 0.65,
-                        value: (game.score() - fx.previous_score).saturating_sub(if events.clear {
-                            game.summary().bonus
-                        } else {
-                            0
-                        }),
-                    };
-                    fx.popup_cursor = (fx.popup_cursor + 1) % fx.popups.len();
-                    popup_spawned = true;
-                }
-            }
-        }
-        fx.previous_bricks = hp_grid(game);
-        fx.previous_score = game.score();
+        self.fx.record(game, events);
     }
 
     pub fn draw(
@@ -1421,10 +1678,10 @@ impl Renderer {
         // Texture readback is bottom-up; render flipped so the PNG is upright.
         camera.zoom.y = -camera.zoom.y;
         set_camera(&camera);
-        let hits = self.hits;
+        let (hits, tally) = (self.hits, self.tally);
         self.frame(view, game, ui, profile, 1.0, None);
         // An offscreen capture is not what the player sees.
-        self.hits = hits;
+        (self.hits, self.tally) = (hits, tally);
         // SAFETY: main thread, between draw calls; executes the batched frame.
         unsafe { get_internal_gl() }.flush();
         target.texture.get_texture_data().export_png(path);
@@ -1447,6 +1704,11 @@ impl Renderer {
             std::mem::take(&mut self.text),
             None,
         );
+        let chapter = game.sector().sector().chapter;
+        self.fx.palette = self
+            .fx
+            .palette
+            .refresh(chapter, profile.settings.high_contrast);
         // Painting the background into the scene batch, rather than with
         // `clear_background`, saves a full-framebuffer pass: Macroquad has
         // already cleared once this frame.
@@ -1458,9 +1720,14 @@ impl Renderer {
             gl_use_material(opaque);
             v.cover(WHITE);
             gl_use_default_material();
+            // Its own pipeline, so its own draw call.
+            let mut tally = v.tally.get();
+            tally.calls += 1;
+            v.tally.set(tally);
         }
         self.hits = v.hits.into_inner();
         self.text = v.buffer.into_inner();
+        self.tally = v.tally.get();
     }
 }
 
@@ -1477,8 +1744,14 @@ fn scene(
     let (stage, summary) = ui
         .preview
         .map_or((game.stage(), game.summary()), |p| (p.stage, p.summary));
-    frame::arch(v, fx.wall_flash);
-    if ui.screen != Screen::Play {
+    v.look.set(Look {
+        reduced: profile.settings.reduced_effects,
+        high: profile.settings.high_contrast,
+    });
+    let play = ui.screen == Screen::Play;
+    let sky = play.then(|| game.sector().sector().chapter);
+    frame::arch(v, sky, &fx.walls);
+    if !play {
         if ui.screen == Screen::Title {
             screens::title(v, ui, profile);
         } else {
@@ -1490,43 +1763,15 @@ fn scene(
         }
         return;
     }
-    bricks(v, fx, game);
-    effects(v, fx, game);
-    paddle(v, fx, game);
-    for drop in game.capsules() {
-        if drop.active {
-            v.rounded(
-                drop.pos.x - 15.0,
-                drop.pos.y - 10.0,
-                30.0,
-                20.0,
-                10.0,
-                power_color(drop.power),
-            );
-        }
-    }
-    balls(v, fx, game, alpha);
+    pieces::draw(v, fx, game, alpha);
     frame::band_play(v, fx, game, profile, ui.notice > 0.0);
     frame::field_region(v, 0);
-    let mut letter = [0; 4];
-    for drop in game.capsules() {
-        if drop.active {
-            let letter = capsule(drop.power).encode_utf8(&mut letter);
-            let y = drop.pos.y + v.cap(Role::Label) / 2.0;
-            v.put(
-                letter,
-                Role::Label,
-                Slot::centered(drop.pos.x, 30.0, y),
-                NIGHT,
-            );
-        }
-    }
     // Points float from the brick in caption-sized figures.
     for popup in &fx.popups {
         if popup.life > 0.0 {
             let color = opacity(INK, 0.85 * (popup.life * 3.0).min(1.0));
             v.format(TextId::Plus, &[Arg::Count(popup.value)], Form::Full, |t| {
-                let slot = Slot::centered(popup.pos.x, 120.0, popup.pos.y);
+                let slot = Slot::centered(popup.pos.x, POPUP_W, popup.pos.y);
                 v.put(t, Role::Caption, slot, color)
             });
         }
@@ -1556,7 +1801,7 @@ fn scene(
         }
     }
     if let Some(perf) = perf {
-        v.panel(80.0, 430.0, 560.0, 210.0);
+        v.panel(80.0, 430.0, 560.0, 234.0);
         v.say(
             TextId::PerfTitle,
             &[],
@@ -1571,236 +1816,6 @@ fn scene(
     }
 }
 
-fn bricks(v: &Scene, fx: &Fx, game: &Game) {
-    // Quiet connections make the actual orthogonal blast routes readable.
-    for cell in FieldCell::all() {
-        if !game.board().is_core(cell) || game.board().hp(cell) == 0 {
-            continue;
-        }
-        let r = cell_rect(cell);
-        let [_, right, _, down] = cell.neighbors();
-        for other in [right, down].into_iter().flatten() {
-            if game.board().is_core(other) && game.board().hp(other) > 0 {
-                let next = cell_rect(other);
-                v.line(
-                    V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0),
-                    V2::new(next.x + next.w / 2.0, next.y + next.h / 2.0),
-                    1.0,
-                    opacity(AMBER, 0.32),
-                );
-            }
-        }
-    }
-    let pulse = 0.7 + 0.15 * (game.stage_ticks() as f32 * DT * 2.0).sin();
-    for cell in FieldCell::all() {
-        let i = cell.index();
-        let hp = game.board().hp(cell);
-        let r = cell_rect(cell);
-        let c = if game.board().is_core(cell) {
-            AMBER
-        } else {
-            sector_color(cell.row(), game.sector().sector().chapter)
-        };
-        let flash = fx.brick_flash[i] / 0.18;
-        if hp == 0 {
-            if flash > 0.0 {
-                v.frame(
-                    r.x - (1.0 - flash) * 5.0,
-                    r.y - (1.0 - flash) * 5.0,
-                    r.w + (1.0 - flash) * 10.0,
-                    r.h + (1.0 - flash) * 10.0,
-                    opacity(c, flash * 0.75),
-                );
-            }
-            continue;
-        }
-        let fill = if game.board().is_core(cell) {
-            shade(AMBER, 0.24)
-        } else if hp > 1 {
-            shade(c, 0.42)
-        } else {
-            shade(c, 0.80)
-        };
-        v.rounded(r.x, r.y, r.w, r.h, 4.0, fill);
-        v.rect(r.x + 4.0, r.y, r.w - 8.0, 2.0, mix(fill, INK, 0.22));
-        if game.board().is_core(cell) {
-            let center = V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
-            for (from, to) in [
-                (V2::new(-6.0, 0.0), V2::new(0.0, -5.0)),
-                (V2::new(0.0, -5.0), V2::new(6.0, 0.0)),
-                (V2::new(6.0, 0.0), V2::new(0.0, 5.0)),
-                (V2::new(0.0, 5.0), V2::new(-6.0, 0.0)),
-            ] {
-                v.line(center + from, center + to, 1.5, opacity(AMBER, pulse));
-            }
-            v.circle(center, 1.5, INK);
-        } else if hp > 1 {
-            for j in 0..hp {
-                let x = r.x + r.w / 2.0 - f32::from(hp - 1) * 5.0 + f32::from(j) * 10.0;
-                v.circle(V2::new(x, r.y + r.h / 2.0), 2.5, mix(c, INK, 0.5));
-            }
-        }
-        if flash > 0.0 {
-            v.rounded(r.x, r.y, r.w, r.h, 4.0, opacity(INK, flash * 0.8));
-        }
-    }
-}
-fn effects(v: &Scene, fx: &Fx, game: &Game) {
-    for cell in FieldCell::all() {
-        let flash = game.effects().relay_flash[cell.index()];
-        if flash == 0 {
-            continue;
-        }
-        let r = cell_rect(cell);
-        let progress = 1.0 - f32::from(flash) / 36.0;
-        let center = V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
-        let color = opacity(AMBER, (1.0 - progress) * 0.75);
-        v.frame(
-            r.x - progress * 8.0,
-            r.y - progress * 5.0,
-            r.w + progress * 16.0,
-            r.h + progress * 10.0,
-            color,
-        );
-        for direction in [
-            V2::new(CELL_W, 0.0),
-            V2::new(-CELL_W, 0.0),
-            V2::new(0.0, CELL_H),
-            V2::new(0.0, -CELL_H),
-        ] {
-            v.line(
-                center + direction * progress * 0.6,
-                center + direction * progress,
-                1.0,
-                color,
-            );
-        }
-    }
-    for p in &game.effects().particles {
-        if p.life <= 0.0 {
-            continue;
-        }
-        let c = opacity(
-            sector_color(p.hue % 7, game.sector().sector().chapter),
-            (p.life * 3.0).min(1.0),
-        );
-        v.line(
-            p.pos - p.velocity * 0.012,
-            p.pos,
-            1.0,
-            opacity(c, c.a * 0.5),
-        );
-        v.rect(p.pos.x - 1.0, p.pos.y - 1.0, 2.0, 2.0, c);
-    }
-    if fx.pickup_flash > 0.0 {
-        let progress = 1.0 - fx.pickup_flash / 0.65;
-        v.ring(
-            V2::new(game.paddle().x, PADDLE_Y),
-            20.0 + progress * 90.0,
-            2.0,
-            opacity(CYAN, (1.0 - progress) * 0.6),
-        );
-    }
-}
-fn paddle(v: &Scene, fx: &Fx, game: &Game) {
-    let paddle = game.paddle().x;
-    let x = paddle - game.paddle().width / 2.0;
-    let w = game.paddle().width;
-    v.rounded(x, PADDLE_Y, w, PADDLE_HEIGHT, PADDLE_HEIGHT / 2.0, INK);
-    // The center sends the ball straight up; the ends steer it.
-    v.rounded(paddle - 9.0, PADDLE_Y + 5.0, 18.0, 4.0, 2.0, CYAN);
-    if game.powers().anchor_charges > 0 || game.balls().iter().any(|b| b.active && b.held) {
-        v.rect(x + 12.0, PADDLE_Y - 3.0, w - 24.0, 1.0, CYAN);
-        for i in 0..ANCHOR_CHARGES {
-            v.circle(
-                V2::new(paddle - 8.0 + f32::from(i) * 8.0, PADDLE_Y + 22.0),
-                2.0,
-                if i < game.powers().anchor_charges {
-                    CYAN
-                } else {
-                    MUTED
-                },
-            );
-        }
-    }
-    if game.powers().wide() {
-        v.rect(
-            x,
-            PADDLE_Y + 28.0,
-            w * (game.powers().wide_seconds / WIDE_SECONDS).min(1.0),
-            2.0,
-            power_color(Power::Wide),
-        );
-    }
-    if game.powers().slow() {
-        v.rect(
-            x,
-            PADDLE_Y + 32.0,
-            w * (game.powers().slow_seconds / SLOW_SECONDS).min(1.0),
-            2.0,
-            power_color(Power::Slow),
-        );
-    }
-    if fx.paddle_flash > 0.0 {
-        v.rounded(
-            x - 2.0,
-            PADDLE_Y - 2.0,
-            w + 4.0,
-            18.0,
-            9.0,
-            opacity(CYAN, fx.paddle_flash * 2.0),
-        );
-    }
-}
-fn balls(v: &Scene, fx: &Fx, game: &Game, alpha: f32) {
-    for (i, ball) in game.balls().iter().enumerate() {
-        if !ball.active {
-            continue;
-        }
-        if ball.held {
-            let mut point = ball.pos;
-            let mut direction = ball.velocity.normalized();
-            for n in 1..=10 {
-                point += direction * 12.0;
-                if point.x < LEFT + RADIUS {
-                    point.x = 2.0 * (LEFT + RADIUS) - point.x;
-                    direction.x = -direction.x;
-                }
-                if point.x > RIGHT - RADIUS {
-                    point.x = 2.0 * (RIGHT - RADIUS) - point.x;
-                    direction.x = -direction.x;
-                }
-                v.circle(point, 1.5, opacity(CYAN, 0.6 - n as f32 * 0.04));
-            }
-        }
-        let color = if ball.phase_charges > 0 {
-            PALETTE[5]
-        } else {
-            CYAN
-        };
-        for n in (0..if ball.held { 0 } else { fx.trail_len[i] }).rev() {
-            let index = (fx.cursor + 12 - 1 - n) % 12;
-            let c = opacity(color, 0.22 * (1.0 - n as f32 / 12.0));
-            v.circle(fx.trails[i][index], RADIUS * (1.0 - n as f32 / 15.0), c);
-        }
-        let pos = if ball.held {
-            ball.pos
-        } else {
-            ball.previous.lerp(ball.pos, alpha)
-        };
-        for n in 0..ball.phase_charges {
-            v.circle(
-                V2::new(
-                    pos.x - f32::from(ball.phase_charges - 1) * 3.0 + f32::from(n) * 6.0,
-                    pos.y + 14.0,
-                ),
-                1.5,
-                color,
-            );
-        }
-        v.circle(pos, RADIUS, INK);
-    }
-}
 /// Text formatted on the stack, so drawing scores, times and the rare
 /// cut line allocates nothing. Overflow only truncates.
 struct Stack<const N: usize> {
@@ -1938,13 +1953,14 @@ fn sector_color(row: usize, chapter: Chapter) -> Color {
         Chapter::Afterlight => DUSK[row % 7],
     }]
 }
+/// A power's hue: never amber, which is the cores' and the medals'.
 fn power_color(power: Power) -> Color {
     match power {
-        Power::Wide => PALETTE[3],
-        Power::Slow => AMBER,
-        Power::Multi => PALETTE[6],
+        Power::Wide => MINT,
+        Power::Slow => EMBER,
+        Power::Multi => ORCHID,
         Power::Anchor => CYAN,
-        Power::Phase => PALETTE[5],
+        Power::Phase => INDIGO,
     }
 }
 
@@ -1954,7 +1970,9 @@ mod frame;
 mod view;
 pub use view::{Class, View, mouse, preview};
 mod moments;
+mod pieces;
 mod screens;
 mod sheet;
+mod status;
 #[cfg(test)]
 mod tests;
