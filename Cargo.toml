@@ -1,6 +1,7 @@
 [workspace]
-members = [".", "crates/ark", "crates/ark-text"]
-default-members = [".", "crates/ark", "crates/ark-text"]
+members = [".", "crates/ark", "crates/ark-glyphs", "crates/ark-text", "tools/fontbake"]
+# The font baker is run by hand (docs/localization.md); it is not a default member.
+default-members = [".", "crates/ark", "crates/ark-glyphs", "crates/ark-text"]
 # Path dependencies under the workspace root join it automatically; the
 # vendored miniquad must stay outside so lints never run on it.
 exclude = ["vendor/miniquad"]

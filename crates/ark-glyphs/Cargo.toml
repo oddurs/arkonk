@@ -1,0 +1,18 @@
+[package]
+name = "ark-glyphs"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "ARKONK's baked Noto Sans glyph atlases, metrics and kerning, with the text layout that uses them"
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+# Chinese, Japanese and Korean atlases: about 640 KB of the binary.
+cjk = []
+
+[dependencies]
+ark-text = { path = "../ark-text" }
+# Inflate only, without allocation. The game already links this version.
+miniz_oxide = { version = "0.8.9", default-features = false }
