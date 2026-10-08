@@ -7,6 +7,7 @@ pub enum Screen {
     Sectors,
     Play,
 }
+#[derive(Clone)]
 pub struct Ui {
     pub screen: Screen,
     pub paused: bool,
@@ -46,10 +47,10 @@ pub fn menu_rect(row: usize) -> Rect {
 }
 /// The single action on the sector-clear card.
 pub fn next_rect() -> Rect {
-    Rect::new(310.0, 524.0, 340.0, 46.0)
+    Rect::new(310.0, 514.0, 340.0, 46.0)
 }
 pub fn back_rect() -> Rect {
-    Rect::new(64.0, 46.0, 104.0, 36.0)
+    Rect::new(56.0, 46.0, 150.0, 36.0)
 }
 pub fn play_rect() -> Rect {
     Rect::new(310.0, 768.0, 340.0, 46.0)
@@ -57,7 +58,7 @@ pub fn play_rect() -> Rect {
 pub fn sector_rect(index: usize) -> Rect {
     Rect::new(
         105.0 + (index / 4) as f32 * 255.0,
-        196.0 + (index % 4) as f32 * 118.0,
+        196.0 + (index % 4) as f32 * 112.0,
         240.0,
         104.0,
     )

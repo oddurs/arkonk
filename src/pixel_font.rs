@@ -1,101 +1,39 @@
-//! A small original 5x7 alphabet, packed once into a single nearest-filtered atlas.
-//! UI glyphs share a texture batch; glyph cells snap to whole physical pixels so
-//! text stays even at any window scale.
-use macroquad::prelude::*;
+//! A small original 5x7 alphabet. It draws the ARKONK logo and the app icons,
+//! and stands in for Noto when a window is too small for it to stay legible.
 
-#[derive(Clone)]
-pub struct PixelFont {
-    texture: Texture2D,
-    /// Physical pixels per scene unit, set once per frame by the renderer.
-    pub density: f32,
-}
-impl PixelFont {
-    /// The DEL cell (code 127, never drawn as text) is solid white, so shapes
-    /// can sample the atlas and batch with text.
-    pub const WHITE_UV: Vec2 = vec2(124.5 / 128.0, 44.5 / 48.0);
-    pub fn new() -> Self {
-        let mut image = Image::gen_image_color(128, 48, Color::new(0.0, 0.0, 0.0, 0.0));
-        for code in 32..128 {
-            let glyph = glyph(char::from(code as u8));
-            let x = (code - 32) % 16 * 8;
-            let y = (code - 32) / 16 * 8;
-            for (row, &bits) in glyph.iter().enumerate() {
-                for col in 0..5 {
-                    if bits & (1 << (4 - col)) != 0 {
-                        image.set_pixel(x + col, y + row as u32, WHITE);
-                    }
+/// The pixel font's block in the texture atlas: 16 × 6 cells of 8 × 8.
+pub const ATLAS_W: usize = 128;
+pub const ATLAS_H: usize = 48;
+
+/// Coverage for the atlas block: ASCII 32–127 in 8 × 8 cells; the DEL cell
+/// (127, never drawn as text) is solid, so shapes can sample it.
+pub fn atlas() -> Vec<u8> {
+    let mut out = vec![0; ATLAS_W * ATLAS_H];
+    for code in 32_u8..128 {
+        let (x, y) = cell(char::from(code));
+        for (row, &bits) in glyph(char::from(code)).iter().enumerate() {
+            for col in 0..5 {
+                if bits & (1 << (4 - col)) != 0 {
+                    out[(y + row) * ATLAS_W + x + col] = 255;
                 }
             }
         }
-        for y in 40..48 {
-            for x in 120..128 {
-                image.set_pixel(x, y, WHITE);
-            }
-        }
-        let texture = Texture2D::from_image(&image);
-        texture.set_filter(FilterMode::Nearest);
-        Self {
-            texture,
-            density: 1.0,
-        }
     }
-    pub fn texture(&self) -> &Texture2D {
-        &self.texture
+    for y in 40..48 {
+        out[y * ATLAS_W + 120..y * ATLAS_W + 128].fill(255);
     }
-    pub fn pixel(&self, size: f32) -> f32 {
-        let cell = if size >= 28.0 {
-            4.0
-        } else if size >= 20.0 {
-            3.0
-        } else if size >= 12.0 {
-            2.0
-        } else {
-            1.0
-        };
-        (cell * self.density).round().max(1.0) / self.density
-    }
-    fn snap(&self, value: f32) -> f32 {
-        (value * self.density).round() / self.density
-    }
-    pub fn width(&self, text: &str, size: f32) -> f32 {
-        if text.is_empty() {
-            0.0
-        } else {
-            (text.chars().count() as f32 * 6.0 - 1.0) * self.pixel(size)
-        }
-    }
-    pub fn draw(&self, text: &str, x: f32, baseline: f32, size: f32, color: Color) {
-        let pixel = self.pixel(size);
-        let x = self.snap(x);
-        let top = self.snap(baseline - 7.0 * pixel);
-        for (i, character) in text.chars().enumerate() {
-            let character = character.to_ascii_uppercase();
-            if character == ' ' {
-                continue;
-            }
-            let code = if character.is_ascii() && (' '..='\u{7f}').contains(&character) {
-                character as u32
-            } else {
-                u32::from(b'?')
-            } - 32;
-            draw_texture_ex(
-                &self.texture,
-                x + i as f32 * 6.0 * pixel,
-                top,
-                color,
-                DrawTextureParams {
-                    source: Some(Rect::new(
-                        (code % 16 * 8) as f32,
-                        (code / 16 * 8) as f32,
-                        5.0,
-                        7.0,
-                    )),
-                    dest_size: Some(vec2(5.0 * pixel, 7.0 * pixel)),
-                    ..Default::default()
-                },
-            );
-        }
-    }
+    out
+}
+
+/// The top-left pixel of a character's cell in the atlas block.
+pub fn cell(c: char) -> (usize, usize) {
+    let code = (c as usize).clamp(32, 127) - 32;
+    (code % 16 * 8, code / 16 * 8)
+}
+
+/// Whether the pixel font can draw `c` (after upper-casing ASCII).
+pub fn has(c: char) -> bool {
+    c == ' ' || (c.is_ascii() && glyph(c.to_ascii_uppercase()) != [0; 7])
 }
 
 pub fn glyph(character: char) -> [u8; 7] {

@@ -24,15 +24,24 @@ license.workspace = true
 repository.workspace = true
 
 [features]
+default = ["cjk"]
+# Chinese, Japanese and Korean glyph atlases, about 640 KB; without them
+# those languages fall back to English. See docs/localization.md.
+cjk = ["ark-glyphs/cjk"]
 # Opt-in so development, CI tests and the benchmark never need a Steam client;
 # see docs/steam/README.md.
 steam = ["dep:steamworks"]
 
 [dependencies]
 ark = { path = "crates/ark" }
+ark-glyphs = { path = "crates/ark-glyphs" }
+ark-text = { path = "crates/ark-text" }
 gilrs = "0.11.2"
 macroquad = { version = "0.4.16", features = ["audio"] }
 steamworks = { version = "0.13.1", optional = true }
+# The OS language list, through each platform's own API; no dependencies
+# on desktop targets.
+sys-locale = "0.3.2"
 
 [dev-dependencies]
 insta = "1.49.0"
@@ -46,6 +55,14 @@ lto = "thin"
 codegen-units = 1
 
 [profile.dev.package."*"]
+opt-level = 3
+
+# Text layout and atlas inflation run thousands of times in the layout test.
+# Neither holds simulation state, so the replay goldens (exact at opt-level
+# 0) are untouched.
+[profile.dev.package.ark-glyphs]
+opt-level = 3
+[profile.dev.package.ark-text]
 opt-level = 3
 
 # Localized macOS Metal fixes; provenance and patch scope in vendor/miniquad/ARKONK.md.

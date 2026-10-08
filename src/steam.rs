@@ -102,6 +102,11 @@ mod imp {
                 s.queue(progress, achievements::from_clear(game));
             }
         }
+        /// The game language the player picked for this game in Steam.
+        pub fn language(&self) -> Option<ark_text::Locale> {
+            let s = self.0.as_ref()?;
+            ark_text::Locale::from_steam(&s.client.apps().current_game_language())
+        }
         /// What friends see: menus, or the sector being played.
         pub fn presence(&mut self, playing: bool, game: &Game) {
             let Some(s) = &mut self.0 else { return };
@@ -196,6 +201,9 @@ mod imp {
             false
         }
         pub fn cleared(&mut self, _: &Game, _: &Progress) {}
+        pub fn language(&self) -> Option<ark_text::Locale> {
+            None
+        }
         pub fn presence(&mut self, _: bool, _: &Game) {}
     }
 }

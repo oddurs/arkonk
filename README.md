@@ -5,9 +5,13 @@ chapters, saved checkpoints, replayable sectors, and 36 medals to earn at your o
 pace. Direct mouse control, 240 Hz collision simulation, and restrained feedback
 keep the focus on the next bounce.
 
-The presentation is flat and quiet: rounded bricks, a pill paddle, an original
-5×7 pixel typeface, and a dark field. Each chapter has its own palette. The HUD
-shows only the score, the sector with a progress strip, and remaining lives.
+The presentation is flat and quiet: rounded bricks, a pill paddle, Noto Sans
+type, an original 5×7 pixel logo, and a dark field. Each chapter has its own
+palette. The HUD shows only the score, the sector with a progress strip, and
+remaining lives. ARKONK speaks English, French, German, Spanish (Spain and
+Latin America), Brazilian Portuguese, Italian, Polish, Russian, Simplified
+Chinese, Japanese and Korean; the translations are drafts awaiting native
+review ([docs/localization.md](docs/localization.md)).
 [Start screen](docs/attract.png) · [Sector map](docs/sectors.png)
 
 ![ARKONK in play](docs/screenshot.png)
@@ -37,8 +41,9 @@ credentials the app gets an ad-hoc signature that runs on this Mac only;
 [docs/RELEASING.md](docs/RELEASING.md) covers Developer ID signing and notarization.
 
 No downloaded assets or working-directory-dependent resource files are needed.
-The original 5×7 pixel alphabet is packed into an atlas at startup; artwork is
-drawn with native geometry, and sounds are synthesized and decoded once.
+UI type is baked into the binary as pre-rendered Noto glyphs and packed into
+one atlas at startup; artwork is drawn with native geometry, and sounds are
+synthesized and decoded once.
 Native macOS is verified locally. Windows and Linux have CI build coverage.
 On Linux, install the native libraries first (Debian/Ubuntu):
 
@@ -154,7 +159,8 @@ connection, or asset download is used during play.
 
 macOS uses native Metal; Windows and Linux use OpenGL. The fixed 960×900 scene
 is drawn straight to the window through a letterboxing camera, so shapes render
-at native resolution and glyph cells snap to whole physical pixels. One final
+at native resolution and every glyph lands on a whole physical pixel, drawn
+1:1 from a strike baked at that size. One final
 full-window draw restores framebuffer alpha after translucent overlays, so no
 compositor can show the window through them.
 
@@ -175,7 +181,7 @@ fixed pools in the renderer. A restart reuses them.
 - Fixed arrays for three balls, 384 particles, and twelve power-up drops.
 - Eight collision resolutions per ball per tick. If exhausted, the ball stays
   at its last safe position; it never advances unchecked through bricks.
-- Single-threaded simulation. Shapes sample a white cell of the font atlas, so
+- Single-threaded simulation. Shapes sample a white cell of the glyph atlas, so
   geometry and text share one texture and the whole scene is one Macroquad draw
   call. On Metal every draw call is a full-framebuffer render pass; a frame is
   now three (Macroquad's clear, the scene, the opaque-alpha pass) instead of
@@ -284,7 +290,8 @@ cargo run --locked --release --features steam
 
 A `steam` build unlocks achievements from saved medals and sector results
 (re-synced at startup, so earlier medals count), shows the current sector as rich
-presence, and pauses when the Steam overlay opens. Progress syncs through Steam
+presence, follows the game language chosen in Steam, and pauses when the
+Steam overlay opens. Progress syncs through Steam
 Auto-Cloud with no game code. Without a running Steam client the game logs one
 line and plays on. The app id is `APP_ID` in `src/steam.rs`, Valve's test app
 480 until the real one replaces it. `scripts/package.sh --steam` puts the Steam
@@ -297,6 +304,7 @@ id, packaging, and the exact partner-site configuration.
 scripts/task check
 cargo run --locked --release --bin arkonk -- --smoke-test
 cargo run --locked --release --bin arkonk -- --flow-test
+cargo run --locked --release --bin arkonk -- --locale de   # any shipped tag, or pseudo
 ```
 
 The smoke test opens a window, launches a ball, follows it with the paddle,
@@ -310,6 +318,9 @@ logs alone.
 The OpenGL smoke test also renders play, title, and sector screens offscreen at
 1280×800 (Steam Deck), 1920×1080, 2560×1440, 3440×1440, and 1024×768 into
 `target/layout-*.png`, then checks that a 10×10 window request is refused.
+It also switches language mid-run, which rebuilds the glyph atlas, and writes
+`target/locale-switch.png`. Run it with `--locale <tag>` to capture every
+screen in another language.
 `--flow-test` drives the real menu input handlers through new journey, sector clear,
 checkpoint restore, practice, focus pause, resume, and retry, with assertions at
 transition boundaries. It also checks sticky catches with combined powers,
@@ -334,9 +345,12 @@ settings.
 `src/audio.rs`, and `src/perf.rs` handle presentation, `src/ui.rs` holds menu
 layout and keyboard/mouse input, `src/input.rs` merges gamepads (via
 [gilrs](https://crates.io/crates/gilrs)) into the same controls and tracks the
-active device, `src/pixel_font.rs` contains the original bitmap type, and
-`src/text.rs` holds the English names and tips for sectors, chapters and powers,
-which the simulation knows only by id and slug.
+active device, `src/locale.rs` picks the language, `src/atlas.rs` packs the
+glyph atlas, and `src/pixel_font.rs` holds the original 5×7 bitmap type.
+Display text, string tables and formatting live in `crates/ark-text`, and the
+baked Noto glyphs and line layout in `crates/ark-glyphs`; `tools/fontbake`
+rebakes them from pinned font releases. The simulation knows sectors,
+chapters and powers only by id and slug.
 `src/steam.rs` is the only Steamworks caller; `src/achievements.rs` and
 `src/presence.rs` decide what it reports.
 Collision tests cover high

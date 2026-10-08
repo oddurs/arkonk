@@ -22,4 +22,11 @@ mkdir -p "$(dirname "$out")"
 # --all-features: the Steam build links extra crates, and one notice covers both.
 cargo about generate --locked --all-features --fail \
     -c packaging/licenses/about.toml -o "$out" packaging/licenses/about.hbs
+# The UI type is bitmaps rendered from these fonts (SIL OFL 1.1), linked into
+# every build; cargo-about cannot see them, so their licenses follow here.
+for font in packaging/licenses/fonts/*.txt; do
+    printf '\n%s\n' "================================================================================" >>"$out"
+    printf 'Font software, rendered into the glyph atlases in crates/ark-glyphs\n\n' >>"$out"
+    cat "$font" >>"$out"
+done
 echo "Wrote $out" >&2

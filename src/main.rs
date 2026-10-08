@@ -4,10 +4,12 @@
 // Only Steam reports achievements and presence; both are tested without it.
 #[cfg(any(feature = "steam", test))]
 mod achievements;
+mod atlas;
 mod audio;
 mod diagnostics;
 mod display;
 mod input;
+mod locale;
 mod perf;
 mod pixel_font;
 #[cfg(any(feature = "steam", test))]
@@ -17,7 +19,6 @@ mod settings;
 mod smoke;
 mod steam;
 mod storage;
-mod text;
 mod ui;
 
 use ark::{
@@ -28,6 +29,7 @@ use ark::{
     sectors::SectorId,
     tuning::ADVANCE_DELAY_TICKS,
 };
+use ark_text::Locale;
 use audio::Audio;
 use input::{Device, Gamepads};
 use macroquad::prelude::*;
@@ -210,8 +212,19 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
     let mut dirty = false;
     let mut last_save_attempt = -5.0;
     let mut game = Game::new();
-    let mut renderer = Renderer::new();
+    let (language, origin) = locale::choose(
+        locale::flag(),
+        profile.settings.locale,
+        steam.language(),
+        locale::system(),
+    );
+    let mut renderer = Renderer::new(language);
     diagnostics::set_backend(renderer.backend());
+    let (atlas_w, atlas_h) = renderer.atlas_size();
+    diagnostics::info(format_args!(
+        "Language: {} ({origin:?}), glyph atlas {atlas_w}x{atlas_h}",
+        renderer.locale().tag()
+    ));
     diagnostics::info(format_args!(
         "Started: {}, window {}x{} at {}x scale, {}",
         renderer.backend(),
@@ -603,6 +616,16 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         if smoke && !flow && !perf_test {
             match frames {
                 30 => ui.screen = Screen::Title,
+                140 => ui.preview = preview(Stage::Ready),
+                // Switching language rebuilds the glyph atlas mid-run.
+                244 => {
+                    ui.screen = Screen::Title;
+                    renderer.set_locale(if language == Locale::De {
+                        Locale::Ja
+                    } else {
+                        Locale::De
+                    });
+                }
                 150 => ui.paused = true,
                 160 => ui.preview = preview(Stage::GameOver),
                 180 => ui.preview = preview(Stage::Cleared),
@@ -638,12 +661,14 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             let capture = match frames {
                 30 => Some("target/attract.png"),
                 120 => Some("target/smoke-test.png"),
+                140 => Some("target/ready.png"),
                 150 => Some("target/paused.png"),
                 160 => Some("target/game-over.png"),
                 170 => Some("target/stats.png"),
                 180 => Some("target/clear.png"),
                 190 => Some("target/sectors.png"),
                 230 => Some("target/resized.png"),
+                244 => Some("target/locale-switch.png"),
                 250 => Some("target/attract-pad.png"),
                 260 => Some("target/paused-pad.png"),
                 270 => Some("target/sectors-pad.png"),
@@ -653,6 +678,9 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             };
             if let Some(p) = capture {
                 renderer.capture(p);
+            }
+            if frames == 244 {
+                renderer.set_locale(language);
             }
             if frames == 200 {
                 request_new_screen_size(800.0, 600.0);
