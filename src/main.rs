@@ -11,6 +11,7 @@ mod display;
 mod input;
 mod locale;
 mod perf;
+mod pictogram;
 mod pixel_font;
 #[cfg(any(feature = "steam", test))]
 mod presence;
