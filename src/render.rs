@@ -1676,27 +1676,30 @@ fn hud(v: &Scene, game: &Game, profile: &Profile) {
         );
     }
 }
+/// The eyebrow's baseline on the ready card; the rest stacks under it.
+const READY_TOP: f32 = 540.0;
 fn ready(v: &Scene, game: &Game) {
     let id = game.sector();
     let chapter = id.sector().chapter;
     let eyebrow = [Arg::Text(TextId::ChapterName(chapter)), Arg::Sector(id)];
-    v.say(
-        TextId::ReadyEyebrow,
-        &eyebrow,
-        Role::Label,
-        Slot::line(540.0),
-        sector_color(0, chapter),
-    );
+    let hue = sector_color(0, chapter);
+    let line = Slot::line(READY_TOP);
+    v.say(TextId::ReadyEyebrow, &eyebrow, Role::Label, line, hue);
+    let name = READY_TOP + S12 + cap_height(Role::Display);
     v.say(
         TextId::SectorName(id),
         &[],
         Role::Display,
-        Slot::line(586.0),
+        Slot::line(name),
         INK,
     );
-    let tip = Slot::centered(WIDTH / 2.0, 720.0, 622.0);
-    let lines = v.paragraph((TextId::SectorTip(id), &[]), Role::Body, tip, 2, DIM);
-    let y = 622.0 + lines as f32 * LINE + 22.0;
+    // Display descenders and a tip's capsule chips both reach into the gap.
+    let tip = name + S16 + cap_height(Role::Body);
+    let slot = Slot::centered(WIDTH / 2.0, 720.0, tip);
+    let lines = v.paragraph((TextId::SectorTip(id), &[]), Role::Body, slot, 2, DIM);
+    let last = tip + lines.saturating_sub(1) as f32 * LINE;
+    // The one inline hint: what to do next, in the interactive colour.
+    let y = last + GROUP + cap_height(Role::Body);
     match v.device {
         Device::KeyboardMouse => v.say(TextId::KeysServe, &[], Role::Body, Slot::line(y), CYAN),
         Device::Gamepad => {
