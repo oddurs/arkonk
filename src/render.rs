@@ -71,7 +71,7 @@ const PAD: f32 = S32;
 /// The height of a role's capitals in scene units, as laid out. Gaps on
 /// the spacing scale run from one line's baseline to the next line's
 /// capitals, so a line's baseline is the one above plus gap plus this.
-fn cap_height(role: Role) -> f32 {
+const fn cap_height(role: Role) -> f32 {
     // Noto Sans capitals are 714 units of its 1000-unit em.
     spec::style(role).0 * 0.714
 }
@@ -1606,48 +1606,46 @@ fn balls(v: &Scene, fx: &Fx, game: &Game, alpha: f32) {
         v.circle(pos, RADIUS, INK);
     }
 }
+/// The HUD's two baselines: labels, then values a pair's gap under the
+/// score's capitals. Score, sector name and lives all sit on the second.
+const HUD_LABEL: f32 = 70.0;
+const HUD_VALUE: f32 = HUD_LABEL + PAIR + cap_height(Role::Display);
 /// Score left, sector centre, lives right. Labels are small tracked
 /// capitals; figures are tabular, so the score never shifts as it grows.
 fn hud(v: &Scene, game: &Game, profile: &Profile) {
     let side = WIDTH / 2.0 - 160.0 - LEFT;
-    v.say(
-        TextId::Score,
-        &[],
-        Role::Label,
-        Slot::left(LEFT, side, 70.0),
-        DIM,
+    let label = |slot: Slot| Slot {
+        y: HUD_LABEL,
+        ..slot
+    };
+    let value = |slot: Slot| Slot {
+        y: HUD_VALUE,
+        ..slot
+    };
+    let (left, centre, right) = (
+        Slot::left(LEFT, side, 0.0),
+        Slot::centered(WIDTH / 2.0, 300.0, 0.0),
+        Slot::right(RIGHT, side, 0.0),
     );
+    v.say(TextId::Score, &[], Role::Label, label(left), DIM);
     let score = Figures::count(v.locale, game.score());
-    v.put(
-        score.as_str(),
-        Role::Display,
-        Slot::left(LEFT, side, 108.0),
-        INK,
-    );
+    v.put(score.as_str(), Role::Display, value(left), INK);
 
     let eyebrow = if game.mode() == Mode::Practice {
         TextId::PracticeNumber
     } else {
         TextId::SectorNumber
     };
-    v.say(
-        eyebrow,
-        &[Arg::Sector(game.sector())],
-        Role::Label,
-        Slot::centered(WIDTH / 2.0, 300.0, 70.0),
-        DIM,
-    );
-    v.say(
-        TextId::SectorName(game.sector()),
-        &[],
-        Role::Body,
-        Slot::centered(WIDTH / 2.0, 300.0, 100.0),
-        INK,
-    );
+    let sector = [Arg::Sector(game.sector())];
+    v.say(eyebrow, &sector, Role::Label, label(centre), DIM);
+    let name = TextId::SectorName(game.sector());
+    v.say(name, &[], Role::Body, value(centre), INK);
+    // The journey at a glance: here in the focus colour, cleared sectors
+    // as supporting text, the rest muted.
     for id in SectorId::all() {
         v.rect(
             WIDTH / 2.0 - 94.0 + id.index() as f32 * 16.0,
-            116.0,
+            HUD_VALUE + S12,
             12.0,
             2.0,
             if id == game.sector() {
@@ -1660,17 +1658,15 @@ fn hud(v: &Scene, game: &Game, profile: &Profile) {
         );
     }
 
-    v.say(
-        TextId::Lives,
-        &[],
-        Role::Label,
-        Slot::right(RIGHT, side, 70.0),
-        DIM,
-    );
+    v.say(TextId::Lives, &[], Role::Label, label(right), DIM);
+    // The dots rest on the value baseline, like the figures beside them.
     let shown = game.lives().max(3);
     for i in 0..shown {
         v.circle(
-            V2::new(RIGHT - 5.0 - f32::from(shown - 1 - i) * 16.0, 97.0),
+            V2::new(
+                RIGHT - 5.0 - f32::from(shown - 1 - i) * 16.0,
+                HUD_VALUE - 5.0,
+            ),
             5.0,
             if i < game.lives() { INK } else { MUTED },
         );
