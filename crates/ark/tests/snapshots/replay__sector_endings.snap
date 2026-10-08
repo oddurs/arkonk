@@ -1,0 +1,31 @@
+---
+source: tests/replay.rs
+expression: out
+---
+sector 04 down to its last three bricks
+  1024  sector 04 playing   score      0  lives 3  bricks  3  3f66aa77650d48f4
+  2048  sector 04 playing   score      0  lives 3  bricks  3  12d3f3bbfa21245e
+  3072  sector 04 playing   score    250  lives 3  bricks  1  02d94e6f50d997d7
+  4096  sector 04 playing   score    250  lives 3  bricks  1  12bdbf825824265d
+  5120  sector 04 playing   score    250  lives 3  bricks  1  9e911deaa14e6c47
+  6144  sector 04 playing   score    250  lives 3  bricks  1  5e4c0a13831944d8
+  7168  sector 05 playing   score   2775  lives 4  bricks 49  06684ed869db0731
+  8192  sector 05 playing   score   2925  lives 4  bricks 48  4150a95d132ddb43
+sector 08 down to its last three bricks
+  1024  sector 08 playing   score    125  lives 3  bricks  2  1b72d459a80c0992
+  2048  sector 08 playing   score    250  lives 3  bricks  1  786f16af3ef418dc
+  3072  sector 08 playing   score    250  lives 3  bricks  1  0f75b07fab3308bd
+  4096  sector 08 playing   score    250  lives 3  bricks  1  045a1573cc5299a0
+  5120  sector 08 playing   score    250  lives 3  bricks  1  dff6852236b925df
+  6144  sector 08 playing   score    250  lives 3  bricks  1  5ec65b0647c1d9ef
+  7168  sector 09 playing   score   2125  lives 3  bricks 56  36bd844aee79f42c
+  8192  sector 09 playing   score   2250  lives 3  bricks 55  c817a144ba917ddc
+sector 12 down to its last three bricks
+  1024  sector 12 playing   score    125  lives 3  bricks  2  3f2ea9d44ac09223
+  2048  sector 12 victory   score   2400  lives 4  bricks  0  9cab2b2f27405160
+  3072  sector 12 victory   score   2400  lives 4  bricks  0  59071f61668e94f8
+  4096  sector 12 victory   score   2400  lives 4  bricks  0  9d438249ba0d0c70
+  5120  sector 12 victory   score   2400  lives 4  bricks  0  7934d97719081058
+  6144  sector 12 victory   score   2400  lives 4  bricks  0  e9c841a706ea8cc0
+  7168  sector 12 victory   score   2400  lives 4  bricks  0  4b23f18602697d58
+  8192  sector 12 victory   score   2400  lives 4  bricks  0  35b6b18f4410f0f0

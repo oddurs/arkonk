@@ -1,0 +1,22 @@
+---
+source: src/storage.rs
+expression: visible(&p.encode())
+---
+ARKONK 1\n
+best 24600\n
+unlocked 11\n
+settings 1 4\n
+display 1\n
+record 0 0 0\n
+record 1 0 0\n
+record 2 3 40\n
+record 3 7 7000\n
+record 4 0 0\n
+record 5 0 0\n
+record 6 0 0\n
+record 7 0 0\n
+record 8 0 0\n
+record 9 0 0\n
+record 10 0 0\n
+record 11 0 0\n
+checkpoint 5 31250 4 99000\n

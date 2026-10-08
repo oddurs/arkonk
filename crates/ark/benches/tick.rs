@@ -1,5 +1,16 @@
-//! Headless benchmarks. Run with `cargo run --release --bin benchmark`.
-use arkonk::{game::*, physics::V2};
+//! Headless simulation benchmark: `cargo bench -p ark`.
+//!
+//! Its assertions are gates, not just measurements: zero heap allocations
+//! while simulating, no exhausted collision budget, real brick impacts and
+//! every sector covered. Under `cargo test` (no `--bench` argument) it runs a
+//! shorter workload with the same assertions.
+use ark::{
+    Game, Input, Mode, Particle, Power, Stage,
+    field::{BALL_RADIUS, CellSet, FIELD, PADDLE_Y},
+    geom::V2,
+    sectors::{SECTOR_COUNT, SectorId},
+    tuning::{MAX_BALLS, MAX_CAPSULES},
+};
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     hint::black_box,
@@ -40,17 +51,15 @@ unsafe impl GlobalAlloc for CountingAllocator {
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
-fn setup(stress: bool, relays: bool, level: usize) -> Game {
-    let mut g = Game::at(level, Mode::Journey);
-    g.step(&Input {
+fn setup(stress: bool, relays: bool, sector: SectorId) -> Game {
+    let mut g = Game::start(sector, Mode::Journey);
+    g.step(Input {
         launch: true,
         ..Default::default()
     });
+    let mut sandbox = g.sandbox();
     if relays {
-        g.bricks.fill(1);
-        g.cores.fill(true);
-        g.remaining = ROWS * COLS;
-        g.initial_bricks = g.remaining;
+        sandbox.fill_board(1, CellSet::ALL);
         for power in [
             Power::Anchor,
             Power::Phase,
@@ -58,45 +67,58 @@ fn setup(stress: bool, relays: bool, level: usize) -> Game {
             Power::Slow,
             Power::Multi,
         ] {
-            g.apply_power(power);
+            sandbox.grant(power);
         }
     }
     if stress {
-        for (i, b) in g.balls.iter_mut().enumerate() {
-            b.active = true;
-            b.pos = V2::new(240.0 + i as f32 * 160.0, 460.0);
-            b.previous = b.pos;
-            b.velocity = V2::new(0.34 + i as f32 * 0.18, -0.8).normalized() * 12000.0;
+        for i in 0..MAX_BALLS {
+            sandbox.place_ball(
+                i,
+                V2::new(240.0 + i as f32 * 160.0, 460.0),
+                V2::new(0.34 + i as f32 * 0.18, -0.8).normalized() * 12000.0,
+            );
         }
         if relays {
             // Exercise an actual catch/release before the upward balls ignite
             // the board; this fast scenario clears before capsules can fall.
-            g.balls[0].pos = V2::new(WIDTH / 2.0, PADDLE_Y - RADIUS - 1.0);
-            g.balls[0].previous = g.balls[0].pos;
-            g.balls[0].velocity = V2::new(0.0, 12000.0);
+            sandbox.place_ball(
+                0,
+                V2::new(FIELD.center().x, PADDLE_Y - BALL_RADIUS - 1.0),
+                V2::new(0.0, 12000.0),
+            );
         }
-        g.particles.fill(Particle {
+        sandbox.effects().particles.fill(Particle {
             pos: V2::new(400.0, 400.0),
             velocity: V2::new(100.0, 100.0),
             life: 10.0,
             hue: 0,
         });
-        for (i, d) in g.drops.iter_mut().enumerate() {
-            *d = Drop {
-                pos: V2::new(120.0 + i as f32 * 60.0, 300.0),
-                power: Power::Multi,
-                active: true,
-            };
+        for i in 0..MAX_CAPSULES {
+            sandbox.spawn_capsule(i, V2::new(120.0 + i as f32 * 60.0, 300.0), Power::Multi);
         }
     }
     g
 }
 
-fn run(stress: bool, relays: bool) {
-    const BATCH: usize = 64;
-    const BATCHES: usize = 4096;
-    let mut game = setup(stress, relays, 0);
-    let mut samples = Vec::with_capacity(BATCHES);
+/// How much work one scenario does.
+struct Load {
+    batches: usize,
+    /// Ticks spent in each sector before moving to the next.
+    sector_ticks: usize,
+}
+const BENCH: Load = Load {
+    batches: 4096,
+    sector_ticks: 20000,
+};
+const TEST: Load = Load {
+    batches: 1024,
+    sector_ticks: 5000,
+};
+const BATCH: usize = 64;
+
+fn run(load: &Load, stress: bool, relays: bool) {
+    let mut game = setup(stress, relays, SectorId::FIRST);
+    let mut samples = Vec::with_capacity(load.batches);
     let mut score = 0_u64;
     let mut caps = 0_u64;
     let mut impacts = 0_u64;
@@ -107,70 +129,65 @@ fn run(stress: bool, relays: bool) {
     let mut tick = 0;
     ALLOCATIONS.store(0, Ordering::Relaxed);
     COUNTING.store(true, Ordering::Relaxed);
-    for _ in 0..BATCHES {
+    for _ in 0..load.batches {
         let start = Instant::now();
         for _ in 0..BATCH {
-            if tick % 20000 == 0
-                || matches!(game.phase, Phase::GameOver | Phase::Victory)
-                || (stress && (tick % 240 == 0 || game.phase != Phase::Playing))
+            if tick % load.sector_ticks == 0
+                || matches!(game.stage(), Stage::GameOver | Stage::Victory)
+                || (stress && (tick % 240 == 0 || game.stage() != Stage::Playing))
             {
-                score += u64::from(game.score);
-                caps += game.collision_caps;
-                game = setup(stress, relays, (tick / 20000) % LEVEL_COUNT);
+                score += u64::from(game.score());
+                caps += game.diagnostics().budget_exhausted;
+                let next = SectorId::new((tick / load.sector_ticks) % SECTOR_COUNT);
+                game = setup(stress, relays, next.expect("taken modulo the sector count"));
             }
-            level_mask |= 1 << game.level;
+            level_mask |= 1 << game.sector().index();
             if stress {
                 // Replenish depleted pools to keep the measured workload full.
-                for (i, ball) in game.balls.iter_mut().enumerate() {
+                for i in 0..MAX_BALLS {
+                    let ball = game.balls()[i];
                     if !ball.active {
                         let pos = V2::new(240.0 + i as f32 * 160.0, 460.0);
-                        *ball = Ball {
-                            pos,
-                            previous: pos,
-                            velocity: V2::new(0.4, -0.8),
-                            active: true,
-                            ..Ball::default()
-                        };
+                        game.sandbox().place_ball(i, pos, V2::new(0.4, -0.8));
                     }
-                    ball.velocity = ball.velocity.normalized() * 12000.0;
+                    let velocity = game.balls()[i].velocity.normalized() * 12000.0;
+                    game.sandbox().aim_ball(i, velocity);
                 }
-                for (i, drop) in game.drops.iter_mut().enumerate() {
-                    if !drop.active {
-                        *drop = Drop {
-                            pos: V2::new(120.0 + i as f32 * 60.0, 300.0),
-                            power: if relays {
-                                [
-                                    Power::Multi,
-                                    Power::Anchor,
-                                    Power::Phase,
-                                    Power::Wide,
-                                    Power::Slow,
-                                ][i % 5]
-                            } else {
-                                Power::Multi
-                            },
-                            active: true,
+                for i in 0..MAX_CAPSULES {
+                    if !game.capsules()[i].active {
+                        let power = if relays {
+                            [
+                                Power::Multi,
+                                Power::Anchor,
+                                Power::Phase,
+                                Power::Wide,
+                                Power::Slow,
+                            ][i % 5]
+                        } else {
+                            Power::Multi
                         };
+                        let pos = V2::new(120.0 + i as f32 * 60.0, 300.0);
+                        game.sandbox().spawn_capsule(i, pos, power);
                     }
                 }
             }
             let x = game
-                .balls
+                .balls()
                 .iter()
                 .find(|b| b.active)
-                .map_or(WIDTH / 2.0, |b| b.pos.x)
+                .map_or(FIELD.center().x, |b| b.pos.x)
                 + (tick as f32 * 0.003).sin() * 36.0;
-            game.step(black_box(&Input {
-                mouse_x: Some(x),
+            let events = game.step(black_box(Input {
+                target_x: Some(x),
                 launch: true,
                 ..Default::default()
             }));
-            impacts += u64::from(game.events.brick);
-            chain_ticks += u64::from(game.events.relay);
-            phase_hits += u64::from(game.events.phase_hit);
-            catches += u64::from(game.events.caught);
+            impacts += u64::from(events.brick);
+            chain_ticks += u64::from(events.relay);
+            phase_hits += u64::from(events.phase_hit);
+            catches += u64::from(events.caught);
             if stress {
-                for p in &mut game.particles {
+                for p in &mut game.sandbox().effects().particles {
                     p.life = 1.0;
                 }
             }
@@ -181,8 +198,8 @@ fn run(stress: bool, relays: bool) {
     }
     COUNTING.store(false, Ordering::Relaxed);
     let allocations = ALLOCATIONS.load(Ordering::Relaxed);
-    score += u64::from(game.score);
-    caps += game.collision_caps;
+    score += u64::from(game.score());
+    caps += game.diagnostics().budget_exhausted;
     samples.sort_unstable_by(f64::total_cmp);
     let mean = samples.iter().sum::<f64>() / samples.len() as f64;
     println!(
@@ -190,14 +207,14 @@ fn run(stress: bool, relays: bool) {
         if relays {
             "Relay stress (84 cores, 3 fast balls, all five powers, full pools)"
         } else if stress {
-            "Stress (3 balls @ 12k px/s, 384 particles, 12 drops)"
+            "Stress (3 balls @ 12k px/s, 384 particles, 12 capsules)"
         } else {
             "Gameplay (autopaddle, all levels)"
         },
-        BATCH * BATCHES,
+        BATCH * load.batches,
         mean,
-        samples[BATCHES * 95 / 100],
-        samples[BATCHES * 99 / 100]
+        samples[load.batches * 95 / 100],
+        samples[load.batches * 99 / 100]
     );
     println!(
         "  allocations {allocations}, collision caps {caps}, brick impact ticks {impacts}, score checksum {score}, level mask {level_mask:012b}"
@@ -215,15 +232,20 @@ fn run(stress: bool, relays: bool) {
     if !stress {
         assert_eq!(
             level_mask,
-            (1 << LEVEL_COUNT) - 1,
+            (1 << SECTOR_COUNT) - 1,
             "Gameplay must exercise all twelve sectors"
         );
     }
 }
 
 fn main() {
+    let load = if std::env::args().any(|a| a == "--bench") {
+        &BENCH
+    } else {
+        &TEST
+    };
     println!("ARKONK headless simulation benchmark (batch percentiles; excludes graphics/audio)");
-    run(false, false);
-    run(true, false);
-    run(true, true);
+    run(load, false, false);
+    run(load, true, false);
+    run(load, true, true);
 }

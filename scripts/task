@@ -17,9 +17,12 @@ task() {
     case "$1" in
     fmt) run cargo fmt --all ;;
     fmt:check) run cargo fmt --all -- --check ;;
-    lint) run cargo clippy --locked --all-targets --all-features -- -D warnings ;;
-    test) run cargo test --locked --all-targets ;;
-    build) run cargo build --locked --release ;;
+    lint) run cargo clippy --locked --workspace --all-targets --all-features -- -D warnings ;;
+    test)
+        run cargo test --locked --workspace --all-targets
+        run cargo test --locked --workspace --doc
+        ;;
+    build) run cargo build --locked --workspace --release ;;
     check)
         task fmt:check
         task lint
@@ -27,7 +30,7 @@ task() {
         task build
         # The benchmark asserts zero simulation allocations and full collision
         # budgets, so it is a gate, not just a measurement.
-        run cargo run --locked --release --bin benchmark
+        run cargo bench --locked -p ark --bench tick
         ;;
     *) usage ;;
     esac

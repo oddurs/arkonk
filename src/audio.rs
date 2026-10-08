@@ -1,4 +1,4 @@
-use arkonk::game::Events;
+use ark::Events;
 use macroquad::audio::{PlaySoundParams, Sound, load_sound_from_bytes, play_sound};
 
 pub struct Audio {
