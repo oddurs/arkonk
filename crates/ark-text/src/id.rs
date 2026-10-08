@@ -114,19 +114,24 @@ text_ids! {
 
 }
 
-/// Which text style an id is set in, which decides the glyphs baked for
-/// each size: labels and display lines use few characters, so their sizes
-/// carry only those. Hints are captions. Any id may also be set as
-/// [`Role::Body`].
+/// Which of the six text roles an id is set in, which decides the glyphs
+/// baked for each size: labels and headings use few characters, so their
+/// sizes carry only those. Any id may also be set as [`Role::Body`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Role {
-    /// Small, tracked, authored in capitals where the script has them.
-    Label,
-    Body,
-    /// Control hints and other secondary lines: quieter than body text.
-    Caption,
-    /// Headings and large figures.
+    /// The one hero line on a screen, in the Display cut.
     Display,
+    /// Sheet titles and screen headers, in the Display cut.
+    Title,
+    /// Scores and results, tabular.
+    Figure,
+    /// Actions, names, tips.
+    Body,
+    /// Help lines and notes: quieter than body text.
+    Caption,
+    /// Small, tracked, authored in capitals where the script has them:
+    /// names of values and eyebrows, never actions.
+    Label,
 }
 
 impl TextId {
@@ -159,8 +164,8 @@ impl TextId {
             | ReadyEyebrow | StatPoints | StatTime | StatBonus | StatBestChain | ChapterName(_) => {
                 Role::Label
             }
-            SectorsHeading | Paused | JourneyComplete | OneMoreOrbit | SectorClear
-            | SectorName(_) => Role::Display,
+            SectorsHeading | Paused | JourneyComplete | OneMoreOrbit | SectorClear => Role::Title,
+            SectorName(_) => Role::Display,
             KeysMove | KeysServe | KeysPause | KeysRelease | KeysBrowse | KeysPlay | KeysBack
             | KeysContinue | PadMove | PadBrowse | ActionServe | ActionPause | ActionRelease
             | ActionSelect | ActionResume | ActionRetry | ActionPlay | ActionBack
@@ -170,15 +175,38 @@ impl TextId {
         }
     }
 
-    /// The role of another string that quotes this one through an
-    /// [`crate::Arg::Text`] slot, when that differs from [`Self::role`]:
-    /// the Continue button's caption names the saved sector. The atlases
-    /// bake the quoted characters at that role's sizes too.
-    pub const fn quoted_as(self) -> Option<Role> {
+    /// Other roles this text is set in besides [`Self::role`] and body
+    /// text, including where another string quotes it through an
+    /// [`crate::Arg::Text`] slot: a sector's name is the ready card's hero
+    /// line, the detail sheet's title, and part of the Continue button's
+    /// caption. The atlases bake its characters at those roles' sizes too.
+    pub const fn also(self) -> &'static [Role] {
+        use TextId::*;
         match self {
-            TextId::SectorName(_) => Some(Role::Caption),
-            _ => None,
+            SectorName(_) => &[Role::Title, Role::Caption],
+            Plus | Fraction => &[Role::Figure],
+            _ => &[],
         }
+    }
+
+    /// Whether this text may be set emphasised, in its role's strong cut:
+    /// actions, which are Medium when primary or focused, and the sector
+    /// name in the band.
+    pub const fn strong(self) -> bool {
+        use TextId::*;
+        matches!(
+            self,
+            ContinueJourney
+                | NewJourney
+                | SectorSelect
+                | ActionResume
+                | RetrySector
+                | MainMenu
+                | NextSector
+                | BackToSectors
+                | PlaySector
+                | SectorName(_)
+        )
     }
 }
 

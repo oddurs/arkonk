@@ -3,37 +3,70 @@
 //! and the sizes the game asks for cannot disagree.
 use ark_text::Role;
 
-/// Noto Sans and Noto Sans CJK weights in use.
+/// The cuts in use: Noto Sans Regular and Medium, and Noto Sans Display
+/// Medium for headings. CJK has no Display cut, so its Display face is
+/// baked from Noto Sans CJK Medium.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Weight {
     Regular,
     Medium,
+    Display,
 }
 
 impl Weight {
-    pub const ALL: [Self; 2] = [Self::Regular, Self::Medium];
+    pub const ALL: [Self; 3] = [Self::Regular, Self::Medium, Self::Display];
 }
 
-/// A role's size in scene units (the fixed 960 × 900 scene), its weight,
-/// and its letter spacing in em. Labels are small capitals, so they get a
-/// little air; ideographic scripts are never tracked.
+/// A role's size in scene units (the fixed 960 × 900 scene), its cut, and
+/// its letter spacing in em. Labels are small capitals, so they get air;
+/// large headings close up a little. Ideographic scripts are never tracked.
 pub const fn style(role: Role) -> (f32, Weight, f32) {
     match role {
-        Role::Label => (15.0, Weight::Regular, 0.06),
+        Role::Display => (40.0, Weight::Display, -0.01),
+        Role::Title => (26.0, Weight::Display, -0.005),
+        Role::Figure => (32.0, Weight::Medium, 0.0),
         // 20 puts Steam Deck body text on the 18 px strike, whose lowercase
         // is just over 9 px tall.
         Role::Body => (20.0, Weight::Regular, 0.0),
         Role::Caption => (16.0, Weight::Regular, 0.0),
-        Role::Display => (32.0, Weight::Medium, 0.0),
+        Role::Label => (15.0, Weight::Medium, 0.10),
     }
 }
 
-pub const ROLES: [Role; 4] = [Role::Label, Role::Body, Role::Caption, Role::Display];
+/// Baseline to baseline, in em, for lines of `role` that wrap.
+pub const fn line(role: Role) -> f32 {
+    match role {
+        Role::Display => 1.1,
+        Role::Title => 1.2,
+        Role::Body | Role::Caption => 1.4,
+        Role::Figure | Role::Label => 1.0,
+    }
+}
+
+/// The cut a role takes when it is emphasised: body text is Medium on a
+/// primary or focused action. The other roles have one cut.
+pub const fn strong(role: Role) -> Weight {
+    match role {
+        Role::Body => Weight::Medium,
+        _ => style(role).1,
+    }
+}
+
+pub const ROLES: [Role; 6] = [
+    Role::Display,
+    Role::Title,
+    Role::Figure,
+    Role::Body,
+    Role::Caption,
+    Role::Label,
+];
 
 /// Every pixel size a strike may be baked at. Steps stay within about 10 %
-/// up to 32 px, then widen where a pixel matters less.
-pub const LADDER: [u8; 22] = [
-    10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 56, 64,
+/// up to 32 px, then widen where a pixel matters less. The largest serve
+/// the Display role on Retina and 4K screens.
+pub const LADDER: [u8; 25] = [
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 56, 64, 72, 80,
+    96,
 ];
 
 /// Physical pixels per scene unit on the displays the layouts are checked
@@ -82,8 +115,13 @@ pub fn rungs(role: Role) -> impl Iterator<Item = u8> {
 /// half a ladder step larger than its layout planned. `None` below about
 /// 87 % of the smallest baked size, where the pixel font takes over.
 pub fn ppem(role: Role, density: f32) -> Option<u8> {
-    let (size, _, _) = style(role);
-    let px = size * density;
+    ppem_px(role, style(role).0 * density)
+}
+
+/// [`ppem`] for text of `role` laid out `px` physical pixels tall, for the
+/// few places set off the role's own size (a card's name, the band's
+/// smaller figures).
+pub fn ppem_px(role: Role, px: f32) -> Option<u8> {
     let smallest = rungs(role).min()?;
     if px < f32::from(smallest) * 0.87 {
         return None;

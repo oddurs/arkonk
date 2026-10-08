@@ -17,7 +17,7 @@ use ark::{
     sectors::{Chapter, SECTOR_COUNT, SectorId},
     tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
-use ark_glyphs::{Fonts, ICON_EM, spec};
+use ark_glyphs::{Fonts, ICON_EM, spec, spec::Weight};
 use ark_text::{Arg, Form, Locale, Role, TextId, capsule, icon_power};
 use macroquad::models::Vertex;
 use macroquad::prelude::*;
@@ -76,19 +76,53 @@ const PAD: f32 = S32;
 /// the spacing scale run from one line's baseline to the next line's
 /// capitals, so a line's baseline is the one above plus gap plus this.
 const fn cap_height(role: Role) -> f32 {
-    // Noto Sans capitals are 714 units of its 1000-unit em.
+    // Noto Sans and Noto Sans Display capitals are 714 units of the em.
     spec::style(role).0 * 0.714
+}
+
+/// How a piece of text is set: its role, whether it is emphasised (body
+/// text on a primary or focused action), and its size in scene units,
+/// the role's own unless a place sets it otherwise.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Style {
+    role: Role,
+    strong: bool,
+    size: f32,
+}
+impl From<Role> for Style {
+    fn from(role: Role) -> Self {
+        Self {
+            role,
+            strong: false,
+            size: spec::style(role).0,
+        }
+    }
+}
+impl Style {
+    fn strong(self) -> Self {
+        Self {
+            strong: true,
+            ..self
+        }
+    }
+    fn weight(self) -> Weight {
+        if self.strong {
+            spec::strong(self.role)
+        } else {
+            spec::style(self.role).1
+        }
+    }
 }
 
 /// Side margin for full-width text, and the widest a centred line may be.
 const MARGIN: f32 = 64.0;
 const FULL: f32 = WIDTH - 2.0 * MARGIN;
 /// Baseline-to-baseline for body text.
-const LINE: f32 = 26.0;
-/// Baseline-to-baseline for wrapped lines of `role`: 1.3 em, so body text
-/// steps by `LINE`.
-fn leading(role: Role) -> f32 {
-    spec::style(role).0 * 1.3
+const LINE: f32 = 28.0;
+/// Baseline-to-baseline for wrapped lines of `style`.
+fn leading(style: impl Into<Style>) -> f32 {
+    let style = style.into();
+    style.size * spec::line(style.role)
 }
 /// The footer's last baseline; rows stack upward from it.
 const FOOTER: f32 = 872.0;
@@ -627,22 +661,27 @@ impl Scene<'_> {
     /// How `role` is set here. Below the smallest legible Noto strike the
     /// 5×7 font takes over, for text it can spell; the Small and Compact
     /// layouts will decide the rest.
-    fn face(&self, role: Role, text: &str) -> Face {
-        match spec::ppem(role, self.density) {
+    fn face(&self, style: Style, text: &str) -> Face {
+        let role = style.role;
+        match spec::ppem_px(role, style.size * self.density) {
             Some(ppem) => Face::Noto(ppem),
             None if text.chars().all(pixel_font::has) => {
-                Face::Pixel(if role == Role::Display { 2.0 } else { 1.0 })
+                Face::Pixel(if matches!(role, Role::Display | Role::Title) {
+                    2.0
+                } else {
+                    1.0
+                })
             }
             None => Face::Noto(spec::rungs(role).min().unwrap_or(spec::LADDER[0])),
         }
     }
     /// The advance width of `text`, in scene units.
-    fn measure(&self, text: &str, role: Role) -> f32 {
-        match self.face(role, text) {
+    fn measure(&self, text: &str, style: impl Into<Style>) -> f32 {
+        let style = style.into();
+        match self.face(style, text) {
             Face::Noto(ppem) => {
-                let (_, weight, tracking) = spec::style(role);
-                let tracking = self.fonts.tracking(tracking, ppem);
-                self.fonts.measure(text, weight, ppem, tracking) / self.density
+                let tracking = self.fonts.tracking(spec::style(style.role).2, ppem);
+                self.fonts.measure(text, style.weight(), ppem, tracking) / self.density
             }
             Face::Pixel(cell) => {
                 let n = text.chars().count() as f32;
@@ -651,13 +690,13 @@ impl Scene<'_> {
         }
     }
     /// The height of capitals, in scene units, for centring a line.
-    fn cap(&self, role: Role) -> f32 {
-        let (size, weight, _) = spec::style(role);
-        match (self.face(role, "A"), self.fonts.latin.face(weight)) {
+    fn cap(&self, style: impl Into<Style>) -> f32 {
+        let style = style.into();
+        match (self.face(style, "A"), self.fonts.latin.face(style.weight())) {
             (Face::Noto(ppem), Some(f)) => {
                 f32::from(f.cap_height) * f32::from(ppem) / f32::from(f.units_per_em) / self.density
             }
-            _ => size * 0.7,
+            _ => style.size * 0.7,
         }
     }
     fn missing(&self, text: &str, c: char) {
@@ -671,19 +710,20 @@ impl Scene<'_> {
         }
     }
     /// Draws `text` with its left end at `x` and its baseline at `y`.
-    fn draw(&self, text: &str, role: Role, x: f32, y: f32, color: Color) {
+    fn draw(&self, text: &str, style: impl Into<Style>, x: f32, y: f32, color: Color) {
+        let style = style.into();
         let d = self.density;
         // Whole physical pixels: the view's offset is snapped too, so every
         // glyph lands exactly on the pixel grid.
         let (ox, oy) = ((x * d).round(), (y * d).round());
-        match self.face(role, text) {
+        match self.face(style, text) {
             Face::Noto(ppem) => {
-                let (_, weight, tracking) = spec::style(role);
-                let tracking = self.fonts.tracking(tracking, ppem);
+                let weight = style.weight();
+                let tracking = self.fonts.tracking(spec::style(style.role).2, ppem);
                 self.fonts.layout(text, weight, ppem, tracking, |p| {
                     if let Some(power) = icon_power(p.c) {
                         let x = (ox + p.x.round()) / d;
-                        self.chip(power, x, y, f32::from(ppem) / d, role);
+                        self.chip(power, x, y, f32::from(ppem) / d, style);
                         return;
                     }
                     let cell = p
@@ -721,7 +761,7 @@ impl Scene<'_> {
     }
     /// A capsule as the player sees it falling, `size` tall, sitting on the
     /// capitals of `beside` text whose baseline is `baseline`.
-    fn chip(&self, power: Power, x: f32, baseline: f32, size: f32, beside: Role) {
+    fn chip(&self, power: Power, x: f32, baseline: f32, size: f32, beside: Style) {
         let (w, cy) = (ICON_EM * size, baseline - self.cap(beside) / 2.0);
         self.rounded(x, cy - size / 2.0, w, size, size / 2.0, power_color(power));
         let mut letter = [0; 4];
@@ -736,8 +776,9 @@ impl Scene<'_> {
     }
     /// Draws `text` aligned in `slot`; text wider than the slot is drawn
     /// anyway and reported to the layout tests.
-    fn put(&self, text: &str, role: Role, slot: Slot, color: Color) -> f32 {
-        let width = self.measure(text, role);
+    fn put(&self, text: &str, style: impl Into<Style>, slot: Slot, color: Color) -> f32 {
+        let style = style.into();
+        let width = self.measure(text, style);
         if width > slot.w + 0.5
             && let Some(log) = self.misfits
         {
@@ -753,7 +794,7 @@ impl Scene<'_> {
             Align::Center => slot.x + (slot.w - width) / 2.0,
             Align::Right => slot.x + slot.w - width,
         };
-        self.draw(text, role, x, slot.y, color);
+        self.draw(text, style, x, slot.y, color);
         width
     }
     /// Formats `id` into the scene's buffer and hands it to `with`.
@@ -766,24 +807,27 @@ impl Scene<'_> {
     }
     /// Sets `id` in `slot`, switching to its short wording if the full one
     /// does not fit.
-    fn say(&self, id: TextId, args: &[Arg], role: Role, slot: Slot, color: Color) {
-        let fits = self.format(id, args, Form::Full, |t| self.measure(t, role) <= slot.w);
+    fn say(&self, id: TextId, args: &[Arg], style: impl Into<Style>, slot: Slot, color: Color) {
+        let style = style.into();
+        let fits = self.format(id, args, Form::Full, |t| self.measure(t, style) <= slot.w);
         let form = if fits { Form::Full } else { Form::Short };
-        self.format(id, args, form, |t| self.put(t, role, slot, color));
+        self.format(id, args, form, |t| self.put(t, style, slot, color));
     }
-    fn width_of(&self, id: TextId, args: &[Arg], role: Role) -> f32 {
-        self.format(id, args, Form::Full, |t| self.measure(t, role))
+    fn width_of(&self, id: TextId, args: &[Arg], style: impl Into<Style>) -> f32 {
+        let style = style.into();
+        self.format(id, args, Form::Full, |t| self.measure(t, style))
     }
     /// How many lines `paragraph` would set `id` in, `width` wide.
-    fn lines(&self, (id, args): (TextId, &[Arg]), role: Role, width: f32) -> usize {
-        self.format(id, args, Form::Full, |text| match self.face(role, text) {
+    fn lines(&self, (id, args): (TextId, &[Arg]), style: impl Into<Style>, width: f32) -> usize {
+        let style = style.into();
+        self.format(id, args, Form::Full, |text| match self.face(style, text) {
             Face::Noto(ppem) => {
-                let (_, weight, tracking) = spec::style(role);
-                let tracking = self.fonts.tracking(tracking, ppem);
+                let tracking = self.fonts.tracking(spec::style(style.role).2, ppem);
                 let room = width * self.density;
-                self.fonts.wrap(text, weight, ppem, tracking, room, |_| {})
+                self.fonts
+                    .wrap(text, style.weight(), ppem, tracking, room, |_| {})
             }
-            Face::Pixel(_) => pixel_lines(text, width, |t| self.measure(t, role), |_| {}),
+            Face::Pixel(_) => pixel_lines(text, width, |t| self.measure(t, style), |_| {}),
         })
     }
     /// Sets `id` across up to `max` lines from baseline `slot.y`, wrapping
@@ -792,17 +836,18 @@ impl Scene<'_> {
     fn paragraph(
         &self,
         (id, args): (TextId, &[Arg]),
-        role: Role,
+        style: impl Into<Style>,
         slot: Slot,
         max: usize,
         color: Color,
     ) -> usize {
+        let style = style.into();
         self.format(id, args, Form::Full, |text| {
             let mut lines = 0;
             let line = |line: &str| {
-                let y = slot.y + lines as f32 * leading(role);
+                let y = slot.y + lines as f32 * leading(style);
                 if lines < max {
-                    self.put(line, role, Slot { y, ..slot }, color);
+                    self.put(line, style, Slot { y, ..slot }, color);
                 } else if let Some(log) = self.misfits {
                     log.borrow_mut().push(Misfit {
                         text: text.into(),
@@ -813,15 +858,15 @@ impl Scene<'_> {
                 }
                 lines += 1;
             };
-            match self.face(role, text) {
+            match self.face(style, text) {
                 Face::Noto(ppem) => {
-                    let (_, weight, tracking) = spec::style(role);
-                    let tracking = self.fonts.tracking(tracking, ppem);
+                    let tracking = self.fonts.tracking(spec::style(style.role).2, ppem);
                     let room = slot.w * self.density;
-                    self.fonts.wrap(text, weight, ppem, tracking, room, line);
+                    self.fonts
+                        .wrap(text, style.weight(), ppem, tracking, room, line);
                 }
                 Face::Pixel(_) => {
-                    pixel_lines(text, slot.w, |t| self.measure(t, role), line);
+                    pixel_lines(text, slot.w, |t| self.measure(t, style), line);
                 }
             }
             lines.min(max)
@@ -998,15 +1043,21 @@ impl Scene<'_> {
         }
         let color = if focused { CYAN } else { INK };
         let line = |y| Slot::centered(r.x + r.w / 2.0, r.w - 2.0 * S16, y);
+        let body = Style::from(Role::Body);
+        let label = if primary || focused {
+            body.strong()
+        } else {
+            body
+        };
         match detail {
             None => {
                 let baseline = r.y + r.h / 2.0 + self.cap(Role::Body) / 2.0;
-                self.say(id, args, Role::Body, line(baseline), color);
+                self.say(id, args, label, line(baseline), color);
             }
             Some((detail, detail_args)) => {
                 let block = cap_height(Role::Body) + PAIR + cap_height(Role::Caption);
                 let name = r.y + (r.h - block) / 2.0 + cap_height(Role::Body);
-                self.say(id, args, Role::Body, line(name), color);
+                self.say(id, args, label, line(name), color);
                 let below = name + PAIR + cap_height(Role::Caption);
                 self.say(detail, detail_args, Role::Caption, line(below), DIM);
             }
@@ -1760,7 +1811,7 @@ fn balls(v: &Scene, fx: &Fx, game: &Game, alpha: f32) {
 fn pause(v: &Scene, game: &Game, focus: usize, profile: &Profile) {
     let menu_at = ui::pause_menu();
     let title = menu_at.top - GROUP;
-    let eyebrow = title - cap_height(Role::Display) - S12;
+    let eyebrow = title - cap_height(Role::Title) - S12;
     let top = eyebrow - cap_height(Role::Label) - PAD;
     let text = PANEL;
     let note = menu_at.bottom() + S16 + cap_height(Role::Caption);
@@ -1785,7 +1836,7 @@ fn pause(v: &Scene, game: &Game, focus: usize, profile: &Profile) {
     let slot = |y| Slot::centered(WIDTH / 2.0, text, y);
     let hue = sector_color(0, chapter);
     v.say(TextId::ReadyEyebrow, &args, Role::Label, slot(eyebrow), hue);
-    v.say(TextId::Paused, &[], Role::Display, slot(title), INK);
+    v.say(TextId::Paused, &[], Role::Title, slot(title), INK);
     menu(v, &menu_at, focus, None);
     v.paragraph((TextId::RetryNote, &[]), Role::Caption, slot(note), 2, DIM);
     let mut y = keys;
@@ -2000,7 +2051,7 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
     v.say(
         TextId::SectorsHeading,
         &[],
-        Role::Display,
+        Role::Title,
         Slot::centered(WIDTH / 2.0, 480.0, 80.0),
         INK,
     );
@@ -2137,7 +2188,7 @@ fn sector_detail(v: &Scene, id: SectorId, profile: &Profile) {
     ];
     let chip = medals
         .iter()
-        .map(|&(medal, _)| v.width_of(medal, &[], Role::Label) + 2.0 * S12)
+        .map(|&(medal, _)| v.width_of(medal, &[], Role::Label) + 2.0 * S8)
         .fold(0.0, f32::max);
     let text = Slot::left(x + chip + S16, table - chip - S16, 0.0);
     let par = [Arg::Clock(level.par_seconds)];
@@ -2171,7 +2222,7 @@ fn sector_detail(v: &Scene, id: SectorId, profile: &Profile) {
     // The best time sits under the target it is measured against.
     if record.best_ticks > 0 {
         let cy = rows + 3.0 * S32 + S12;
-        let label = Slot::centered(x + chip / 2.0, chip, cy + v.cap(Role::Label) / 2.0);
+        let label = Slot::left(x, chip + S16, cy + v.cap(Role::Label) / 2.0);
         v.say(TextId::StatBest, &[], Role::Label, label, DIM);
         let t = Figures::of(|f| write!(f, "{}", Clock(record.best_ticks)));
         let baseline = cy + v.cap(Role::Body) / 2.0;
@@ -2226,7 +2277,7 @@ fn results(v: &Scene, game: &Game, profile: &Profile, victory: bool, focus: usiz
     let menu_at = ui::result_menu(victory);
     let pairs = menu_at.top - GROUP;
     let title = pairs - cap_height(Role::Body) - S16;
-    let top = title - cap_height(Role::Display) - PAD;
+    let top = title - cap_height(Role::Title) - PAD;
     let note = menu_at.bottom() + S16 + cap_height(Role::Caption);
     let bottom = note + PAD;
     v.panel(WIDTH / 2.0 - PANEL_W / 2.0, top, PANEL_W, bottom - top);
@@ -2236,7 +2287,7 @@ fn results(v: &Scene, game: &Game, profile: &Profile, victory: bool, focus: usiz
     } else {
         TextId::OneMoreOrbit
     };
-    v.say(heading, &[], Role::Display, line(title), INK);
+    v.say(heading, &[], Role::Title, line(title), INK);
     v.pairs(
         &[
             (TextId::StatPoints, game.score()),
@@ -2249,9 +2300,9 @@ fn results(v: &Scene, game: &Game, profile: &Profile, victory: bool, focus: usiz
     v.say(TextId::ProgressSaved, &[], Role::Caption, line(note), DIM);
 }
 /// Distance between the sector-clear columns, and the widest a medal chip
-/// grows: three chips at most 136 wide leave at least 14 between them.
-const CLEAR_COLUMN: f32 = 150.0;
-const CHIP_MAX: f32 = 136.0;
+/// grows: three chips at most 152 wide leave at least 8 between them.
+const CLEAR_COLUMN: f32 = 160.0;
+const CHIP_MAX: f32 = 152.0;
 /// A medal as a pill, `w` wide from `x`: amber when earned, muted when not.
 fn medal_chip(v: &Scene, medal: TextId, (x, top, w): (f32, f32, f32), earned: bool) {
     let tone = if earned { AMBER } else { MUTED };
@@ -2276,12 +2327,12 @@ fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
     let value = chips - GROUP;
     let label = value - cap_height(Role::Body) - PAIR;
     let title = label - cap_height(Role::Label) - GROUP;
-    let top = title - cap_height(Role::Display) - PAD;
+    let top = title - cap_height(Role::Title) - PAD;
     let hint = button.y + button.h + S16 + cap_height(Role::Caption);
     let bottom = hint + PAD;
     v.panel(WIDTH / 2.0 - PANEL_W / 2.0, top, PANEL_W, bottom - top);
     let line = |y| Slot::centered(WIDTH / 2.0, PANEL, y);
-    v.say(TextId::SectorClear, &[], Role::Display, line(title), INK);
+    v.say(TextId::SectorClear, &[], Role::Title, line(title), INK);
     for (i, name) in [TextId::StatTime, TextId::StatBonus, TextId::StatBestChain]
         .into_iter()
         .enumerate()

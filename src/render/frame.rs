@@ -152,7 +152,7 @@ pub(super) fn band_play(v: &Scene, fx: &Fx, game: &Game, profile: &Profile) {
     let (left, right) = (BAND.x + BAND_PAD, BAND.x + BAND.w - BAND_PAD);
     let mid = BAND.y + BAND.h / 2.0;
     let score = Figures::count(v.locale, game.score());
-    let figure = Role::Display;
+    let figure = Role::Figure;
     let size = spec::style(figure).0;
     let side = 280.0;
     v.put(

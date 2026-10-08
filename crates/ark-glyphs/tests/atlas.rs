@@ -41,11 +41,15 @@ fn every_string_has_its_glyphs_at_every_size_it_is_drawn() {
             for form in [Form::Full, Form::Short] {
                 let mut text = String::new();
                 write(&mut text, locale, form, id, &args).unwrap();
-                for role in [Some(id.role()), Some(Role::Body), id.quoted_as()]
-                    .into_iter()
-                    .flatten()
-                {
-                    let (_, weight, _) = spec::style(role);
+                let mut styles: Vec<_> = [id.role(), Role::Body]
+                    .iter()
+                    .chain(id.also())
+                    .map(|&r| (r, spec::style(r).1))
+                    .collect();
+                if id.strong() {
+                    styles.push((Role::Body, spec::strong(Role::Body)));
+                }
+                for (role, weight) in styles {
                     for ppem in spec::rungs(role) {
                         fonts.layout(&text, weight, ppem, 0.0, |p| {
                             let glyph = p.glyph.unwrap_or_else(|| {
