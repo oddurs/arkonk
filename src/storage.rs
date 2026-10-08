@@ -49,7 +49,7 @@ impl Profile {
         };
         let main = read(path);
         if let Read::Valid(p) = main {
-            loaded.profile = p;
+            loaded.profile = *p;
             loaded.origin = Origin::Saved;
             return loaded;
         }
@@ -58,7 +58,7 @@ impl Profile {
         }
         match read(&backup) {
             Read::Valid(p) => {
-                loaded.profile = p;
+                loaded.profile = *p;
                 loaded.origin = Origin::Backup;
             }
             Read::Invalid(why) => loaded.quarantine(&backup, why),
@@ -133,7 +133,8 @@ const READ_LIMIT: u64 = 64 * 1024;
 
 enum Read {
     Missing,
-    Valid(Profile),
+    // Boxed: 64 sector records make a profile large beside the other cases.
+    Valid(Box<Profile>),
     Invalid(String),
 }
 
@@ -153,7 +154,7 @@ fn read(path: &Path) -> Read {
     }
     // Invalid UTF-8 only spoils the lines it touches; decode skips those.
     match Profile::decode(&bytes) {
-        Some(p) => Read::Valid(p),
+        Some(p) => Read::Valid(Box::new(p)),
         None => Read::Invalid("not an ARKONK profile".into()),
     }
 }
@@ -361,7 +362,7 @@ mod tests {
     }
     fn read_valid(path: &Path) -> Profile {
         match read(path) {
-            Read::Valid(p) => p,
+            Read::Valid(p) => *p,
             _ => panic!("{} is not a valid profile", path.display()),
         }
     }
