@@ -210,6 +210,33 @@ pub fn effects(game: &mut Game, frame: u32) {
     }
 }
 
+/// A player partway through: four sectors open, a mix of medals and best
+/// times, and a journey saved in sector 03. The smoke run starts from an
+/// empty profile, so without this its captures would never show a saved
+/// journey, earned medals or a locked selection.
+pub fn showcase() -> Profile {
+    const SAVE: &str = "ARKONK 1\nbest 18450\nunlocked 4\n\
+        record 0 7 21840\nrecord 1 3 30960\nrecord 2 1 41520\n\
+        checkpoint 2 2450 3 0\n";
+    Profile::decode(SAVE.as_bytes()).expect("a fixed version-1 save decodes")
+}
+
+/// Smoke frames drawn with [`showcase`] progress, the screen and sector to
+/// show, and where the capture goes.
+pub const SHOWCASE: [(u32, Screen, usize, bool, &str); 5] = [
+    (300, Screen::Title, 0, false, "target/attract-saved.png"),
+    (310, Screen::Sectors, 1, false, "target/sectors-medals.png"),
+    (320, Screen::Sectors, 6, false, "target/sectors-locked.png"),
+    (330, Screen::Title, 0, true, "target/attract-saved-pad.png"),
+    (
+        340,
+        Screen::Sectors,
+        6,
+        true,
+        "target/sectors-locked-pad.png",
+    ),
+];
+
 /// Physical sizes rendered offscreen after the main smoke run: Steam Deck,
 /// 1080p, 1440p, ultrawide, and 4:3.
 pub const LAYOUTS: [(&str, u32, u32); 5] = [

@@ -265,6 +265,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
     let subscriber = macroquad::input::utils::register_input_subscriber();
     let mut focus = Focus::default();
     let mut pads = Gamepads::new(!smoke);
+    let showcase = smoke::showcase();
     loop {
         let now = get_time();
         let frame_time = Instant::now();
@@ -649,13 +650,31 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 _ => {}
             }
         }
+        let staged = (smoke && !flow && !perf_test)
+            .then(|| smoke::SHOWCASE.iter().find(|s| s.0 == frames))
+            .flatten();
+        if let Some(&(_, screen, sector, pad, _)) = staged {
+            ui.screen = screen;
+            ui.sector = SectorId::clamped(sector);
+            ui.choice = 0;
+            if pad {
+                ui.device = Device::Gamepad;
+            }
+        }
         renderer.draw(
             &game,
             &ui,
-            &profile,
+            if staged.is_some() {
+                &showcase
+            } else {
+                &profile
+            },
             alpha,
             (stats || (smoke && frames == 170)).then_some(&perf),
         );
+        if let Some(&(.., path)) = staged {
+            renderer.capture(path);
+        }
         if let Some((size, p)) = layout_capture {
             renderer.capture_at((&game, &ui, &profile), size, &p);
         }
