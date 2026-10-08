@@ -1,0 +1,20 @@
+ARKONK 1
+best 60800
+unlocked 7
+settings 0 7
+display 0
+locale de
+effects 1
+record 0 7 15776
+record 1 7 25562
+record 2 7 20948
+record 3 7 23956
+record 4 7 17157
+record 5 7 25644
+record 6 0 0
+record 7 0 0
+record 8 0 0
+record 9 0 0
+record 10 0 0
+record 11 0 0
+checkpoint 6 60800 4 140269
