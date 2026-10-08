@@ -7,7 +7,7 @@ use crate::{
 };
 use ark::{
     Game, Input, Medals, Mode, Particle, Power, Stage,
-    field::{BALL_RADIUS as RADIUS, Cell, CellSet, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
+    field::{BALL_RADIUS as RADIUS, BOTTOM, Cell, CellSet, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
     geom::V2,
     sectors::SectorId,
     tuning::{ADVANCE_DELAY_TICKS, MAX_BALLS, MAX_CAPSULES},
@@ -150,6 +150,27 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         57 => {
             assert!(ui.paused);
             keys = pad_controls(west, None, true);
+        }
+        // Serve and drain three times: the results menu opens on Retry.
+        59..=67 => match (frame - 59) % 3 {
+            0 => keys = pad_controls(south, None, false),
+            1 => {
+                assert_eq!(game.stage(), Stage::Playing);
+                let below = V2::new(GRID_X, BOTTOM - RADIUS);
+                game.sandbox().place_ball(0, below, V2::new(0.0, 2400.0));
+            }
+            _ => assert_eq!(game.lives(), 2 - ((frame - 59) / 3) as u8),
+        },
+        68 => {
+            assert_eq!(game.stage(), Stage::GameOver);
+            assert_eq!(ui.choice, 0, "the focus opens on the primary action");
+            keys = pad_controls(south, None, true);
+        }
+        69 => {
+            assert!(ui.screen == Screen::Play && !ui.paused);
+            assert_eq!(game.stage(), Stage::Ready);
+            assert!(game.sector().index() == 8 && game.mode() == Mode::Practice);
+            println!("Results flow passed: game over focuses Retry, A retries");
         }
         _ => {}
     }

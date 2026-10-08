@@ -774,7 +774,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 "target/relay.png"
             });
         }
-        if flow && frames >= 58 {
+        if flow && frames >= 69 {
             break;
         }
         frames += 1;

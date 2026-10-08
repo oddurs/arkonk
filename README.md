@@ -339,9 +339,12 @@ checkpoint restore, practice, focus pause, resume, and retry, with assertions at
 transition boundaries. It also checks sticky catches with combined powers,
 pause/resume while holding, explicit release, Phase contacts, and relay ignition,
 then pauses, resumes, navigates, and retries with gamepad buttons through the same
-mapping a controller uses. Test runs never open gamepads, so a controller on the
+mapping a controller uses, and finally loses a practice run's last life to check
+that the results menu opens on Retry. Test runs never open gamepads, so a controller on the
 desk cannot steer them. The OpenGL smoke test also writes `target/*-pad.png`
-captures of every screen with gamepad prompts.
+captures of every screen with gamepad prompts, and draws a fixed partway profile
+for `target/attract-saved*.png` (the Continue button) and
+`target/sectors-medals.png` / `target/sectors-locked*.png`.
 `--effects-test` exercises repeated full-board cascades, full pools, and resizing.
 
 The simulation is its own crate, `crates/ark`, with no dependencies: `clock.rs`
