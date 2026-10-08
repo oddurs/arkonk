@@ -858,6 +858,8 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 270 => Some("target/sectors-pad.png"),
                 275 => Some("target/settings-pad.png"),
                 280 => Some("target/clear-pad.png"),
+        let tally = renderer.tally();
+        perf.geometry(tally.vertices, tally.calls);
                 290 => Some("target/ready-pad.png"),
                 _ => None,
             };
