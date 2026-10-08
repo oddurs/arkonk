@@ -15,7 +15,7 @@ mod common;
 use ark::{
     Events, Game, Input, Mode, Power, Stage,
     field::{Cell, CellSet},
-    sectors::SectorId,
+    sectors::{Chapter, SECTOR_COUNT, SectorId},
 };
 use common::script::Pilot;
 use std::fmt::Write;
@@ -203,6 +203,11 @@ impl Recorder {
     }
 }
 
+/// The sector with `slug`, wherever the journey puts it.
+fn named(slug: &str) -> SectorId {
+    SectorId::from_slug(slug).unwrap()
+}
+
 fn pilot(seed: u64) -> impl FnMut(u32, &mut Game) -> Input {
     let mut pilot = Pilot::new(seed);
     move |_, game| pilot.input(ball_x(game))
@@ -215,7 +220,7 @@ fn pilot(seed: u64) -> impl FnMut(u32, &mut Game) -> Input {
 )]
 fn every_sector() {
     let mut out = String::new();
-    for sector in 0..12 {
+    for sector in 0..SECTOR_COUNT {
         for (seed, mode) in [(1, Mode::Journey), (2, Mode::Practice)] {
             let mut game = Game::start(SectorId::new(sector).unwrap(), mode);
             let mut r = Recorder::new(&format!("sector {:02} {mode:?} seed {seed}", sector + 1));
@@ -278,7 +283,7 @@ fn every_power() {
         Power::Anchor,
         Power::Phase,
     ];
-    let mut game = Game::start(SectorId::new(4).unwrap(), Mode::Practice);
+    let mut game = Game::start(named("prism"), Mode::Practice);
     let mut r = Recorder::new("every power in turn, twice");
     let mut pilot = pilot(12);
     r.run(&mut game, 8 * CHECKPOINT, |tick, game| {
@@ -297,7 +302,7 @@ fn every_power() {
     ignore = "f32 goldens are recorded on macOS arm64 at opt-level 0"
 )]
 fn anchor_hold() {
-    let mut game = Game::start(SectorId::new(1).unwrap(), Mode::Journey);
+    let mut game = Game::start(named("satellites"), Mode::Journey);
     let mut r = Recorder::new("anchor catches held for seconds, then released");
     let mut pilot = pilot(13);
     r.run(&mut game, 6 * CHECKPOINT, |tick, game| {
@@ -319,8 +324,9 @@ fn anchor_hold() {
 fn sector_endings() {
     let mut out = String::new();
     // The last sector of each chapter: medals, the chapter's extra life, the
-    // next chapter's opening and, after the twelfth, victory.
-    for sector in [3, 7, 11] {
+    // next chapter's opening and, after the last, victory.
+    for chapter in Chapter::ALL {
+        let sector = chapter.sectors().last().unwrap().index();
         let mut game = Game::start(SectorId::new(sector).unwrap(), Mode::Journey);
         let mut kept = 0;
         for cell in Cell::all().rev() {
@@ -341,4 +347,33 @@ fn sector_endings() {
         out += &r.out;
     }
     insta::assert_snapshot!(out);
+}
+
+/// Gates on their beat: the pilot plays Eclipse's set piece, whose gates
+/// ring the cores, and Event Horizon, whose blasts meet gates mid-beat.
+fn gate_sessions() -> String {
+    let mut out = String::new();
+    for (slug, seed) in [("totality", 30), ("event_horizon", 31)] {
+        let mut game = Game::start(named(slug), Mode::Practice);
+        let mut r = Recorder::new(&format!("{slug} gates, seed {seed}"));
+        r.run(&mut game, 8 * CHECKPOINT, pilot(seed));
+        out += &r.out;
+    }
+    out
+}
+
+/// The gate beat is driven by the tick counter alone, so a replay is the
+/// same game on any platform and at any optimization level.
+#[test]
+fn gates_replay_identically() {
+    assert_eq!(gate_sessions(), gate_sessions());
+}
+
+#[test]
+#[cfg_attr(
+    not(all(target_os = "macos", target_arch = "aarch64", debug_assertions)),
+    ignore = "f32 goldens are recorded on macOS arm64 at opt-level 0"
+)]
+fn eclipse_gates() {
+    insta::assert_snapshot!(gate_sessions());
 }

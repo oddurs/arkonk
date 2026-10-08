@@ -106,13 +106,15 @@ struct Load {
     /// Ticks spent in each sector before moving to the next.
     sector_ticks: usize,
 }
+// Each load visits every sector once: batches × BATCH ticks cover
+// SECTOR_COUNT × sector_ticks.
 const BENCH: Load = Load {
     batches: 4096,
-    sector_ticks: 20000,
+    sector_ticks: 4000,
 };
 const TEST: Load = Load {
     batches: 1024,
-    sector_ticks: 5000,
+    sector_ticks: 1000,
 };
 const BATCH: usize = 64;
 
@@ -125,7 +127,7 @@ fn run(load: &Load, stress: bool, relays: bool) {
     let mut chain_ticks = 0_u64;
     let mut phase_hits = 0_u64;
     let mut catches = 0_u64;
-    let mut level_mask = 0_u16;
+    let mut level_mask = 0_u64;
     let mut tick = 0;
     ALLOCATIONS.store(0, Ordering::Relaxed);
     COUNTING.store(true, Ordering::Relaxed);
@@ -217,7 +219,7 @@ fn run(load: &Load, stress: bool, relays: bool) {
         samples[load.batches * 99 / 100]
     );
     println!(
-        "  allocations {allocations}, collision caps {caps}, brick impact ticks {impacts}, score checksum {score}, level mask {level_mask:012b}"
+        "  allocations {allocations}, collision caps {caps}, brick impact ticks {impacts}, score checksum {score}, level mask {level_mask:016x}"
     );
     println!("  relay ticks {chain_ticks}, phase hits {phase_hits}, anchor catches {catches}");
     if relays {
@@ -232,8 +234,8 @@ fn run(load: &Load, stress: bool, relays: bool) {
     if !stress {
         assert_eq!(
             level_mask,
-            (1 << SECTOR_COUNT) - 1,
-            "Gameplay must exercise all twelve sectors"
+            u64::MAX >> (64 - SECTOR_COUNT),
+            "Gameplay must exercise every sector"
         );
     }
 }

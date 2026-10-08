@@ -18,10 +18,10 @@ use super::{
 };
 use crate::{
     clock::{DT, TICK_HZ},
-    field::{BOTTOM, Cell, CellSet, FIELD, PADDLE_Y, cell_rect},
+    field::{BALL_RADIUS, BOTTOM, Cell, CellSet, FIELD, PADDLE_Y, cell_rect, swept_cells},
     geom::V2,
     progress::Checkpoint,
-    sectors::SectorId,
+    sectors::{BeatPhase, SectorId},
     tuning::*,
 };
 
@@ -35,7 +35,7 @@ const BURST_PICKUP: usize = 24;
 /// How a run is played.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Mode {
-    /// The twelve sectors in order, from a saved checkpoint.
+    /// The journey's sectors in order, from a saved checkpoint.
     #[default]
     Journey,
     /// One unlocked sector, replayed for medals without touching the journey.
@@ -272,6 +272,14 @@ impl Game {
             ticks: self.run_ticks,
         }
     }
+    /// Where the sector's gate beat is, if it has gates. It holds still
+    /// while a ball waits to be served.
+    pub fn beat(&self) -> Option<BeatPhase> {
+        self.sector
+            .sector()
+            .beat
+            .map(|beat| beat.at(self.sector_ticks))
+    }
     /// Counters for performance overlays and tests.
     pub fn diagnostics(&self) -> Diagnostics {
         Diagnostics {
@@ -385,6 +393,7 @@ impl Game {
         self.sector_ticks += 1;
         self.run_ticks += 1;
         self.quiet_ticks += 1;
+        self.keep_beat();
         self.offer_finishing_assist();
         self.nudge_stalled_balls();
         if self.powers.tick() {
@@ -507,6 +516,35 @@ impl Game {
             self.stage = Stage::GameOver;
         } else {
             self.reset_serve();
+        }
+    }
+
+    /// Gates follow the sector's beat. A gate that turns solid around a ball
+    /// lets it out as if the ball were phased, so nothing is ever trapped
+    /// inside a brick.
+    fn keep_beat(&mut self) {
+        let Some(beat) = self.beat() else {
+            return;
+        };
+        let ghosts = !beat.solid;
+        if ghosts == self.board.gates_are_ghosts() {
+            return;
+        }
+        self.board.set_ghosts(ghosts);
+        if ghosts {
+            return;
+        }
+        for ball in self.balls.iter_mut().filter(|b| b.active) {
+            for cell in swept_cells(ball.pos, ball.pos, BALL_RADIUS) {
+                let r = cell_rect(cell);
+                let inside = ball.pos.x >= r.x - BALL_RADIUS
+                    && ball.pos.x <= r.x + r.w + BALL_RADIUS
+                    && ball.pos.y >= r.y - BALL_RADIUS
+                    && ball.pos.y <= r.y + r.h + BALL_RADIUS;
+                if inside && self.board.is_gate(cell) && self.board.hp(cell) > 0 {
+                    ball.phased.insert(cell);
+                }
+            }
         }
     }
 
@@ -758,6 +796,7 @@ mod tests {
         },
         sectors::SECTOR_COUNT,
         sim::effects::Particle,
+        tuning::PHASE_CONTACTS,
     };
     fn sector(index: usize) -> SectorId {
         SectorId::new(index).unwrap()
@@ -919,7 +958,7 @@ mod tests {
     }
     #[test]
     fn chapter_rewards_and_medals_follow_actual_play() {
-        let mut g = Game::start(sector(3), Mode::Journey);
+        let mut g = Game::start(sector(7), Mode::Journey);
         g.stage = Stage::Playing;
         board(&mut g, &[]);
         g.step(Input::default());
@@ -1195,12 +1234,140 @@ mod tests {
                 g.capsules.fill(Capsule::default());
                 g.damage(c, V2::default(), true);
                 for d in g.capsules.iter().filter(|d| d.active) {
-                    assert!(d.power != Power::Anchor || level >= 1);
-                    assert!(d.power != Power::Multi || level >= 4);
-                    assert!(d.power != Power::Phase || level >= 8);
+                    // Each power drops only once its opening has taught it.
+                    assert!(d.power != Power::Slow || level >= 1);
+                    assert!(d.power != Power::Anchor || level >= 8);
+                    assert!(d.power != Power::Multi || level >= 24);
+                    assert!(d.power != Power::Phase || level >= 32);
                 }
             }
         }
+    }
+    /// The first sector with gates, in play, with only `bricks` on the
+    /// board and the `gates` among them gates.
+    fn gated(bricks: &[(usize, u8, bool)], gates: &[usize]) -> Game {
+        let id = SectorId::all().find(|s| s.sector().beat.is_some()).unwrap();
+        let mut g = Game::start(id, Mode::Practice);
+        g.step(Input {
+            launch: true,
+            ..Input::default()
+        });
+        board(&mut g, bricks);
+        for &i in gates {
+            g.board.set_gate(cell(i), true);
+        }
+        g
+    }
+    /// Sets the sector clock to `ticks` and lets the gates catch up.
+    fn at_beat(g: &mut Game, ticks: u32) {
+        g.sector_ticks = ticks - 1;
+        g.run_ticks = g.run_ticks.max(ticks);
+        g.sandbox().elapse(1);
+    }
+    #[test]
+    fn gates_keep_the_beat_and_hold_it_while_serving() {
+        let mut g = gated(&[(5, 1, false), (40, 1, false)], &[5]);
+        let beat = g.sector.sector().beat.unwrap();
+        let period = beat.solid + beat.ghost;
+        for (t, ghost) in [
+            (1, false),
+            (beat.solid - 1, false),
+            (beat.solid, true),
+            (period - 1, true),
+            (period, false),
+            (period + beat.solid, true),
+        ] {
+            at_beat(&mut g, t);
+            assert_eq!(g.board.gates_are_ghosts(), ghost, "tick {t}");
+            assert_eq!(g.beat().map(|b| b.solid), Some(!ghost));
+            assert_eq!(g.validate(), Ok(()));
+        }
+        // A lost ball stops the clock: the gates stay ghosts until the serve.
+        g.balls[0].pos = V2::new(LEFT + 30.0, BOTTOM + RADIUS - 1.0);
+        g.balls[0].velocity = V2::new(0.0, 500.0);
+        g.step(Input::default());
+        assert_eq!(g.stage, Stage::Ready);
+        for _ in 0..TICK_HZ {
+            g.step(Input::default());
+        }
+        assert!(g.board.gates_are_ghosts());
+        assert_eq!(g.validate(), Ok(()));
+        // A sector without a beat never ghosts, whatever its cells say.
+        let mut plain = playing();
+        plain.board.set_gate(cell(COLS + 1), true);
+        plain.sandbox().elapse(100_000);
+        assert!(!plain.board.gates_are_ghosts());
+        assert!(plain.board.is_solid(cell(COLS + 1)));
+    }
+    #[test]
+    fn a_solid_gate_bounces_and_breaks() {
+        let mut g = gated(&[(5, 1, false), (40, 1, false)], &[5]);
+        g.balls[0].pos = V2::new(GRID_X + 5.0 * CELL_W + 29.0, GRID_Y + 60.0);
+        g.balls[0].velocity = V2::new(0.0, -2000.0);
+        for _ in 0..10 {
+            g.step(Input::default());
+        }
+        assert_eq!(hp(&g, 5), 0);
+        assert!(g.balls[0].velocity.y > 0.0);
+        assert_eq!(g.board.remaining(), 1);
+    }
+    #[test]
+    fn a_ghost_gate_lets_balls_and_phase_through_untouched() {
+        let mut g = gated(&[(5, 1, false), (40, 1, false)], &[5]);
+        let beat = g.sector.sector().beat.unwrap();
+        at_beat(&mut g, beat.solid);
+        g.apply_power(Power::Phase);
+        g.balls[0].pos = V2::new(GRID_X + 5.0 * CELL_W + 29.0, GRID_Y + 60.0);
+        g.balls[0].velocity = V2::new(0.0, -2000.0);
+        let mut met = false;
+        for _ in 0..30 {
+            met |= g.step(Input::default()).brick;
+        }
+        assert!(!met);
+        assert_eq!(hp(&g, 5), 1);
+        assert_eq!(g.balls[0].phase_charges, PHASE_CONTACTS);
+        // It went on to the ceiling and back down, past the gate again.
+        assert!(g.balls[0].velocity.y > 0.0);
+        assert_eq!(g.board.remaining(), 2);
+    }
+    #[test]
+    fn relay_blasts_pass_ghost_gates_and_break_solid_ones() {
+        let c = 3 * COLS + 5;
+        for ghost in [false, true] {
+            let mut g = gated(
+                &[(c, 1, true), (c + 1, 1, false), (c - 1, 1, false)],
+                &[c + 1],
+            );
+            let beat = g.sector.sector().beat.unwrap();
+            at_beat(&mut g, if ghost { beat.solid } else { 1 });
+            g.damage(cell(c), V2::default(), true);
+            for _ in 0..RELAY_TICKS {
+                g.ignite_relays();
+            }
+            assert_eq!(hp(&g, c - 1), 0);
+            assert_eq!(hp(&g, c + 1), u8::from(ghost), "ghost {ghost}");
+        }
+    }
+    #[test]
+    fn a_gate_turning_solid_lets_a_ball_inside_it_out() {
+        let mut g = gated(&[(5, 1, false), (40, 1, false)], &[5]);
+        let beat = g.sector.sector().beat.unwrap();
+        at_beat(&mut g, beat.solid + beat.ghost - 1);
+        assert!(g.board.gates_are_ghosts());
+        let inside = cell_rect(cell(5)).center();
+        g.balls[0].pos = inside;
+        g.balls[0].velocity = V2::new(0.0, 300.0);
+        let events = g.step(Input::default());
+        assert!(!g.board.gates_are_ghosts());
+        assert!(g.balls[0].phased.contains(cell(5)));
+        assert!(!events.brick);
+        for _ in 0..40 {
+            assert!(!g.step(Input::default()).brick);
+        }
+        assert!(!g.balls[0].phased.contains(cell(5)));
+        assert!(g.balls[0].velocity.y > 0.0);
+        assert_eq!(hp(&g, 5), 1);
+        assert_eq!(g.validate(), Ok(()));
     }
     #[test]
     fn deterministic_long_run_stays_finite() {
@@ -1238,6 +1405,7 @@ mod tests {
         assert_eq!(a.score, b.score);
         assert_eq!(a.board, b.board);
         assert_eq!(a.budget_exhausted, 0);
-        assert!(impacts > 100);
+        // Daybreak's open layouts break a brick every few seconds.
+        assert!(impacts > 80);
     }
 }

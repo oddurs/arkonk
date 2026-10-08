@@ -147,11 +147,64 @@ pub(super) fn arch(v: &Scene, sky: Option<Chapter>, walls: &[WallFlash]) {
 }
 
 /// One sky per chapter, in the field glass: a single quad of vertex
-/// colours. Daybreak warms from below, Blue Hour pools cool light at the
-/// top, and Afterlight comes low from one side.
+/// colours. Daybreak warms from below, Morning comes in low from the left,
+/// Zenith lights the whole field from above, Golden Hour slants warm from
+/// the right, Afterlight comes low from one side, Blue Hour pools cool
+/// light at the top, Eclipse leaves a violet rim across the corners, and
+/// Aurora hangs green and violet along the top.
 fn chapter_sky(v: &Scene, field: Rect, chapter: Chapter) {
     let clear = |c: Color| opacity(c, 0.0);
     match chapter {
+        Chapter::Morning => corners(
+            v,
+            field,
+            [
+                clear(PEACH),
+                clear(MINT),
+                opacity(MINT, 0.05),
+                opacity(PEACH, 0.08),
+            ],
+        ),
+        Chapter::Zenith => corners(
+            v,
+            field,
+            [
+                opacity(AZURE, 0.07),
+                opacity(AZURE, 0.07),
+                opacity(AZURE, 0.02),
+                opacity(AZURE, 0.02),
+            ],
+        ),
+        Chapter::GoldenHour => corners(
+            v,
+            field,
+            [
+                clear(PEACH),
+                opacity(PEACH, 0.04),
+                opacity(PEACH, 0.10),
+                opacity(EMBER, 0.05),
+            ],
+        ),
+        Chapter::Eclipse => corners(
+            v,
+            field,
+            [
+                opacity(LILAC, 0.06),
+                clear(VIOLET),
+                opacity(VIOLET, 0.06),
+                clear(VIOLET),
+            ],
+        ),
+        Chapter::Aurora => corners(
+            v,
+            field,
+            [
+                opacity(MINT, 0.09),
+                opacity(VIOLET, 0.08),
+                clear(VIOLET),
+                clear(MINT),
+            ],
+        ),
         Chapter::Daybreak => {
             let top = field.y + 0.45 * field.h;
             let r = Rect::new(field.x, top, field.w, field.y + field.h - top);
@@ -167,19 +220,30 @@ fn chapter_sky(v: &Scene, field: Rect, chapter: Chapter) {
             );
         }
         Chapter::Afterlight => {
-            // Below the rounded corners, so nothing tints the arch.
-            let top = field.y + FIELD_RADIUS;
-            let (left, right, bottom) = (field.x, field.x + field.w, field.y + field.h);
             let corner = |k: f32| opacity(ORCHID, k);
-            let vertices = [
-                v.vertex(vec2(left, top), corner(0.03)),
-                v.vertex(vec2(right, top), corner(0.0)),
-                v.vertex(vec2(right, bottom), corner(0.03)),
-                v.vertex(vec2(left, bottom), corner(0.09)),
-            ];
-            v.mesh(&vertices, &[0, 1, 3, 1, 2, 3]);
+            corners(
+                v,
+                field,
+                [corner(0.03), corner(0.0), corner(0.03), corner(0.09)],
+            );
         }
     }
+}
+
+/// The field washed by one quad whose corners are `colours`: top left, top
+/// right, bottom right, bottom left. It starts below the field's rounded
+/// corners, so nothing tints the arch.
+fn corners(v: &Scene, field: Rect, colours: [Color; 4]) {
+    let top = field.y + FIELD_RADIUS;
+    let (left, right, bottom) = (field.x, field.x + field.w, field.y + field.h);
+    let [tl, tr, br, bl] = colours;
+    let vertices = [
+        v.vertex(vec2(left, top), tl),
+        v.vertex(vec2(right, top), tr),
+        v.vertex(vec2(right, bottom), br),
+        v.vertex(vec2(left, bottom), bl),
+    ];
+    v.mesh(&vertices, &[0, 1, 3, 1, 2, 3]);
 }
 
 /// Each bounce lights 70 units of its wall around the contact, cyan

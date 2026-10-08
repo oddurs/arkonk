@@ -242,6 +242,6 @@ mod tests {
         for (i, id) in all.iter().enumerate() {
             assert!(!all[..i].contains(id), "{id:?} listed twice");
         }
-        assert_eq!(all.len(), TextId::UNITS.len() + 12 + 12 + 3 + 5);
+        assert_eq!(all.len(), TextId::UNITS.len() + 64 + 64 + 8 + 5);
     }
 }

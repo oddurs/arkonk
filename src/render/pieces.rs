@@ -117,9 +117,10 @@ impl Glass {
 /// How much of a brick hue its glass body takes, top and bottom. Measured
 /// on OpenGL captures, red, indigo and orchid glass at the shared 26 %
 /// came out 6 to 9 L* darker than the other hues and read muddy, so they
-/// take the most the design allows at the top.
+/// take the most the design allows at the top; violet and azure, as dark,
+/// join them.
 fn brick_body(hue: Color) -> (f32, f32) {
-    if hue == INDIGO || hue == RED || hue == ORCHID {
+    if [INDIGO, RED, ORCHID, VIOLET, AZURE].contains(&hue) {
         (BODY_DIM_TOP, 11.0)
     } else {
         (26.0, 11.0)

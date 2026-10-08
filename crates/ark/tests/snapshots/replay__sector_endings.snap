@@ -1,31 +1,76 @@
 ---
-source: tests/replay.rs
+source: crates/ark/tests/replay.rs
 expression: out
 ---
-sector 04 down to its last three bricks
-  1024  sector 04 playing   score      0  lives 3  bricks  3  3f66aa77650d48f4
-  2048  sector 04 playing   score      0  lives 3  bricks  3  12d3f3bbfa21245e
-  3072  sector 04 playing   score    250  lives 3  bricks  1  02d94e6f50d997d7
-  4096  sector 04 playing   score    250  lives 3  bricks  1  12bdbf825824265d
-  5120  sector 04 playing   score    250  lives 3  bricks  1  9e911deaa14e6c47
-  6144  sector 04 playing   score    250  lives 3  bricks  1  5e4c0a13831944d8
-  7168  sector 05 playing   score   2775  lives 4  bricks 49  06684ed869db0731
-  8192  sector 05 playing   score   2925  lives 4  bricks 48  4150a95d132ddb43
 sector 08 down to its last three bricks
-  1024  sector 08 playing   score    125  lives 3  bricks  2  1b72d459a80c0992
-  2048  sector 08 playing   score    250  lives 3  bricks  1  786f16af3ef418dc
-  3072  sector 08 playing   score    250  lives 3  bricks  1  0f75b07fab3308bd
-  4096  sector 08 playing   score    250  lives 3  bricks  1  045a1573cc5299a0
-  5120  sector 08 playing   score    250  lives 3  bricks  1  dff6852236b925df
-  6144  sector 08 playing   score    250  lives 3  bricks  1  5ec65b0647c1d9ef
-  7168  sector 09 playing   score   2125  lives 3  bricks 56  36bd844aee79f42c
-  8192  sector 09 playing   score   2250  lives 3  bricks 55  c817a144ba917ddc
-sector 12 down to its last three bricks
-  1024  sector 12 playing   score    125  lives 3  bricks  2  3f2ea9d44ac09223
-  2048  sector 12 victory   score   2400  lives 4  bricks  0  9cab2b2f27405160
-  3072  sector 12 victory   score   2400  lives 4  bricks  0  59071f61668e94f8
-  4096  sector 12 victory   score   2400  lives 4  bricks  0  9d438249ba0d0c70
-  5120  sector 12 victory   score   2400  lives 4  bricks  0  7934d97719081058
-  6144  sector 12 victory   score   2400  lives 4  bricks  0  e9c841a706ea8cc0
-  7168  sector 12 victory   score   2400  lives 4  bricks  0  4b23f18602697d58
-  8192  sector 12 victory   score   2400  lives 4  bricks  0  35b6b18f4410f0f0
+  1024  sector 08 playing   score      0  lives 3  bricks  3  28c6127a82122e88
+  2048  sector 08 playing   score      0  lives 3  bricks  3  ab5251307dbde77d
+  3072  sector 08 playing   score      0  lives 3  bricks  3  5e4d6c1b52af2347
+  4096  sector 08 playing   score      0  lives 3  bricks  3  61e063ddf336b2b9
+  5120  sector 08 playing   score      0  lives 3  bricks  3  a2b57d4de923c881
+  6144  sector 08 playing   score      0  lives 3  bricks  3  df5796291ac03495
+  7168  sector 08 playing   score    275  lives 3  bricks  1  c96e4aeac9e3bff0
+  8192  sector 08 playing   score    275  lives 3  bricks  1  4bcdb68d1b3e8817
+sector 16 down to its last three bricks
+  1024  sector 17 playing   score   2400  lives 4  bricks 36  160fbe69a3386eaa
+  2048  sector 17 playing   score   2525  lives 4  bricks 35  c2080d00d5d897c7
+  3072  sector 17 playing   score   2925  lives 4  bricks 32  ae414b11f57ab858
+  4096  sector 17 playing   score   3300  lives 4  bricks 29  ba0823fc35d47790
+  5120  sector 17 playing   score   4700  lives 4  bricks 22  bebb58e7d411445b
+  6144  sector 17 playing   score   4950  lives 4  bricks 20  2d671d2048ac9cab
+  7168  sector 17 playing   score   4950  lives 4  bricks 20  5507ad9a75346b02
+  8192  sector 17 playing   score   5075  lives 4  bricks 19  162f8262dd3e47bd
+sector 24 down to its last three bricks
+  1024  sector 24 cleared   score   2400  lives 4  bricks  0  9e2849763d7e9e3e
+  2048  sector 25 playing   score   2650  lives 4  bricks 50  21f21cfad81089b1
+  3072  sector 25 playing   score   3525  lives 4  bricks 45  08454e64a7778bba
+  4096  sector 25 playing   score   3775  lives 4  bricks 43  33998a61720e9018
+  5120  sector 25 playing   score   6775  lives 4  bricks 31  15ba4c15593f5984
+  6144  sector 25 playing   score   7250  lives 4  bricks 28  0fe7a08d01c85dfb
+  7168  sector 25 playing   score   8375  lives 4  bricks 22  77c83502c06493f8
+  8192  sector 25 playing   score  12025  lives 4  bricks 10  c572fb4c0ec08216
+sector 32 down to its last three bricks
+  1024  sector 32 playing   score    125  lives 3  bricks  2  12904facb547e38e
+  2048  sector 32 playing   score    125  lives 3  bricks  2  a27508941d1030ca
+  3072  sector 33 playing   score   2400  lives 4  bricks 58  e9364aaa0ab495e7
+  4096  sector 33 playing   score   2775  lives 4  bricks 55  9fac19b57c1f072e
+  5120  sector 33 playing   score   3150  lives 4  bricks 52  87b4508a2a0e849e
+  6144  sector 33 playing   score   3425  lives 4  bricks 50  ed9fc29727582329
+  7168  sector 33 playing   score   3675  lives 4  bricks 48  00a124e6d1ece655
+  8192  sector 33 playing   score   3825  lives 4  bricks 47  6b348a5bc4324b61
+sector 40 down to its last three bricks
+  1024  sector 40 playing   score      0  lives 3  bricks  3  5311359b0b23a0e8
+  2048  sector 40 playing   score    250  lives 2  bricks  1  189b05cf0ec0b899
+  3072  sector 40 game over score    250  lives 0  bricks  1  18c8ed4bafa9f053
+  4096  sector 40 game over score    250  lives 0  bricks  1  0032716301ecd37f
+  5120  sector 40 game over score    250  lives 0  bricks  1  197a9ba881936afb
+  6144  sector 40 game over score    250  lives 0  bricks  1  94536a68ac948987
+  7168  sector 40 game over score    250  lives 0  bricks  1  0514656bc0bab243
+  8192  sector 40 game over score    250  lives 0  bricks  1  68cb6bc5e083de2f
+sector 48 down to its last three bricks
+  1024  sector 48 playing   score    125  lives 3  bricks  2  27e8a511d8a5e30e
+  2048  sector 48 playing   score    125  lives 3  bricks  2  e71c54d2855778a6
+  3072  sector 48 playing   score    250  lives 3  bricks  1  d69647079959cf1d
+  4096  sector 48 playing   score    250  lives 3  bricks  1  a24066182b142710
+  5120  sector 48 playing   score    250  lives 3  bricks  1  8a907d5cd9048948
+  6144  sector 48 cleared   score   2375  lives 4  bricks  0  93f24e601e552163
+  7168  sector 49 playing   score   2625  lives 4  bricks 34  e820e700279f81af
+  8192  sector 49 playing   score   3625  lives 4  bricks 28  5b9c4bf4a1335fcc
+sector 56 down to its last three bricks
+  1024  sector 56 playing   score      0  lives 3  bricks  3  36b435231e6c167b
+  2048  sector 56 playing   score      0  lives 2  bricks  3  8709d0b65b0bf140
+  3072  sector 56 playing   score      0  lives 2  bricks  3  5361c772dc223848
+  4096  sector 56 playing   score     50  lives 2  bricks  3  a5110f331cc32591
+  5120  sector 56 playing   score    175  lives 2  bricks  2  d0336bd2990468e1
+  6144  sector 56 playing   score    200  lives 2  bricks  2  fb2916df71900a17
+  7168  sector 56 playing   score    325  lives 2  bricks  1  282a09c9d2a16a43
+  8192  sector 56 playing   score    325  lives 2  bricks  1  46ecc2be168a4f84
+sector 64 down to its last three bricks
+  1024  sector 64 playing   score    125  lives 3  bricks  2  c580bde5337b5814
+  2048  sector 64 playing   score    125  lives 3  bricks  2  10b9c6dbeaa7e44b
+  3072  sector 64 victory   score   2375  lives 4  bricks  0  5a96a997b1d6d52a
+  4096  sector 64 victory   score   2375  lives 4  bricks  0  0870417ca6aa7b52
+  5120  sector 64 victory   score   2375  lives 4  bricks  0  da28c251a3d8523a
+  6144  sector 64 victory   score   2375  lives 4  bricks  0  e99dbb9f4ac33552
+  7168  sector 64 victory   score   2375  lives 4  bricks  0  88a980399afad6ca
+  8192  sector 64 victory   score   2375  lives 4  bricks  0  a63276f2e3355d32

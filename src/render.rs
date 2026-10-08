@@ -50,8 +50,21 @@ const EMBER: Color = hex(0xff7d38);
 const MINT: Color = hex(0x59f099);
 const INDIGO: Color = hex(0x7d82ff);
 const ORCHID: Color = hex(0xf263c7);
-/// The chapter hues, in the order the sector rows index them.
-const PALETTE: [Color; 7] = [RED, EMBER, AMBER, MINT, CYAN, INDIGO, ORCHID];
+// Brick hues for the later chapters. None is cyan, amber or red, which
+// mean the player, cores and medals, and the drain.
+const LIME: Color = hex(0xb5ea4f);
+const SEAFOAM: Color = hex(0x8ff0c8);
+const AZURE: Color = hex(0x5b9dff);
+const PERIWINKLE: Color = hex(0x9fb0ff);
+const PEACH: Color = hex(0xffa27a);
+const VIOLET: Color = hex(0xb06bff);
+const LILAC: Color = hex(0xd9a6ff);
+/// Every brick hue, in the order the chapters' rows index them. The first
+/// seven are the first chapter's rainbow, which predates the rule above.
+const PALETTE: [Color; 14] = [
+    RED, EMBER, AMBER, MINT, CYAN, INDIGO, ORCHID, LIME, SEAFOAM, AZURE, PERIWINKLE, PEACH, VIOLET,
+    LILAC,
+];
 
 /// The spacing scale, in scene units (4, 8, 12, 16, 24, 32, 48, 64).
 /// Layouts step by these and nothing in between, so related things always
@@ -1944,14 +1957,28 @@ fn hp_grid(game: &Game) -> [u8; CELLS] {
     hp
 }
 
+/// A chapter's brick hue in grid `row`: each chapter is a set of hues,
+/// top row first, indexing [`PALETTE`].
 fn sector_color(row: usize, chapter: Chapter) -> Color {
-    const BLUE: [usize; 7] = [4, 4, 5, 5, 6, 5, 4];
-    const DUSK: [usize; 7] = [6, 0, 1, 2, 1, 0, 6];
-    PALETTE[match chapter {
-        Chapter::Daybreak => row % 7,
-        Chapter::BlueHour => BLUE[row % 7],
-        Chapter::Afterlight => DUSK[row % 7],
-    }]
+    const ROWS: [[usize; 7]; 8] = [
+        // Daybreak: the full rainbow, the sun not yet sorted from the sky.
+        [0, 1, 2, 3, 4, 5, 6],
+        // Morning: seafoam overhead to fresh lime, a little peach low down.
+        [8, 8, 3, 3, 7, 7, 11],
+        // Zenith: the high, blue noon, mint at its heart.
+        [10, 9, 9, 3, 9, 9, 10],
+        // Golden Hour: warm light, ember and peach around orchid.
+        [1, 11, 11, 6, 11, 11, 1],
+        // Afterlight: orchid and ember with the last red.
+        [6, 0, 1, 2, 1, 0, 6],
+        // Blue Hour: cyan and indigo.
+        [4, 4, 5, 5, 6, 5, 4],
+        // Eclipse: violets, the light at the edge of a shadow.
+        [12, 13, 5, 12, 5, 13, 12],
+        // Aurora: green low, violet and orchid high, as auroras are.
+        [6, 12, 13, 8, 3, 3, 7],
+    ];
+    PALETTE[ROWS[chapter.index()][row % 7]]
 }
 /// A power's hue: never amber, which is the cores' and the medals'.
 fn power_color(power: Power) -> Color {

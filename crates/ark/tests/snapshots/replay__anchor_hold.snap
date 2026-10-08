@@ -1,11 +1,11 @@
 ---
-source: tests/replay.rs
+source: crates/ark/tests/replay.rs
 expression: r.out
 ---
 anchor catches held for seconds, then released
-  1024  sector 02 playing   score    125  lives 3  bricks 35  aebdd05735406fca
-  2048  sector 02 playing   score    250  lives 3  bricks 34  9bc26ad8ca15967b
-  3072  sector 02 playing   score    375  lives 3  bricks 33  a0ade4f796778307
-  4096  sector 02 playing   score    650  lives 3  bricks 31  d92c55f26cb0c337
-  5120  sector 02 playing   score   1050  lives 3  bricks 28  d0dcf7b906f008ec
-  6144  sector 02 playing   score   1050  lives 3  bricks 28  34a43612278502d3
+  1024  sector 09 playing   score    125  lives 3  bricks 35  ae593f342cc9e972
+  2048  sector 09 playing   score    250  lives 3  bricks 34  29a565f3fd591567
+  3072  sector 09 playing   score    375  lives 3  bricks 33  735f820a61db8807
+  4096  sector 09 playing   score    650  lives 3  bricks 31  9bb38a54279714b3
+  5120  sector 09 playing   score   1050  lives 3  bricks 28  8790a037dd71a754
+  6144  sector 09 playing   score   1050  lives 3  bricks 28  5bedff1bae0ccc23

@@ -116,7 +116,7 @@ impl Ui {
 
 /// Where the last frame drew what the pointer can hit, so a click lands
 /// on what the player saw, wherever the fit chain put it.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Hits {
     /// The list `rows` belong to.
     pub list: Option<List>,
@@ -126,6 +126,17 @@ pub struct Hits {
     pub back: Option<Rect>,
     /// The sector detail's Play action.
     pub play: Option<Rect>,
+}
+impl Default for Hits {
+    fn default() -> Self {
+        Self {
+            list: None,
+            rows: [Rect::default(); MAX_ROWS],
+            count: 0,
+            back: None,
+            play: None,
+        }
+    }
 }
 impl Hits {
     /// Starts the rows of `list`, dropping any drawn under it: a sheet

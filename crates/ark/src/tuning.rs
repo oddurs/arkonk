@@ -1,7 +1,12 @@
 //! Every rule constant, named. Distances are world pixels, speeds pixels per
 //! second, and durations ticks unless the name says seconds. Changing any of
 //! these changes the game, and the golden replays will say so.
-use crate::{Power, clock::TICK_HZ, geom::V2, sectors::SECTOR_COUNT};
+use crate::{
+    Power,
+    clock::TICK_HZ,
+    geom::V2,
+    sectors::{SECTOR_COUNT, SECTORS},
+};
 
 // The paddle.
 
@@ -93,8 +98,35 @@ pub const DROP_ORDER: [Power; 5] = [
     Power::Multi,
     Power::Phase,
 ];
-/// How many of [`DROP_ORDER`] each sector's random drops can be.
-pub const POWER_UNLOCKS: [usize; SECTOR_COUNT] = [2, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5];
+/// How many of [`DROP_ORDER`] each sector's random drops can be: the powers
+/// an opening capsule has taught by then, so every power first appears as
+/// the capsule that teaches it. The openings must teach in drop order.
+pub const POWER_UNLOCKS: [usize; SECTOR_COUNT] = power_unlocks();
+
+const fn power_unlocks() -> [usize; SECTOR_COUNT] {
+    let mut unlocks = [0; SECTOR_COUNT];
+    let mut taught = 0;
+    let mut i = 0;
+    while i < SECTOR_COUNT {
+        let opening = SECTORS[i].opening as usize;
+        let mut known = false;
+        let mut k = 0;
+        while k < taught {
+            known |= DROP_ORDER[k] as usize == opening;
+            k += 1;
+        }
+        if !known {
+            assert!(
+                taught < DROP_ORDER.len() && DROP_ORDER[taught] as usize == opening,
+                "openings teach the powers in drop order"
+            );
+            taught += 1;
+        }
+        unlocks[i] = taught;
+        i += 1;
+    }
+    unlocks
+}
 
 // Relays.
 

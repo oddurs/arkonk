@@ -40,6 +40,8 @@ pub enum Violation {
     Clocks,
     /// The random generator reached zero, where it would stay.
     Rng,
+    /// The gates are solid or ghosts out of time with the sector's beat.
+    Beat,
 }
 
 /// The board's thickest armour.
@@ -100,6 +102,10 @@ impl Game {
         }
         if self.rng.is_stuck() {
             return Err(Violation::Rng);
+        }
+        let ghosts = self.beat().is_some_and(|beat| !beat.solid);
+        if self.board.gates_are_ghosts() != ghosts {
+            return Err(Violation::Beat);
         }
         Ok(())
     }
