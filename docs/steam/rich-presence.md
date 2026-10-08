@@ -5,15 +5,15 @@ Friends see one of:
 | State | Shown as |
 | --- | --- |
 | Title screen, sector select | In menus |
-| Journey run | Sector 03 · Slipstream |
-| Sector select practice | Practicing Sector 03 · Slipstream |
+| Journey run | Sector 17 · Slipstream |
+| Sector select practice | Practicing Sector 17 · Slipstream |
 
 The game sets three keys, and only when the state changes:
 
 | Key | Value |
 | --- | --- |
 | `steam_display` | `#Menus`, `#Journey` or `#Practice` |
-| `sector` | Two-digit sector number, e.g. `03` |
+| `sector` | Two-digit sector number, e.g. `17` |
 | `name` | The sector's slug, e.g. `slipstream` |
 
 `steam_display` must name a token that Steam knows, or Steam shows nothing.

@@ -17,12 +17,10 @@ pub enum Achievement {
     FirstLight,
     Clean,
     Swift,
-    Daybreak,
-    BlueHour,
-    Afterlight,
-    DaybreakMedals,
-    BlueHourMedals,
-    AfterlightMedals,
+    /// Every sector of the chapter cleared.
+    Chapter(Chapter),
+    /// Every medal of the chapter's sectors.
+    ChapterMedals(Chapter),
     AllMedals,
     Homecoming,
     Chain,
@@ -30,31 +28,41 @@ pub enum Achievement {
 impl Achievement {
     /// Every achievement, for checking the partner-site table.
     #[cfg(test)]
-    const ALL: [Self; 12] = [
-        Self::FirstLight,
-        Self::Clean,
-        Self::Swift,
-        Self::Daybreak,
-        Self::BlueHour,
-        Self::Afterlight,
-        Self::DaybreakMedals,
-        Self::BlueHourMedals,
-        Self::AfterlightMedals,
-        Self::AllMedals,
-        Self::Homecoming,
-        Self::Chain,
-    ];
+    fn all() -> Vec<Self> {
+        [Self::FirstLight, Self::Clean, Self::Swift]
+            .into_iter()
+            .chain(Chapter::ALL.map(Self::Chapter))
+            .chain(Chapter::ALL.map(Self::ChapterMedals))
+            .chain([Self::AllMedals, Self::Homecoming, Self::Chain])
+            .collect()
+    }
+    /// The partner site's name. The three chapters of the 12-sector
+    /// journey keep theirs.
     pub fn api_name(self) -> &'static str {
         match self {
             Self::FirstLight => "FIRST_LIGHT",
             Self::Clean => "CLEAN",
             Self::Swift => "SWIFT",
-            Self::Daybreak => "CHAPTER_DAYBREAK",
-            Self::BlueHour => "CHAPTER_BLUE_HOUR",
-            Self::Afterlight => "CHAPTER_AFTERLIGHT",
-            Self::DaybreakMedals => "MEDALS_DAYBREAK",
-            Self::BlueHourMedals => "MEDALS_BLUE_HOUR",
-            Self::AfterlightMedals => "MEDALS_AFTERLIGHT",
+            Self::Chapter(c) => match c {
+                Chapter::Daybreak => "CHAPTER_DAYBREAK",
+                Chapter::Morning => "CHAPTER_MORNING",
+                Chapter::Zenith => "CHAPTER_ZENITH",
+                Chapter::GoldenHour => "CHAPTER_GOLDEN_HOUR",
+                Chapter::Afterlight => "CHAPTER_AFTERLIGHT",
+                Chapter::BlueHour => "CHAPTER_BLUE_HOUR",
+                Chapter::Eclipse => "CHAPTER_ECLIPSE",
+                Chapter::Aurora => "CHAPTER_AURORA",
+            },
+            Self::ChapterMedals(c) => match c {
+                Chapter::Daybreak => "MEDALS_DAYBREAK",
+                Chapter::Morning => "MEDALS_MORNING",
+                Chapter::Zenith => "MEDALS_ZENITH",
+                Chapter::GoldenHour => "MEDALS_GOLDEN_HOUR",
+                Chapter::Afterlight => "MEDALS_AFTERLIGHT",
+                Chapter::BlueHour => "MEDALS_BLUE_HOUR",
+                Chapter::Eclipse => "MEDALS_ECLIPSE",
+                Chapter::Aurora => "MEDALS_AURORA",
+            },
             Self::AllMedals => "ALL_MEDALS",
             Self::Homecoming => "JOURNEY_COMPLETE",
             Self::Chain => "CHAIN_REACTION",
@@ -76,36 +84,14 @@ pub fn from_progress(progress: &Progress) -> Vec<Achievement> {
         (Achievement::FirstLight, any(Medals::CLEAR)),
         (Achievement::Clean, any(Medals::CLEAN)),
         (Achievement::Swift, any(Medals::SWIFT)),
-        (
-            Achievement::Daybreak,
-            chapter(Chapter::Daybreak, Medals::CLEAR),
-        ),
-        (
-            Achievement::BlueHour,
-            chapter(Chapter::BlueHour, Medals::CLEAR),
-        ),
-        (
-            Achievement::Afterlight,
-            chapter(Chapter::Afterlight, Medals::CLEAR),
-        ),
-        (
-            Achievement::DaybreakMedals,
-            chapter(Chapter::Daybreak, Medals::ALL),
-        ),
-        (
-            Achievement::BlueHourMedals,
-            chapter(Chapter::BlueHour, Medals::ALL),
-        ),
-        (
-            Achievement::AfterlightMedals,
-            chapter(Chapter::Afterlight, Medals::ALL),
-        ),
-        (
-            Achievement::AllMedals,
-            medals(None).all(|m| m == Medals::ALL),
-        ),
     ]
     .into_iter()
+    .chain(Chapter::ALL.map(|c| (Achievement::Chapter(c), chapter(c, Medals::CLEAR))))
+    .chain(Chapter::ALL.map(|c| (Achievement::ChapterMedals(c), chapter(c, Medals::ALL))))
+    .chain([(
+        Achievement::AllMedals,
+        medals(None).all(|m| m == Medals::ALL),
+    )])
     .filter_map(|(a, earned)| earned.then_some(a))
     .collect()
 }
@@ -135,7 +121,7 @@ mod tests {
     use std::fmt::Write;
 
     fn with_medals(medals: [Medals; SECTOR_COUNT]) -> Progress {
-        let mut file = String::from("ARKONK 1\n");
+        let mut file = String::from("ARKONK 2\n");
         for (i, m) in medals.into_iter().enumerate() {
             let ticks = if m == Medals::NONE { 0 } else { 24000 };
             writeln!(file, "record {i} {} {ticks}", m.bits()).unwrap();
@@ -151,7 +137,7 @@ mod tests {
     #[test]
     fn single_medals_unlock_their_firsts() {
         let mut medals = [Medals::NONE; SECTOR_COUNT];
-        medals[5] = Medals::CLEAR | Medals::SWIFT;
+        medals[45] = Medals::CLEAR | Medals::SWIFT;
         assert_eq!(
             from_progress(&with_medals(medals)),
             [Achievement::FirstLight, Achievement::Swift]
@@ -160,28 +146,36 @@ mod tests {
 
     #[test]
     fn chapters_need_every_sector_in_that_chapter() {
+        use Achievement::{Chapter as Cleared, ChapterMedals};
         let mut medals = [Medals::NONE; SECTOR_COUNT];
-        medals[..4].fill(Medals::CLEAR);
-        medals[4..7].fill(Medals::ALL);
+        medals[..8].fill(Medals::CLEAR);
+        medals[8..15].fill(Medals::ALL);
         let earned = from_progress(&with_medals(medals));
-        assert!(earned.contains(&Achievement::Daybreak));
-        assert!(!earned.contains(&Achievement::DaybreakMedals));
-        assert!(!earned.contains(&Achievement::BlueHour));
-        assert!(!earned.contains(&Achievement::BlueHourMedals));
-        medals[7] = Medals::ALL;
+        assert!(earned.contains(&Cleared(Chapter::Daybreak)));
+        assert!(!earned.contains(&ChapterMedals(Chapter::Daybreak)));
+        assert!(!earned.contains(&Cleared(Chapter::Morning)));
+        assert!(!earned.contains(&ChapterMedals(Chapter::Morning)));
+        medals[15] = Medals::ALL;
         let earned = from_progress(&with_medals(medals));
-        assert!(earned.contains(&Achievement::BlueHour));
-        assert!(earned.contains(&Achievement::BlueHourMedals));
+        assert!(earned.contains(&Cleared(Chapter::Morning)));
+        assert!(earned.contains(&ChapterMedals(Chapter::Morning)));
+        assert!(!earned.contains(&Cleared(Chapter::Zenith)));
         assert!(!earned.contains(&Achievement::AllMedals));
     }
 
     #[test]
-    fn thirty_six_medals_unlock_every_profile_achievement() {
+    fn all_192_medals_unlock_every_profile_achievement() {
         let p = with_medals([Medals::ALL; SECTOR_COUNT]);
-        assert_eq!(p.medal_count(), 36);
+        assert_eq!(p.medal_count(), 192);
         let earned = from_progress(&p);
-        assert_eq!(earned.len(), 10);
+        assert_eq!(earned.len(), 3 + 2 * Chapter::ALL.len() + 1);
         assert!(earned.contains(&Achievement::AllMedals));
+        let mut almost = [Medals::ALL; SECTOR_COUNT];
+        almost[SECTOR_COUNT - 1] = Medals::CLEAR | Medals::CLEAN;
+        let earned = from_progress(&with_medals(almost));
+        assert!(!earned.contains(&Achievement::AllMedals));
+        assert!(!earned.contains(&Achievement::ChapterMedals(Chapter::Aurora)));
+        assert!(earned.contains(&Achievement::Chapter(Chapter::Aurora)));
     }
 
     #[test]
@@ -237,9 +231,13 @@ mod tests {
     #[test]
     fn partner_site_table_lists_every_api_name() {
         let doc = include_str!("../docs/steam/achievements.md");
-        for a in Achievement::ALL {
+        let all = Achievement::all();
+        for (i, a) in all.iter().enumerate() {
             assert!(doc.contains(&format!("`{}`", a.api_name())), "{a:?}");
+            assert!(!all[..i].iter().any(|b| b.api_name() == a.api_name()));
         }
+        assert_eq!(all.len(), 22);
         assert!(doc.contains(&format!("`{MEDALS_STAT}`")));
+        assert!(doc.contains("| 0 / 192 / 0 |"));
     }
 }
