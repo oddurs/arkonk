@@ -527,7 +527,10 @@ pub(super) fn medal_pip(v: &Scene, r: Rect, earned: bool) {
     let r = v.snap_rect(r);
     let radius = r.h / 2.0 + 0.5;
     if earned {
-        v.halo(r, radius, 5.0, opacity(AMBER, 0.5));
+        v.glow(
+            Rect::new(r.x - 6.0, r.y - 6.0, r.w + 12.0, r.h + 12.0),
+            opacity(AMBER, 0.6),
+        );
         v.shape(r, [radius; 4], Fill::ramp(hex(0xffe2a3), AMBER));
     } else {
         v.shape(r, [radius; 4], Fill::flat(hex(0x232836)));

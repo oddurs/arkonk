@@ -5,6 +5,10 @@
 use super::*;
 use crate::ui::Prompt;
 
+fn grow(r: Rect, x: f32, y: f32) -> Rect {
+    Rect::new(r.x - x, r.y - y, r.w + 2.0 * x, r.h + 2.0 * y)
+}
+
 /// The arch's outer edge on a Regular screen. Its last fifth fades to
 /// night, as the design's mask does, so the one open side is the one a
 /// ball can leave by.
@@ -74,21 +78,23 @@ pub(super) fn field_region(v: &Scene, layer: u8) {
 }
 
 /// The arch, the field inside it, and the walls: everything under the
-/// pieces. `flash` lights the walls after a bounce.
-pub(super) fn arch(v: &Scene, flash: f32) {
+/// pieces. In play the field holds its chapter's `sky`; `walls` are the
+/// bounces lighting the wall where they struck.
+pub(super) fn arch(v: &Scene, sky: Option<Chapter>, walls: &[WallFlash]) {
     let field = v.snap_rect(Rect::new(LEFT, TOP, RIGHT - LEFT, BOTTOM - TOP));
     let hair = v.thick(1.0);
-    let lift = (flash * 5.0).min(0.6);
-    let wall = |alpha: f32| opacity(CYAN, alpha + (1.0 - alpha) * lift);
+    let wall = |alpha: f32| opacity(CYAN, alpha);
     if v.class == Class::Compact {
         // One-pixel rails, flat glass: nothing a few pixels cannot hold.
         let (arch, _) = parts(v);
         v.rect(field.x, field.y, field.w, field.h, FIELD_GLASS);
         let side = v.snap(arch.x);
-        for x in [side, v.snap(arch.x + arch.w) - hair] {
+        let rails = (side, v.snap(arch.x + arch.w) - hair);
+        for x in [rails.0, rails.1] {
             v.rect(x, field.y, hair, field.h, hex(0x1e2a35));
         }
         v.rect(field.x, field.y, field.w, hair, wall(0.45));
+        flashes(v, walls, (rails.0, rails.1, field.y), hair);
         return;
     }
     let (frame, _) = parts(v);
@@ -125,15 +131,114 @@ pub(super) fn arch(v: &Scene, flash: f32) {
 
     let fr = FIELD_RADIUS;
     v.shape(field, [fr, fr, 0.0, 0.0], Fill::flat(FIELD_GLASS));
+    if let Some(chapter) = sky {
+        chapter_sky(v, field, chapter);
+    }
     // The walls are the field's own edge: cyan hairlines, brightest on
     // the ceiling, and none at the bottom.
     top_edge(v, field, (fr, hair), wall(0.20), wall(0.13));
+    flashes(v, walls, (field.x, field.x + field.w - hair, field.y), hair);
     let drain = v.snap(BOTTOM - DRAIN);
     v.ramp(
         Rect::new(field.x, drain, field.w, field.y + field.h - drain),
         opacity(NIGHT, 0.0),
         NIGHT,
     );
+}
+
+/// One sky per chapter, in the field glass: a single quad of vertex
+/// colours. Daybreak warms from below, Blue Hour pools cool light at the
+/// top, and Afterlight comes low from one side.
+fn chapter_sky(v: &Scene, field: Rect, chapter: Chapter) {
+    let clear = |c: Color| opacity(c, 0.0);
+    match chapter {
+        Chapter::Daybreak => {
+            let top = field.y + 0.45 * field.h;
+            let r = Rect::new(field.x, top, field.w, field.y + field.h - top);
+            v.ramp(r, clear(EMBER), opacity(EMBER, 0.09));
+        }
+        Chapter::BlueHour => {
+            let r = Rect::new(field.x, field.y, field.w, 0.55 * field.h);
+            let fr = FIELD_RADIUS;
+            v.shape(
+                r,
+                [fr, fr, 0.0, 0.0],
+                Fill::ramp(opacity(INDIGO, 0.08), clear(INDIGO)),
+            );
+        }
+        Chapter::Afterlight => {
+            // Below the rounded corners, so nothing tints the arch.
+            let top = field.y + FIELD_RADIUS;
+            let (left, right, bottom) = (field.x, field.x + field.w, field.y + field.h);
+            let corner = |k: f32| opacity(ORCHID, k);
+            let vertices = [
+                v.vertex(vec2(left, top), corner(0.03)),
+                v.vertex(vec2(right, top), corner(0.0)),
+                v.vertex(vec2(right, bottom), corner(0.03)),
+                v.vertex(vec2(left, bottom), corner(0.09)),
+            ];
+            v.mesh(&vertices, &[0, 1, 3, 1, 2, 3]);
+        }
+    }
+}
+
+/// Each bounce lights 70 units of its wall around the contact, cyan
+/// fading to nothing at both ends, for 120 ms. `rails` are the left and
+/// right walls' x and the ceiling's y; `t` their thickness.
+fn flashes(v: &Scene, walls: &[WallFlash], (left, right, top): (f32, f32, f32), t: f32) {
+    const HALF: f32 = 35.0;
+    let reduced = v.look.get().reduced;
+    for flash in walls {
+        let k = status::Flash::WALL.at(flash.age, reduced);
+        if k <= 0.0 {
+            continue;
+        }
+        let lit = opacity(CYAN, 0.8 * k);
+        let clear = opacity(CYAN, 0.0);
+        let at = flash.along;
+        let (a, mid, b, across) = match flash.wall {
+            Wall::Top => (
+                vec2(at - HALF, top),
+                vec2(at, top),
+                vec2(at + HALF, top),
+                vec2(0.0, t),
+            ),
+            Wall::Left | Wall::Right => {
+                let x = if flash.wall == Wall::Left {
+                    left
+                } else {
+                    right
+                };
+                (
+                    vec2(x, at - HALF),
+                    vec2(x, at),
+                    vec2(x, at + HALF),
+                    vec2(t, 0.0),
+                )
+            }
+        };
+        for (from, to) in [(a, mid), (mid, b)] {
+            let (cf, ct) = if from == a {
+                (clear, lit)
+            } else {
+                (lit, clear)
+            };
+            let vertices = [
+                v.vertex(from, cf),
+                v.vertex(to, ct),
+                v.vertex(to + across, ct),
+                v.vertex(from + across, cf),
+            ];
+            v.mesh(&vertices, &[0, 1, 2, 0, 2, 3]);
+        }
+        let glow = Rect::new(
+            a.x.min(b.x) - 6.0,
+            a.y.min(b.y) - 6.0,
+            (b.x - a.x).abs() + across.x + 12.0,
+            (b.y - a.y).abs() + across.y + 12.0,
+        );
+        v.glow(glow, opacity(CYAN, 0.5 * k));
+    }
 }
 
 /// The top and sides of `r`, its top corners rounded, as a line `t`
@@ -200,7 +305,7 @@ pub(super) fn pips(
         }
         let radii = [2.0; 4];
         if Some(id) == current {
-            v.halo(r, 2.0, 4.0, opacity(CYAN, 0.45));
+            v.glow(grow(r, 6.0, 6.0), opacity(CYAN, 0.8));
             v.shape(r, radii, Fill::ramp(hex(0xb8f3fc), CYAN));
         } else if profile.progress.record(id).medals != Medals::NONE {
             v.shape(
@@ -356,14 +461,15 @@ fn lives(v: &Scene, right: f32, mid: f32, lives: u8, (entry, gained): (u8, f32))
         let bounds = Rect::new(p.x - D / 2.0, p.y - D / 2.0, D, D);
         if i < lives {
             if gained > 0.0 && i + 1 == lives {
-                v.halo(bounds, D / 2.0, 12.0, opacity(AMBER, 0.6 * gained));
+                v.glow(grow(bounds, 14.0, 14.0), opacity(AMBER, 0.6 * gained));
                 v.ring(p, D / 2.0, 4.0, opacity(AMBER, 0.25 * gained));
             }
-            v.halo(bounds, D / 2.0, 4.0, opacity(hex(0xdcf0ff), 0.3));
+            // The ball's own pearl and halo, small.
+            v.glow(grow(bounds, 7.0, 7.0), opacity(hex(0xdcf0ff), 0.35));
             v.pearl(p, D / 2.0, 1.0);
         } else {
-            let t = v.thick(1.5);
-            v.ring(p, D / 2.0 - t, t, hex(0x3a4256));
+            let t = v.thick(0.75);
+            v.ring(p, D / 2.0 - t, t, MUTED);
         }
     }
     let row = (f32::from(count) * (D + GAP) - GAP).max(0.0);
