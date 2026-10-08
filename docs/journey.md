@@ -44,13 +44,13 @@ Serve speed by sector, one bar per sector, 420 to 625 px/s:
 
 ```
 Daybreak     ▁▁▁▁▁▁▁▂  420–460
-Morning      ▁▁▁▂▂▂▂▃  440–485
+Morning      ▁▁▁▂▂▂▂▃  440–483
 Zenith       ▂▂▂▃▃▃▃▄  460–510
 Golden Hour  ▃▃▃▃▄▄▄▅  480–535
-Afterlight   ▃▄▄▄▄▅▅▆  500–560
+Afterlight   ▃▄▄▄▄▅▅▅  500–555
 Blue Hour    ▃▃▄▄▄▄▅▅  490–550
-Eclipse      ▄▄▅▅▅▆▆▆  520–580
-Aurora       ▅▆▆▆▇▇▇█  550–625
+Eclipse      ▄▄▅▅▅▆▆▆  520–585
+Aurora       ▅▅▆▆▇▇▇█  550–625
 ```
 
 Blue Hour steps further back than the other chapters: darkness is the
@@ -63,105 +63,105 @@ is the Swift medal's target, derived as described under [Par times](#par-times).
 
 | # | Sector | Opens with | Speed | Bricks | Armour | Cores | Gates | Dark | Par |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 1 | First Light * | Wide | 420 | 34 | – | – | – | – | – |
-| 2 | Drift | Slow | 425 | 24 | – | – | – | – | – |
-| 3 | Horizon | Wide | 430 | 30 | – | – | – | – | – |
-| 4 | Glimmer | Slow | 435 | 25 | – | – | – | – | – |
-| 5 | Skylark | Wide | 440 | 24 | – | – | – | – | – |
-| 6 | Lanterns | Slow | 445 | 36 | – | – | – | – | – |
-| 7 | Tidewater | Wide | 450 | 32 | – | – | – | – | – |
-| 8 | Sunrise | Slow | 460 | 44 | – | – | – | – | – |
+| 1 | First Light * | Wide | 420 | 34 | – | – | – | – | 170 s |
+| 2 | Drift | Slow | 425 | 24 | – | – | – | – | 95 s |
+| 3 | Horizon | Wide | 430 | 30 | – | – | – | – | 105 s |
+| 4 | Glimmer | Slow | 435 | 25 | – | – | – | – | 115 s |
+| 5 | Skylark | Wide | 440 | 24 | – | – | – | – | 115 s |
+| 6 | Lanterns | Slow | 445 | 36 | – | – | – | – | 135 s |
+| 7 | Tidewater | Wide | 450 | 32 | – | – | – | – | 85 s |
+| 8 | Sunrise | Slow | 460 | 44 | – | – | – | – | 165 s |
 
 **2 · Morning** (Anchor, aiming, first armour)
 
 | # | Sector | Opens with | Speed | Bricks | Armour | Cores | Gates | Dark | Par |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 9 | Satellites * | Anchor | 440 | 36 | 11 % | – | – | – | – |
-| 10 | Dewpoint | Wide | 445 | 28 | 29 % | – | – | – | – |
-| 11 | Aperture | Anchor | 450 | 34 | 29 % | – | – | – | – |
-| 12 | Cloister | Anchor | 455 | 36 | 11 % | – | – | – | – |
-| 13 | Keystone | Slow | 460 | 26 | 23 % | – | – | – | – |
-| 14 | Sundial | Wide | 470 | 32 | 19 % | – | – | – | – |
-| 15 | Pinhole | Anchor | 475 | 41 | 27 % | – | – | – | – |
-| 16 | Windrose | Anchor | 485 | 36 | 33 % | – | – | – | – |
+| 9 | Satellites * | Anchor | 440 | 36 | 11 % | – | – | – | 175 s |
+| 10 | Dewpoint | Wide | 445 | 28 | 29 % | – | – | – | 190 s |
+| 11 | Aperture | Anchor | 450 | 34 | 29 % | – | – | – | 175 s |
+| 12 | Cloister | Anchor | 455 | 36 | 11 % | – | – | – | 125 s |
+| 13 | Keystone | Slow | 460 | 26 | 23 % | – | – | – | 185 s |
+| 14 | Sundial | Wide | 470 | 32 | 19 % | – | – | – | 170 s |
+| 15 | Pinhole | Anchor | 475 | 41 | 27 % | – | – | – | 120 s |
+| 16 | Windrose | Anchor | 483 | 36 | 33 % | – | – | – | 200 s |
 
 **3 · Zenith** (relay cores and chains)
 
 | # | Sector | Opens with | Speed | Bricks | Armour | Cores | Gates | Dark | Par |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 17 | Slipstream * | Anchor | 460 | 36 | – | 11 % | – | – | – |
-| 18 | Filament | Wide | 465 | 42 | – | 24 % | – | – | – |
-| 19 | Meridian | Anchor | 470 | 36 | – | 33 % | – | – | – |
-| 20 | Cascade | Wide | 480 | 35 | – | 40 % | – | – | – |
-| 21 | Crossfade * | Anchor | 485 | 54 | 11 % | 30 % | – | – | – |
-| 22 | Switchback | Anchor | 490 | 64 | – | 38 % | – | – | – |
-| 23 | Solstice | Slow | 500 | 54 | – | 33 % | – | – | – |
-| 24 | Resonance * | Anchor | 510 | 42 | 5 % | 24 % | – | – | – |
+| 17 | Slipstream * | Anchor | 460 | 36 | – | 11 % | – | – | 120 s |
+| 18 | Filament | Wide | 465 | 42 | – | 24 % | – | – | 70 s |
+| 19 | Meridian | Anchor | 470 | 36 | – | 33 % | – | – | 90 s |
+| 20 | Cascade | Wide | 480 | 35 | – | 40 % | – | – | 75 s |
+| 21 | Crossfade * | Anchor | 485 | 54 | 11 % | 30 % | – | – | 105 s |
+| 22 | Switchback | Anchor | 490 | 64 | – | 38 % | – | – | 60 s |
+| 23 | Solstice | Slow | 500 | 54 | – | 33 % | – | – | 45 s |
+| 24 | Resonance * | Anchor | 510 | 42 | 5 % | 24 % | – | – | 100 s |
 
 **4 · Golden Hour** (Multiball, dense fields)
 
 | # | Sector | Opens with | Speed | Bricks | Armour | Cores | Gates | Dark | Par |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 25 | Prism * | Multi | 480 | 52 | 19 % | 15 % | – | – | – |
-| 26 | Honeycomb | Multi | 485 | 54 | – | 11 % | – | – | – |
-| 27 | Spindrift | Multi | 495 | 42 | 10 % | – | – | – | – |
-| 28 | Undertow * | Wide | 500 | 64 | 19 % | 19 % | – | – | – |
-| 29 | Harvest | Multi | 510 | 72 | 17 % | 11 % | – | – | – |
-| 30 | Kaleidoscope | Anchor | 515 | 60 | 10 % | 30 % | – | – | – |
-| 31 | Tapestry | Multi | 525 | 66 | 27 % | 18 % | – | – | – |
-| 32 | Long Shadows | Multi | 535 | 54 | 11 % | 33 % | – | – | – |
+| 25 | Prism * | Multi | 480 | 52 | 19 % | 15 % | – | – | 125 s |
+| 26 | Honeycomb | Multi | 485 | 54 | – | 11 % | – | – | 120 s |
+| 27 | Spindrift | Multi | 495 | 42 | 10 % | – | – | – | 140 s |
+| 28 | Undertow * | Wide | 500 | 64 | 19 % | 19 % | – | – | 110 s |
+| 29 | Harvest | Multi | 510 | 72 | 17 % | 11 % | – | – | 175 s |
+| 30 | Kaleidoscope | Anchor | 515 | 60 | 10 % | 30 % | – | – | 110 s |
+| 31 | Tapestry | Multi | 525 | 66 | 27 % | 18 % | – | – | 160 s |
+| 32 | Long Shadows | Multi | 535 | 54 | 11 % | 33 % | – | – | 100 s |
 
 **5 · Afterlight** (Phase, armoured shells around cores)
 
 | # | Sector | Opens with | Speed | Bricks | Armour | Cores | Gates | Dark | Par |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 33 | Afterglow * | Phase | 500 | 58 | 17 % | 14 % | – | – | – |
-| 34 | Chrysalis | Phase | 510 | 30 | 40 % | 27 % | – | – | – |
-| 35 | Geode | Phase | 515 | 38 | 47 % | 21 % | – | – | – |
-| 36 | Parallax * | Phase | 525 | 72 | 33 % | 22 % | – | – | – |
-| 37 | Citadel | Phase | 530 | 58 | 59 % | 10 % | – | – | – |
-| 38 | Nautilus | Phase | 540 | 65 | 65 % | 35 % | – | – | – |
-| 39 | Vespers | Anchor | 550 | 48 | 50 % | 25 % | – | – | – |
-| 40 | Supernova * | Multi | 560 | 48 | 17 % | 33 % | – | – | – |
+| 33 | Afterglow * | Phase | 500 | 58 | 17 % | 14 % | – | – | 135 s |
+| 34 | Chrysalis | Phase | 510 | 30 | 40 % | 27 % | – | – | 125 s |
+| 35 | Geode | Phase | 515 | 38 | 47 % | 21 % | – | – | 120 s |
+| 36 | Parallax * | Phase | 525 | 72 | 33 % | 22 % | – | – | 160 s |
+| 37 | Citadel | Phase | 530 | 58 | 59 % | 10 % | – | – | 200 s |
+| 38 | Nautilus | Phase | 540 | 65 | 65 % | 35 % | – | – | 165 s |
+| 39 | Vespers | Anchor | 550 | 48 | 50 % | 25 % | – | – | 125 s |
+| 40 | Supernova * | Multi | 555 | 48 | 17 % | 33 % | – | – | 90 s |
 
 **6 · Blue Hour** (darkness)
 
 | # | Sector | Opens with | Speed | Bricks | Armour | Cores | Gates | Dark | Par |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 41 | Moonrise * | Multi | 490 | 50 | 16 % | 24 % | – | – | – |
-| 42 | Gloaming | Slow | 500 | 40 | 15 % | 10 % | – | 30 % | – |
-| 43 | Lamplight | Wide | 505 | 42 | 10 % | 14 % | – | 50 % | – |
-| 44 | Fireflies | Slow | 515 | 35 | – | 20 % | – | 65 % | – |
-| 45 | Lighthouse | Anchor | 520 | 42 | 10 % | 5 % | – | 80 % | – |
-| 46 | Nocturne | Multi | 530 | 41 | 15 % | 7 % | – | 90 % | – |
-| 47 | Deep Field | Phase | 540 | 31 | 19 % | 19 % | – | 95 % | – |
-| 48 | Constellation | Anchor | 550 | 30 | 13 % | 53 % | – | 100 % | – |
+| 41 | Moonrise * | Multi | 490 | 50 | 16 % | 24 % | – | – | 125 s |
+| 42 | Gloaming | Slow | 500 | 40 | 15 % | 10 % | – | 30 % | 115 s |
+| 43 | Lamplight | Wide | 505 | 42 | 10 % | 14 % | – | 50 % | 135 s |
+| 44 | Fireflies | Slow | 515 | 35 | – | 20 % | – | 65 % | 115 s |
+| 45 | Lighthouse | Anchor | 520 | 42 | 10 % | 5 % | – | 80 % | 125 s |
+| 46 | Nocturne | Multi | 530 | 41 | 15 % | 7 % | – | 90 % | 120 s |
+| 47 | Deep Field | Phase | 540 | 31 | 19 % | 19 % | – | 95 % | 90 s |
+| 48 | Constellation | Anchor | 550 | 30 | 13 % | 53 % | – | 100 % | 50 s |
 
 **7 · Eclipse** (gate bricks on a beat)
 
 | # | Sector | Opens with | Speed | Bricks | Armour | Cores | Gates | Dark | Par |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 49 | Penumbra | Slow | 520 | 36 | – | – | 22 % | – | – |
-| 50 | Metronome | Wide | 530 | 52 | – | – | 15 % | – | – |
-| 51 | Corona | Anchor | 535 | 40 | – | 30 % | 40 % | – | – |
-| 52 | Syzygy | Slow | 545 | 39 | 31 % | 21 % | 8 % | – | – |
-| 53 | Pulsar | Multi | 550 | 38 | – | 21 % | 53 % | – | – |
-| 54 | Shutter | Phase | 560 | 48 | 25 % | – | 42 % | – | – |
-| 55 | Umbra | Anchor | 570 | 47 | 11 % | 21 % | 26 % | – | – |
-| 56 | Totality | Phase | 580 | 58 | 38 % | 24 % | 38 % | – | – |
+| 49 | Penumbra | Slow | 520 | 36 | – | – | 22 % | – | 130 s |
+| 50 | Metronome | Wide | 530 | 52 | – | – | 15 % | – | 140 s |
+| 51 | Corona | Anchor | 535 | 40 | – | 30 % | 40 % | – | 95 s |
+| 52 | Syzygy | Slow | 545 | 39 | 31 % | 21 % | 8 % | – | 120 s |
+| 53 | Pulsar | Multi | 550 | 38 | – | 21 % | 53 % | – | 120 s |
+| 54 | Shutter | Phase | 560 | 48 | 25 % | – | 42 % | – | 140 s |
+| 55 | Umbra | Anchor | 582 | 47 | 11 % | 21 % | 26 % | – | 95 s |
+| 56 | Totality | Phase | 585 | 58 | 38 % | 24 % | 38 % | – | 190 s |
 
 **8 · Aurora** (everything, faster)
 
 | # | Sector | Opens with | Speed | Bricks | Armour | Cores | Gates | Dark | Par |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---:|
-| 57 | Solar Wind | Wide | 550 | 42 | 33 % | 17 % | 17 % | – | – |
-| 58 | Borealis | Multi | 560 | 37 | 35 % | 16 % | 11 % | – | – |
-| 59 | Ribbons | Slow | 570 | 46 | 9 % | 39 % | 13 % | – | – |
-| 60 | Polar Night | Anchor | 580 | 42 | 33 % | 10 % | 10 % | 80 % | – |
-| 61 | Cathedral | Phase | 590 | 38 | 58 % | 21 % | 11 % | – | – |
-| 62 | Shimmer | Multi | 600 | 54 | 30 % | 15 % | 13 % | – | – |
-| 63 | Event Horizon | Phase | 610 | 56 | 36 % | 25 % | 39 % | – | – |
-| 64 | Homecoming * | Phase | 625 | 58 | 31 % | 28 % | – | – | – |
+| 57 | Solar Wind | Wide | 550 | 42 | 33 % | 17 % | 17 % | – | 125 s |
+| 58 | Borealis | Multi | 554 | 37 | 35 % | 16 % | 11 % | – | 95 s |
+| 59 | Ribbons | Slow | 565 | 46 | 9 % | 39 % | 13 % | – | 65 s |
+| 60 | Polar Night | Anchor | 580 | 42 | 33 % | 10 % | 10 % | 80 % | 100 s |
+| 61 | Cathedral | Phase | 590 | 38 | 58 % | 21 % | 11 % | – | 135 s |
+| 62 | Shimmer | Multi | 600 | 54 | 30 % | 15 % | 13 % | – | 170 s |
+| 63 | Event Horizon | Phase | 610 | 56 | 36 % | 25 % | 39 % | – | 140 s |
+| 64 | Homecoming * | Phase | 625 | 58 | 31 % | 28 % | – | – | 75 s |
 
 ## Where the original twelve went
 
