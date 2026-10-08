@@ -758,8 +758,83 @@ fn arabic_sheets_mirror() {
                 "{locale:?}: label not at the left"
             );
         }
+        settings_rows_mirror(locale, &fonts, &atlas);
     }
 }
+
+/// The Effects and Contrast rows of the Settings sheet, in a regular window
+/// and on a Compact page: the name leads the row and the value ends it, so
+/// in Arabic the name is at the right and the value at the left.
+fn settings_rows_mirror(locale: Locale, fonts: &Fonts, atlas: &Atlas) {
+    let rtl = locale == Locale::Ar;
+    let last = crate::settings::ROWS.len() - 1;
+    let ui = Ui {
+        screen: Screen::Play,
+        paused: true,
+        settings: Some(last),
+        ..Ui::default()
+    };
+    let mut profile = Profile::default();
+    profile.settings.reduced_effects = true;
+    profile.settings.high_contrast = true;
+    let rows = [
+        (TextId::SettingEffects, TextId::EffectsReduced),
+        (TextId::SettingContrast, TextId::ContrastHigh),
+    ];
+    for (w, h) in [(1920.0, 1080.0), (240.0, 240.0)] {
+        let view = View::fit(w, h, 1.0).unwrap();
+        let log = RefCell::new(Log::default());
+        let v = Scene::new(
+            None,
+            (atlas, fonts, locale),
+            &view,
+            &ui,
+            String::new(),
+            Some(&log),
+        );
+        scene(&v, &Fx::default(), &Game::new(), &ui, &profile, 1.0, None);
+        let hits = v.hits.into_inner();
+        let placed = log.into_inner().placed;
+        // The sheet sets each string full or short, whichever fits.
+        let find = |id: TextId, row: Rect| {
+            [Form::Full, Form::Short]
+                .into_iter()
+                .find_map(|form| {
+                    let mut s = String::new();
+                    ark_text::write(&mut s, locale, form, id, &[]).unwrap();
+                    placed
+                        .iter()
+                        .find(|p| p.text == s && contains(row, p.rect, 0.5))
+                })
+                .unwrap_or_else(|| panic!("{locale:?} {w}: {id:?} not drawn in its row"))
+                .rect
+        };
+        let mut checked = 0;
+        for (i, (name, value)) in rows.into_iter().enumerate() {
+            let row = hits.rows()[ROWS_BEFORE + i];
+            // A Compact page too short for every row leaves earlier ones off.
+            if row.w == 0.0 {
+                continue;
+            }
+            let (name, value) = (find(name, row), find(value, row));
+            if rtl {
+                assert!(value.right() < name.x, "{locale:?} {w}: value not left");
+                assert!(name.x > row.center().x, "{locale:?} {w}: name not right");
+            } else {
+                assert!(name.right() < value.x, "{locale:?} {w}: value not right");
+                assert!(
+                    name.right() < row.center().x,
+                    "{locale:?} {w}: name not left"
+                );
+            }
+            checked += 1;
+        }
+        assert!(checked > 0, "{locale:?} {w}: no look row drawn");
+    }
+}
+
+/// The settings rows ahead of Effects and Contrast.
+const ROWS_BEFORE: usize = 4;
 
 /// A sector at its busiest: every brick live, three balls in flight, one
 /// phased and one held, all twelve capsules falling, Wide, Slow and
