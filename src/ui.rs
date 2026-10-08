@@ -1,7 +1,7 @@
 use crate::input::Device;
 use ark::{
     SectorSummary, Stage,
-    sectors::{SECTOR_COUNT, SectorId},
+    sectors::{CHAPTER_SECTORS, Chapter, SECTOR_COUNT, SectorId},
 };
 /// The most rows any list has: sector select's, a card per sector.
 const MAX_ROWS: usize = SECTOR_COUNT;
@@ -126,6 +126,8 @@ pub struct Hits {
     pub back: Option<Rect>,
     /// The sector detail's Play action.
     pub play: Option<Rect>,
+    /// Sector select's chapter tabs, in chapter order.
+    pub tabs: [Option<Rect>; 8],
 }
 impl Default for Hits {
     fn default() -> Self {
@@ -135,6 +137,7 @@ impl Default for Hits {
             count: 0,
             back: None,
             play: None,
+            tabs: [None; 8],
         }
     }
 }
@@ -167,6 +170,51 @@ impl Hits {
     pub fn play_at(&self, p: Vec2) -> bool {
         self.play.is_some_and(|r| r.contains(p))
     }
+    /// The chapter whose tab is under `p`.
+    pub fn tab_at(&self, p: Vec2) -> Option<Chapter> {
+        let at = self
+            .tabs
+            .iter()
+            .position(|t| t.is_some_and(|r| r.contains(p)))?;
+        Chapter::new(at)
+    }
+}
+
+/// Where a move on sector select lands. A chapter's eight sectors lie in
+/// rows of `cols`; `dx` and `dy` step across and down them, and stepping
+/// off the grid's left or right edge turns to the chapter beside it, as
+/// `page` does, keeping the place on the grid. A single column is a list:
+/// `dx` steps through the whole journey one sector at a time.
+pub fn sector_step(at: SectorId, cols: usize, (dx, dy): (i32, i32), page: i32) -> SectorId {
+    let last = (SECTOR_COUNT / CHAPTER_SECTORS) as i32 - 1;
+    if cols <= 1 {
+        let to = at.index() as i32 + dx + dy + page * CHAPTER_SECTORS as i32;
+        return SectorId::clamped(to.max(0) as usize);
+    }
+    let cols = cols.min(CHAPTER_SECTORS) as i32;
+    let rows = (CHAPTER_SECTORS as i32 + cols - 1) / cols;
+    let i = at.chapter_index() as i32;
+    let mut chapter = at.sector().chapter.index() as i32 + page;
+    let mut col = i % cols + dx;
+    let row = (i / cols + dy).clamp(0, rows - 1);
+    if col < 0 {
+        if chapter > 0 {
+            chapter -= 1;
+            col = cols - 1;
+        } else {
+            col = 0;
+        }
+    } else if col >= cols {
+        if chapter < last {
+            chapter += 1;
+            col = 0;
+        } else {
+            col = cols - 1;
+        }
+    }
+    let chapter = chapter.clamp(0, last);
+    let place = (row * cols + col).min(CHAPTER_SECTORS as i32 - 1);
+    SectorId::clamped((chapter * CHAPTER_SECTORS as i32 + place) as usize)
 }
 
 /// A stage, and the results card to show with it, drawn in place of the
@@ -297,6 +345,8 @@ pub struct Controls {
     pub down: bool,
     pub left: bool,
     pub right: bool,
+    /// Turn a page of chapters: -1 back, 1 on.
+    pub page: i8,
     pub restart: bool,
     pub focus_lost: bool,
 }
@@ -313,6 +363,9 @@ impl Controls {
             down: is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S),
             left: is_key_pressed(KeyCode::Left),
             right: is_key_pressed(KeyCode::Right),
+            // The brackets set the volume, except on sector select.
+            page: i8::from(is_key_pressed(KeyCode::RightBracket))
+                - i8::from(is_key_pressed(KeyCode::LeftBracket)),
             restart: is_key_pressed(KeyCode::R),
             focus_lost: false,
         }
@@ -394,7 +447,40 @@ mod tests {
             hits.push(Rect::new(i as f32 * 10.0, 0.0, 10.0, 10.0));
         }
         // The last chapter's cards were dropped once the list held eight.
-        assert_eq!(hits.row_at(List::Sectors, Vec2::new(115.0, 5.0)), Some(11));
+        assert_eq!(hits.row_at(List::Sectors, Vec2::new(635.0, 5.0)), Some(63));
+        hits.tabs[7] = Some(Rect::new(0.0, 20.0, 10.0, 10.0));
+        assert_eq!(hits.tab_at(Vec2::new(5.0, 25.0)), Some(Chapter::Aurora));
+        assert_eq!(hits.tab_at(Vec2::new(5.0, 5.0)), None);
+    }
+    #[test]
+    fn sector_select_steps_in_the_grid_and_turns_chapters_at_its_edges() {
+        let at = |i| SectorId::clamped(i);
+        let step = |i, cols, d, page| sector_step(at(i), cols, d, page).index();
+        // A 4 × 2 grid: 16..19 over 20..23 for Zenith.
+        assert_eq!(step(17, 4, (1, 0), 0), 18);
+        assert_eq!(step(17, 4, (0, 1), 0), 21);
+        assert_eq!(step(21, 4, (0, 1), 0), 21);
+        // Off the right edge, the next chapter's first column, same row.
+        assert_eq!(step(19, 4, (1, 0), 0), 24);
+        assert_eq!(step(23, 4, (1, 0), 0), 28);
+        assert_eq!(step(16, 4, (-1, 0), 0), 11);
+        assert_eq!(step(20, 4, (-1, 0), 0), 15);
+        // Pages keep the place; the ends hold.
+        assert_eq!(step(18, 4, (0, 0), 1), 26);
+        assert_eq!(step(18, 4, (0, 0), -1), 10);
+        assert_eq!(step(2, 4, (0, 0), -1), 2);
+        assert_eq!(step(0, 4, (-1, 0), 0), 0);
+        assert_eq!(step(63, 4, (1, 0), 0), 63);
+        assert_eq!(step(60, 4, (0, 0), 1), 60);
+        // Two columns of four.
+        assert_eq!(step(9, 2, (1, 0), 0), 16);
+        assert_eq!(step(9, 2, (0, 1), 0), 11);
+        assert_eq!(step(14, 2, (0, 1), 0), 14);
+        // One column is a list through the journey.
+        assert_eq!(step(7, 1, (1, 0), 0), 8);
+        assert_eq!(step(7, 1, (0, -1), 0), 6);
+        assert_eq!(step(7, 1, (0, 0), 1), 15);
+        assert_eq!(step(0, 1, (-1, 0), 0), 0);
     }
     #[test]
     fn a_pressed_glyph_flashes_briefly() {

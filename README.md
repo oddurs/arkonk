@@ -1,7 +1,7 @@
 # ARKONK
 
-A small, precise brick breaker in Rust. Twelve authored sectors across three
-chapters, saved checkpoints, replayable sectors, and 36 medals to earn at your own
+A small, precise brick breaker in Rust. 64 authored sectors across eight
+chapters, saved checkpoints, replayable sectors, and 192 medals to earn at your own
 pace. Direct mouse control, 240 Hz collision simulation, and restrained feedback
 keep the focus on the next bounce.
 
@@ -109,7 +109,12 @@ the straight-up spot.
 
 ## Your journey
 
-**Daybreak**, **Blue Hour**, and **Afterlight** each contain four distinct layouts.
+The journey is one day, dawn to dawn: **Daybreak**, **Morning**, **Zenith**,
+**Golden Hour**, **Afterlight**, **Blue Hour**, **Eclipse**, and **Aurora**, eight
+sectors each. Every chapter teaches one idea, from aiming with Anchor to relay
+chains, Blue Hour's darkness (bricks show only near the ball and the paddle's keel
+light) and Eclipse's gate bricks, which go solid and ghost on a beat; Aurora
+brings them all back, faster. [`docs/journey.md`](docs/journey.md) has the design.
 Clear a sector to unlock the next and stop at a results screen before continuing.
 Each chapter awards an extra life, up to five. Three medals track each sector:
 
@@ -125,7 +130,8 @@ sound's pitch. Personal best times and medals persist across attempts.
 lives. Quitting mid-sector or choosing Retry returns to that checkpoint; partial
 sector scores are not carried into retries. **Sector Select** lets you practice
 unlocked layouts and improve medals without replacing your journey checkpoint or
-journey high score. New Journey replaces the current checkpoint while keeping
+journey high score; it shows a chapter a page, turned with the tabs, **[** and **]**,
+the shoulder buttons, or the arrows at the grid's edges. New Journey replaces the current checkpoint while keeping
 unlocks, medals, times, and the personal best.
 
 The playfield keeps its proportions when resized, and the window cannot shrink

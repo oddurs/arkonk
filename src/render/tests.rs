@@ -179,8 +179,8 @@ fn overscan_keeps_the_band_and_sheets_in_the_safe_area() {
 /// A profile far along: everything open, medals, best times, a huge best
 /// score, and a checkpoint in `sector`.
 fn veteran(sector: usize) -> Profile {
-    let mut file = String::from("ARKONK 1\nbest 4294967295\nunlocked 12\n");
-    for i in 0..12 {
+    let mut file = String::from("ARKONK 2\nbest 4294967295\nunlocked 64\n");
+    for i in 0..SECTOR_COUNT {
         let _ = writeln!(file, "record {i} 7 {}", 599 * 240 + i);
     }
     let _ = writeln!(file, "checkpoint {sector} 4000000000 5 0");
@@ -265,12 +265,15 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
             play,
             veteran(0),
         ));
-        out.push((
-            format!("play, {}, life gained", s.index()),
-            practice,
-            news,
-            veteran(0),
-        ));
+        // The news line is the same in every sector: one per chapter.
+        if s.ends_chapter() {
+            out.push((
+                format!("play, {}, life gained", s.index()),
+                practice,
+                news,
+                veteran(0),
+            ));
+        }
     }
     let locked = Ui {
         screen: Screen::Sectors,
@@ -914,9 +917,18 @@ fn tally(game: &Game, profile: &Profile) -> Tally {
 fn the_busiest_sector_stays_inside_the_vertex_budget() {
     let mut worst = (0, Tally::default());
     for sector in 0..SECTOR_COUNT {
-        let t = tally(&busiest(sector, None), &Profile::default());
-        if t.vertices > worst.1.vertices {
-            worst = (sector, t);
+        let game = busiest(sector, None);
+        let mut ghosts = game.clone();
+        // Ghost gates draw dashed outlines, their busiest look.
+        if let Some(beat) = game.sector().sector().beat {
+            ghosts.sandbox().elapse(beat.solid);
+            assert!(ghosts.board().gates_are_ghosts());
+        }
+        for game in [game, ghosts] {
+            let t = tally(&game, &Profile::default());
+            if t.vertices > worst.1.vertices {
+                worst = (sector, t);
+            }
         }
     }
     let (sector, t) = worst;

@@ -337,12 +337,13 @@ fn top_edge(v: &Scene, r: Rect, (radius, t): (f32, f32), top: Color, sides: Colo
     }
 }
 
-/// The journey as twelve pips centred on `centre` from `top`: cleared
-/// ones pearl, this one lit cyan, the rest outlined. Returns their span.
+/// A chapter's eight sectors as pips centred on `centre` from `top`:
+/// cleared ones pearl, `current` lit cyan, the rest outlined. Returns
+/// their span.
 pub(super) fn pips(
     v: &Scene,
-    centre: f32,
-    top: f32,
+    (centre, top): (f32, f32),
+    chapter: Chapter,
     current: Option<SectorId>,
     profile: &Profile,
 ) -> f32 {
@@ -352,11 +353,12 @@ pub(super) fn pips(
     let (w, gap, h) = if v.class == Class::Compact {
         (3.0 * px, px, px)
     } else {
-        (14.0, 4.0, 3.0)
+        (PIP.0, PIP.1, 3.0)
     };
     let left = v.snap(centre - span / 2.0);
-    for id in SectorId::all() {
-        let r = v.snap_rect(Rect::new(left + id.index() as f32 * (w + gap), top, w, h));
+    for id in chapter.sectors() {
+        let at = id.chapter_index() as f32;
+        let r = v.snap_rect(Rect::new(left + at * (w + gap), top, w, h));
         if v.class == Class::Compact {
             let lit = profile.progress.record(id).medals != Medals::NONE;
             let colour = match (Some(id) == current, lit) {
@@ -383,13 +385,23 @@ pub(super) fn pips(
     }
     span
 }
+/// A band pip's width and the gap after it.
+const PIP: (f32, f32) = (20.0, 6.0);
 fn pips_span(v: &Scene) -> f32 {
     let (w, gap) = if v.class == Class::Compact {
         (3.0 / v.density, 1.0 / v.density)
     } else {
-        (14.0, 4.0)
+        PIP
     };
-    SECTOR_COUNT as f32 * (w + gap) - gap
+    CHAPTER_SECTORS as f32 * (w + gap) - gap
+}
+
+/// The chapter the band shows: the sector `here`'s, or else the furthest
+/// one open.
+fn band_chapter(here: Option<SectorId>, profile: &Profile) -> Chapter {
+    here.unwrap_or_else(|| SectorId::clamped(profile.progress.unlocked_count().saturating_sub(1)))
+        .sector()
+        .chapter
 }
 /// The pips in a band's middle, between what its ends already hold, when
 /// they fit there with room to spare: a crowded Compact strip drops them
@@ -407,7 +419,14 @@ fn middle_pips(
         } else {
             3.0
         };
-        pips(v, WIDTH / 2.0, v.snap(mid - h / 2.0), current, profile);
+        let chapter = band_chapter(current, profile);
+        pips(
+            v,
+            (WIDTH / 2.0, v.snap(mid - h / 2.0)),
+            chapter,
+            current,
+            profile,
+        );
     }
 }
 
@@ -478,20 +497,31 @@ pub(super) fn band_play(v: &Scene, fx: &Fx, game: &Game, profile: &Profile, noti
             between(left + score_w, right - lives_w),
         );
     } else if v.class == Class::Regular {
-        // The sector's name over the journey: the name's line, 10 apart,
-        // then three-unit pips, centred as one block.
+        // Where the sector is, its name, then its chapter's pips: the
+        // eyebrow's capitals, 6 apart, the name's line, 8 apart, then
+        // three-unit pips, centred as one block.
+        let id = game.sector();
+        let chapter = id.sector().chapter;
         let strong = Style::from(Role::Body).strong();
         let name_h = v.line_h(Role::Body) / spec::line(Role::Body);
-        let top = mid - (name_h + 10.0 + 3.0) / 2.0;
-        let at = v.snap(top + name_h * (0.5 + 0.388));
+        let label = v.cap(Role::Label);
+        let top = mid - (label + 6.0 + name_h + 8.0 + 3.0) / 2.0;
         let side = 280.0;
-        let name = Slot::centered(WIDTH / 2.0, right - left - 2.0 * side, at);
-        v.say(TextId::SectorName(game.sector()), &[], strong, name, INK);
+        let room = right - left - 2.0 * side;
+        let eyebrow = [Arg::Text(TextId::ChapterName(chapter)), Arg::Sector(id)];
+        let at = v.snap(top + label);
+        let hue = sector_color(0, chapter);
+        let slot = Slot::centered(WIDTH / 2.0, room, at);
+        v.say(TextId::ReadyEyebrow, &eyebrow, Role::Label, slot, hue);
+        let name_top = top + label + 6.0;
+        let at = v.snap(name_top + name_h * (0.5 + 0.388));
+        let name = Slot::centered(WIDTH / 2.0, room, at);
+        v.say(TextId::SectorName(id), &[], strong, name, INK);
         pips(
             v,
-            WIDTH / 2.0,
-            v.snap(top + name_h + 10.0),
-            Some(game.sector()),
+            (WIDTH / 2.0, v.snap(name_top + name_h + 8.0)),
+            chapter,
+            Some(id),
             profile,
         );
     } else {
@@ -637,10 +667,31 @@ pub(super) fn band_title(v: &Scene, profile: &Profile, notice: bool) {
         moments::status(v, mid, TextId::SaveFailed, room);
         return;
     }
-    // The journey: twelve pips over how many sectors are open.
+    // The journey: on a Regular band, where it stands in its chapter's
+    // capitals, then the chapter's pips over how many sectors are open.
     let caption = Style::from(Role::Caption).sized(15.0);
-    let top = mid - (3.0 + 10.0 + v.line_h(caption)) / 2.0;
-    pips(v, WIDTH / 2.0, v.snap(top), here, profile);
+    let chapter = band_chapter(here, profile);
+    let regular = v.class == Class::Regular;
+    let label = if regular {
+        v.cap(Role::Label) + S12
+    } else {
+        0.0
+    };
+    let top = mid - (label + 3.0 + 10.0 + v.line_h(caption)) / 2.0;
+    if regular {
+        let at = v.snap(top + v.cap(Role::Label));
+        let slot = Slot::centered(WIDTH / 2.0, 260.0, at);
+        let hue = sector_color(0, chapter);
+        match here {
+            Some(id) => {
+                let eyebrow = [Arg::Text(TextId::ChapterName(chapter)), Arg::Sector(id)];
+                v.say(TextId::ReadyEyebrow, &eyebrow, Role::Label, slot, hue);
+            }
+            None => v.say(TextId::ChapterName(chapter), &[], Role::Label, slot, hue),
+        }
+    }
+    let top = top + label;
+    pips(v, (WIDTH / 2.0, v.snap(top)), chapter, here, profile);
     let open = profile.progress.unlocked_count() as u32;
     let args = [Arg::Count(open), Arg::Count(SECTOR_COUNT as u32)];
     let at = v.baseline(caption, top + 13.0);

@@ -450,7 +450,7 @@ pub(super) fn title(v: &Scene, ui: &Ui, profile: &Profile) {
 
 /// Sector select, one sector a page: where it sits, its name, the board
 /// in miniature, its medals and times, and Play or what opens it, with
-/// the page's place among the twelve at the foot.
+/// the page's place in the journey at the foot.
 pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
     frame::field_region(v, 0);
     let mut page = Page::new(v);
@@ -487,6 +487,12 @@ pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
             hex(0x2a3142)
         } else if level.layout.cores.contains(cell) {
             AMBER
+        } else if level.layout.gates.contains(cell) {
+            mix(
+                frame::FIELD_GLASS,
+                sector_color(cell.row(), level.chapter),
+                0.4,
+            )
         } else {
             sector_color(cell.row(), level.chapter)
         };
@@ -534,7 +540,7 @@ pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
         let r = if other == id { card } else { Rect::default() };
         v.hits.borrow_mut().push(r);
     }
-    // Where this page is among the twelve, between the ways to turn it.
+    // Where this page is in the journey, between the ways to turn it.
     let foot = v.snap(BOTTOM - INSET * px - 7.0 * px);
     let place = Figures::of(|f| write!(f, "{:02}/{:02}", id.index() + 1, SECTOR_COUNT));
     let w = v.measure(place.as_str(), Role::Figure);

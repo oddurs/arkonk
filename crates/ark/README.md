@@ -1,7 +1,7 @@
 # ark
 
 The ARKONK simulation: a fixed 240 Hz step, continuous circle-versus-rectangle
-collision, the twelve authored sectors, and the progress codec. No dependencies,
+collision, the 64 authored sectors, and the progress codec. No dependencies,
 no rendering, no audio, no files, no clocks. The crate documentation
 (`cargo doc -p ark --open`) explains the design: the fixed step, collision
 budget, fixed pools, determinism, the `Sandbox`, and the save format.

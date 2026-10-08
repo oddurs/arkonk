@@ -76,13 +76,8 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "破曉",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
-            Chapter::Afterlight => "暮光",
             Chapter::BlueHour => "藍調時刻",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Afterlight => "暮光",
         },
         PowerName(p) => match p {
             Power::Wide => "加寬",
@@ -150,202 +145,46 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "晨光",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
     "衛星",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
     "滑流",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
-    "交錯",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
     "共振",
     "稜鏡",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "交錯",
     "暗流",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
-    "餘暉",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
-    "視差",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
-    "超新星",
     "月出",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Event Horizon", // awaiting translation
+    "餘暉",
+    "視差",
+    "超新星",
     "歸途",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "晨光",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
     "衛星",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
     "滑流",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
-    "交錯",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
     "共振",
     "稜鏡",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "交錯",
     "暗流",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
-    "餘暉",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
-    "視差",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
-    "超新星",
     "月出",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Stars",         // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Event Horizon", // awaiting translation
+    "餘暉",
+    "視差",
+    "超新星",
     "歸途",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} 加寬、{icon:slow} 減速：接住落下的膠囊",
     "{icon:anchor} 錨定：接住球，瞄準，然後釋放",
-    "Armored bricks take two hits; their rims count down", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall",       // awaiting translation
-    "One door in: send the ball into the courtyard",       // awaiting translation
-    "Knock out the keystone and the arch is open",         // awaiting translation
-    "Read the angles: each shadow is a shot",              // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart",       // awaiting translation
     "琥珀核心：每次爆炸會波及相鄰四塊",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
-    "在兩條中繼線之間打開通路",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
     "相鄰核心會傳遞連鎖反應",
     "{icon:multi} 多球：三顆球，一個缺口",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "在兩條中繼線之間打開通路",
     "攻入裝甲後方的空腔",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
-    "{icon:phase} 相位：連續三次穿透磚塊，無需反彈",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
-    "擊穿外殼，再點燃內部通路",
-    "Through the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                        // awaiting translation
-    "Three bells: ring each one from beneath",                       // awaiting translation
-    "其他球仍在飛行時，接住一顆回球",
     "沿著中繼線繞過空曠的中心",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball shows the way", // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike the core inside", // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side waits for its beat", // awaiting translation
-    "Ignite the sun while the moon is solid: the blast takes both", // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "Through the doors on the beat, up to the rose window", // awaiting translation
-    "Everything at once: keep your eyes on the cores", // awaiting translation
-    "Strike the ring as the gates turn solid: the blast takes them too", // awaiting translation
+    "{icon:phase} 相位：連續三次穿透磚塊，無需反彈",
+    "擊穿外殼，再點燃內部通路",
+    "其他球仍在飛行時，接住一顆回球",
     "最後一圈：讓每個缺口都有價值",
 ];

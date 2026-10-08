@@ -14,7 +14,7 @@ use ark::{
         TOP, cell_rect,
     },
     geom::V2,
-    sectors::{Chapter, SECTOR_COUNT, SectorId},
+    sectors::{CHAPTER_SECTORS, Chapter, SECTOR_COUNT, SectorId},
     tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
 use ark_glyphs::{Fonts, ICON_EM, spec, spec::Weight};
