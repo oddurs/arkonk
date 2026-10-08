@@ -1020,3 +1020,47 @@ fn one_pixel_parts_of_flat_pieces_never_round_away() {
         assert!(on_grid(r.x) && on_grid(r.y), "{r:?}");
     }
 }
+
+/// A relay chain breaks a run of neighbouring bricks a few ticks apart;
+/// their points must not float up as a stack of overlapping figures, and
+/// none of the points may go missing.
+#[test]
+fn a_relay_chains_popups_never_overlap() {
+    let at = |row: usize, col: usize| FieldCell::new(row * ark::field::COLS + col).unwrap();
+    let chain = [
+        (1, 1, 750),
+        (2, 1, 125),
+        (2, 0, 825),
+        (2, 2, 125),
+        (3, 1, 125),
+        (0, 1, 125),
+        (1, 2, 125),
+        (1, 0, 125),
+    ];
+    for gap in [0, 1, 4, 12, 40] {
+        let mut fx = Fx::default();
+        let mut total = 0;
+        for &(row, col, points) in &chain {
+            for _ in 0..gap {
+                fx.age_popups();
+            }
+            fx.spawn_popup(at(row, col), points);
+            total += points;
+            let live: Vec<_> = fx.popups.iter().filter(|p| p.life > 0.0).collect();
+            for (i, p) in live.iter().enumerate() {
+                for q in &live[..i] {
+                    assert!(!p.overlaps(q), "{gap} ticks apart: {p:?} over {q:?}");
+                }
+            }
+        }
+        if gap * chain.len() < (POPUP_LIFE / DT) as usize {
+            let shown: u32 = fx
+                .popups
+                .iter()
+                .filter(|p| p.life > 0.0)
+                .map(|p| p.value)
+                .sum();
+            assert_eq!(shown, total, "{gap} ticks apart");
+        }
+    }
+}

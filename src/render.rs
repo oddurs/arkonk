@@ -10,8 +10,8 @@ use ark::{
     Events, Game, Medals, Mode, PARTICLES, Power, SectorSummary, Stage,
     clock::{DT, TICK_HZ},
     field::{
-        BALL_RADIUS as RADIUS, BOTTOM, CELLS, Cell as FieldCell, LEFT, PADDLE_Y, RIGHT, TOP,
-        cell_rect,
+        BALL_RADIUS as RADIUS, BOTTOM, CELL_H, CELLS, Cell as FieldCell, LEFT, PADDLE_Y, RIGHT,
+        TOP, cell_rect,
     },
     geom::V2,
     sectors::{Chapter, SECTOR_COUNT, SectorId},
@@ -1249,11 +1249,24 @@ fn pixel_lines<'t>(
     count
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 struct Popup {
     pos: V2,
     life: f32,
     value: u32,
+}
+/// Seconds a popup shows, and scene units a second it rises.
+const POPUP_LIFE: f32 = 0.65;
+const POPUP_RISE: f32 = 22.0;
+/// The room a popup's figures are centred in, and a row's height, so a
+/// line of them clears the next.
+const POPUP_W: f32 = 120.0;
+const POPUP_H: f32 = CELL_H;
+impl Popup {
+    /// Whether the two popups' rooms share any area.
+    fn overlaps(&self, other: &Popup) -> bool {
+        (self.pos.x - other.pos.x).abs() < POPUP_W && (self.pos.y - other.pos.y).abs() < POPUP_H
+    }
 }
 
 /// Seconds since an event long enough ago that nothing of it shows.
@@ -1421,35 +1434,63 @@ impl Fx {
             }
             fx.previous_timers[k] = now;
         }
-        for popup in &mut fx.popups {
-            popup.life = (popup.life - DT).max(0.0);
-            popup.pos.y -= 22.0 * DT;
-        }
-        let mut popup_spawned = false;
+        fx.age_popups();
+        // The tick's points float from the first brick it hit.
+        let mut first_hit = None;
         for (cell, age) in FieldCell::all().zip(&mut fx.brick_age) {
             let i = cell.index();
             *age += DT;
             if events.brick && game.board().hp(cell) < fx.previous_bricks[i] {
                 *age = 0.0;
                 fx.brick_was[i] = fx.previous_bricks[i];
-                if !popup_spawned && game.score() > fx.previous_score {
-                    let r = cell_rect(cell);
-                    fx.popups[fx.popup_cursor] = Popup {
-                        pos: V2::new(r.x + r.w / 2.0, r.y),
-                        life: 0.65,
-                        value: (game.score() - fx.previous_score).saturating_sub(if events.clear {
-                            game.summary().bonus
-                        } else {
-                            0
-                        }),
-                    };
-                    fx.popup_cursor = (fx.popup_cursor + 1) % fx.popups.len();
-                    popup_spawned = true;
-                }
+                first_hit = first_hit.or(Some(cell));
             }
+        }
+        if let Some(cell) = first_hit
+            && game.score() > fx.previous_score
+        {
+            let bonus = if events.clear {
+                game.summary().bonus
+            } else {
+                0
+            };
+            fx.spawn_popup(
+                cell,
+                (game.score() - fx.previous_score).saturating_sub(bonus),
+            );
         }
         fx.previous_bricks = hp_grid(game);
         fx.previous_score = game.score();
+    }
+    /// Floats every popup up a tick and fades it.
+    fn age_popups(&mut self) {
+        for popup in &mut self.popups {
+            popup.life = (popup.life - DT).max(0.0);
+            popup.pos.y -= POPUP_RISE * DT;
+        }
+    }
+    /// Floats `points` from the top of `cell`. Points landing where a live
+    /// popup still shows join its running total and keep it up for a full
+    /// life, so a chain reads as one rising figure rather than a stack.
+    /// Popups never move against each other, so none ever comes to overlap.
+    fn spawn_popup(&mut self, cell: FieldCell, points: u32) {
+        let r = cell_rect(cell);
+        let fresh = Popup {
+            pos: V2::new(r.x + r.w / 2.0, r.y),
+            life: POPUP_LIFE,
+            value: points,
+        };
+        if let Some(near) = self
+            .popups
+            .iter_mut()
+            .find(|p| p.life > 0.0 && p.overlaps(&fresh))
+        {
+            near.value = near.value.saturating_add(points);
+            near.life = POPUP_LIFE;
+            return;
+        }
+        self.popups[self.popup_cursor] = fresh;
+        self.popup_cursor = (self.popup_cursor + 1) % self.popups.len();
     }
     /// Lights the wall a bounce this tick came off, beside the ball that
     /// made it; the simulation reports the bounce, not where it was.
@@ -1730,7 +1771,7 @@ fn scene(
         if popup.life > 0.0 {
             let color = opacity(INK, 0.85 * (popup.life * 3.0).min(1.0));
             v.format(TextId::Plus, &[Arg::Count(popup.value)], Form::Full, |t| {
-                let slot = Slot::centered(popup.pos.x, 120.0, popup.pos.y);
+                let slot = Slot::centered(popup.pos.x, POPUP_W, popup.pos.y);
                 v.put(t, Role::Caption, slot, color)
             });
         }
