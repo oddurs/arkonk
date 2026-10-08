@@ -171,7 +171,7 @@ impl TextId {
             | KeysContinue | PadMove | PadBrowse | ActionServe | ActionPause | ActionRelease
             | ActionSelect | ActionResume | ActionRetry | ActionPlay | ActionBack
             | ActionContinue | SoundOn | SoundOff | Volume | Fullscreen | SaveFailed
-            | ContinueDetail | PracticeNote | RetryNote => Role::Caption,
+            | ContinueDetail | PracticeNote | RetryNote | ProgressSaved => Role::Caption,
             _ => Role::Body,
         }
     }

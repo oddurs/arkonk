@@ -135,11 +135,11 @@ pub fn result_menu(victory: bool) -> Menu {
     use Action::*;
     Menu {
         actions: if victory {
-            &[Sectors, NewJourney, MainMenu]
+            &[NewJourney, Sectors, MainMenu]
         } else {
-            &[Sectors, Retry, MainMenu]
+            &[Retry, Sectors, MainMenu]
         },
-        top: 380.0,
+        top: 416.0,
     }
 }
 /// The single action on the sector-clear card.
@@ -219,6 +219,9 @@ mod tests {
         assert_eq!(title_menu(false).actions, [NewJourney, Sectors]);
         assert_eq!(title_menu(true).actions, [Continue, NewJourney, Sectors]);
         assert_eq!(pause_menu().action(0), Resume);
+        // After a run, the way back in comes first and takes the focus.
+        assert_eq!(result_menu(false).actions, [Retry, Sectors, MainMenu]);
+        assert_eq!(result_menu(true).actions, [NewJourney, Sectors, MainMenu]);
     }
     #[test]
     fn menu_steps_wrap_over_the_rows_shown() {

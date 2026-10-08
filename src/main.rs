@@ -602,10 +602,12 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     dirty = true;
                     ui.choice = 0;
                 }
-                if game.stage() == Stage::GameOver && game.mode() == Mode::Journey {
-                    profile.progress.note_score(&game);
-                    dirty = true;
-                    ui.choice = 1;
+                if game.stage() == Stage::GameOver {
+                    ui.choice = 0;
+                    if game.mode() == Mode::Journey {
+                        profile.progress.note_score(&game);
+                        dirty = true;
+                    }
                 }
             }
             audio.play(events);

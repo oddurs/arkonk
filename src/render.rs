@@ -1335,41 +1335,7 @@ fn scene(
             Stage::Ready => ready(v, game),
             Stage::Cleared => cleared(v, game, summary),
             Stage::GameOver | Stage::Victory => {
-                v.scrim();
-                v.panel(240.0, 290.0, 480.0, 350.0);
-                let heading = if stage == Stage::Victory {
-                    TextId::JourneyComplete
-                } else {
-                    TextId::OneMoreOrbit
-                };
-                v.say(
-                    heading,
-                    &[],
-                    Role::Display,
-                    Slot::centered(WIDTH / 2.0, PANEL, 338.0),
-                    INK,
-                );
-                v.pairs(
-                    &[
-                        (TextId::StatPoints, game.score()),
-                        (TextId::StatMedals, profile.progress.medal_count()),
-                    ],
-                    368.0,
-                    PANEL,
-                );
-                menu(
-                    v,
-                    &ui::result_menu(stage == Stage::Victory),
-                    ui.choice,
-                    None,
-                );
-                v.say(
-                    TextId::ProgressSaved,
-                    &[],
-                    Role::Body,
-                    Slot::centered(WIDTH / 2.0, PANEL, 590.0),
-                    DIM,
-                );
+                results(v, game, profile, stage == Stage::Victory, ui.choice);
                 v.footer(&[], footer_error);
             }
             Stage::Playing => {}
@@ -2158,6 +2124,36 @@ fn sector_detail(v: &Scene, id: SectorId, profile: &Profile) {
             DIM,
         );
     }
+}
+/// After the last life or the last sector: the outcome, what the run
+/// earned, and the menu with the way back in first. Stacked from the menu,
+/// whose place the hit areas fix.
+fn results(v: &Scene, game: &Game, profile: &Profile, victory: bool, focus: usize) {
+    v.scrim();
+    let menu_at = ui::result_menu(victory);
+    let pairs = menu_at.top - GROUP;
+    let title = pairs - cap_height(Role::Body) - S16;
+    let top = title - cap_height(Role::Display) - PAD;
+    let note = menu_at.bottom() + S16 + cap_height(Role::Caption);
+    let bottom = note + PAD;
+    v.panel(WIDTH / 2.0 - PANEL_W / 2.0, top, PANEL_W, bottom - top);
+    let line = |y| Slot::centered(WIDTH / 2.0, PANEL, y);
+    let heading = if victory {
+        TextId::JourneyComplete
+    } else {
+        TextId::OneMoreOrbit
+    };
+    v.say(heading, &[], Role::Display, line(title), INK);
+    v.pairs(
+        &[
+            (TextId::StatPoints, game.score()),
+            (TextId::StatMedals, profile.progress.medal_count()),
+        ],
+        pairs,
+        PANEL,
+    );
+    menu(v, &menu_at, focus, None);
+    v.say(TextId::ProgressSaved, &[], Role::Caption, line(note), DIM);
 }
 /// Distance between the sector-clear columns, and the widest a medal chip
 /// grows: three chips at most 136 wide leave at least 14 between them.
