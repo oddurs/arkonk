@@ -138,14 +138,16 @@ for text when a window is too small for Noto to stay legible.
 
 | Role | Size (scene units) | Weight | Use |
 | --- | ---: | --- | --- |
-| Label | 15 | Regular, tracked +0.06 em | Small capitals: `SCORE`, `LIVES`, medals, chapters |
-| Caption | 16 | Regular | Control hints, settings keys, the save warning |
+| Label | 15 | Regular, tracked +0.06 em | Small capitals that name a value: `SCORE`, `LIVES`, medals, chapters, eyebrows |
+| Caption | 16 | Regular | Control hints, settings keys, footnotes, the Continue button's second line, the save warning |
 | Body | 20 | Regular | Buttons, tips, sector names, values, gameplay prompts |
-| Display | 32 | Medium | Headings, the score, the sector being served |
+| Display | 32 | Medium | Screen titles, the score, the sector being served |
 
-Hints are captions so the screen's actions and content lead and the
-control reminders recede; gameplay prompts ("Click or space to serve")
-stay body text because they are the one thing to do next.
+Hints and footnotes are captions so the screen's actions and content lead
+and the reminders recede; gameplay prompts ("Click or space to serve")
+stay body text because they are the one thing to do next. A footnote sits
+under the action it qualifies: "Practice runs never change your journey"
+under Play, "Retry restarts from the checkpoint" under the pause menu.
 
 Figures are tabular (`tnum`) everywhere, so scores and timers never shift as
 they change. Kerning is the fonts' GPOS pair kerning, extracted with a real

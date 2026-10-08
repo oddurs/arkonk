@@ -164,6 +164,16 @@ at native resolution and every glyph lands on a whole physical pixel, drawn
 full-window draw restores framebuffer alpha after translucent overlays, so no
 compositor can show the window through them.
 
+Every screen answers where am I, what matters here, and what to do next.
+A menu lists only what can be done now (`src/ui.rs` builds rows, hit areas
+and focus steps from one action list), its first row is the primary action,
+focused on arrival and the only filled button, and focus is a cyan edge.
+Cyan marks focus and interaction, amber medals and achievements, chapter
+hues chapters; text is ink, dim or muted by importance. Layouts step on a
+4–48 spacing scale named in `src/render.rs`: a label and its value sit 8
+apart, groups 24, sections 48, and panels pad 32. Control hints live in
+the footer, or inline beside the one thing they act on.
+
 Brick-hit flashes, floating scores, paddle impact lights, and pickup rings use
 fixed pools in the renderer. A restart reuses them.
 
