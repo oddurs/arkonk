@@ -1,6 +1,6 @@
 [workspace]
-members = [".", "crates/ark"]
-default-members = [".", "crates/ark"]
+members = [".", "crates/ark", "crates/ark-text"]
+default-members = [".", "crates/ark", "crates/ark-text"]
 # Path dependencies under the workspace root join it automatically; the
 # vendored miniquad must stay outside so lints never run on it.
 exclude = ["vendor/miniquad"]
