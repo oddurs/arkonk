@@ -252,6 +252,8 @@ mod tests {
             volume: 3,
             fullscreen: true,
             locale: Some(ark_text::Locale::Ja),
+            reduced_effects: true,
+            high_contrast: true,
         };
         p.progress
             .begin(&Game::start(SectorId::new(6).unwrap(), Mode::Journey));

@@ -65,6 +65,12 @@ text_ids! {
     /// Follow Steam's language, then the system's.
     LanguageSystem,
     ActionAdjust,
+    SettingEffects,
+    SettingContrast,
+    /// The look as designed: full effects, or standard contrast.
+    LookStandard,
+    EffectsReduced,
+    ContrastHigh,
 
     // Sector select.
     SectorsHeading,
@@ -176,9 +182,8 @@ impl TextId {
             ActionServe | ActionRelease | ActionSelect | ActionBack | Fullscreen | SaveFailed
             | ContinueDetail | PracticeNote | SectorsOf | TargetBest | UnlockHint | Tagline
             | HelpResume | HelpRetry | HelpMainMenu | HelpSectors | HelpNewJourney | ExtraLife
-            | LifeGained | HelpSettings | DisplayWindow | LanguageSystem | ActionAdjust => {
-                Role::Caption
-            }
+            | LifeGained | HelpSettings | DisplayWindow | LanguageSystem | ActionAdjust
+            | LookStandard | EffectsReduced | ContrastHigh => Role::Caption,
             _ => Role::Body,
         }
     }

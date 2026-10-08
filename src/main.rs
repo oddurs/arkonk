@@ -229,6 +229,8 @@ fn main() {
     }
     let (mut profile, path, save_blocked) = load_progress(data.map(|d| d.join("progress.txt")));
     profile.settings.fullscreen |= flag("--fullscreen");
+    profile.settings.reduced_effects |= flag("--reduced-effects");
+    profile.settings.high_contrast |= flag("--high-contrast");
     // Tests run on a desktop someone is using; `--show` is for watching one.
     #[cfg(target_os = "macos")]
     if smoke && !flag("--show") {

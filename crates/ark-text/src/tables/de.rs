@@ -60,6 +60,11 @@ pub(super) fn text(id: TextId) -> &'static str {
         DisplayWindow => "Fenster",
         LanguageSystem => "System",
         ActionAdjust => "Anpassen",
+        SettingEffects => "Effekte",
+        SettingContrast => "Kontrast",
+        LookStandard => "Standard",
+        EffectsReduced => "Reduziert",
+        ContrastHigh => "Hoch",
         KeySpace => "Leertaste",
         KeyEsc => "Esc",
         SectorsOf => "{0} von {1} Sektoren",
@@ -129,6 +134,11 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
         ExtraLife => Some("+1 Leben"),
         SectorName(s) => Some(SHORT_NAMES[s.index()]),
         ReadyEyebrow => Some("SEKTOR {1}"),
+        SettingEffects => Some("Effekte"),
+        SettingContrast => Some("Kontrast"),
+        LookStandard => Some("Normal"),
+        EffectsReduced => Some("Wenig"),
+        ContrastHigh => Some("Hoch"),
         _ => None,
     }
 }

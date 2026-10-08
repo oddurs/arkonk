@@ -59,6 +59,11 @@ pub(super) fn text(id: TextId) -> &'static str {
         DisplayWindow => "Window",
         LanguageSystem => "System",
         ActionAdjust => "Adjust",
+        SettingEffects => "Effects",
+        SettingContrast => "Contrast",
+        LookStandard => "Standard",
+        EffectsReduced => "Reduced",
+        ContrastHigh => "High",
         KeySpace => "Space",
         KeyEsc => "Esc",
         SectorsOf => "{0} of {1} sectors",
@@ -129,6 +134,11 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
         SectorName(s) => Some(SHORT_NAMES[s.index()]),
         ReadyEyebrow => Some("SECTOR {1}"),
         JourneyComplete => Some("Complete"),
+        SettingEffects => Some("Effects"),
+        SettingContrast => Some("Contrast"),
+        LookStandard => Some("Normal"),
+        EffectsReduced => Some("Low"),
+        ContrastHigh => Some("High"),
         _ => None,
     }
 }

@@ -59,6 +59,11 @@ pub(super) fn text(id: TextId) -> &'static str {
         DisplayWindow => "窗口",
         LanguageSystem => "跟随系统",
         ActionAdjust => "调整",
+        SettingEffects => "特效",
+        SettingContrast => "对比度",
+        LookStandard => "标准",
+        EffectsReduced => "减弱",
+        ContrastHigh => "高",
         KeySpace => "空格",
         KeyEsc => "Esc",
         SectorsOf => "{0} / {1} 个星区",
@@ -128,6 +133,11 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
         ExtraLife => Some("+1 生命"),
         SectorName(s) => Some(SHORT_NAMES[s.index()]),
         ReadyEyebrow => Some("星区 {1}"),
+        SettingEffects => Some("特效"),
+        SettingContrast => Some("对比度"),
+        LookStandard => Some("标准"),
+        EffectsReduced => Some("减弱"),
+        ContrastHigh => Some("高"),
         _ => None,
     }
 }
