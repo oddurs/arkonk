@@ -144,7 +144,7 @@ pub fn result_menu(victory: bool) -> Menu {
 }
 /// The single action on the sector-clear card.
 pub fn next_rect() -> Rect {
-    Rect::new(310.0, 514.0, 340.0, 46.0)
+    Rect::new(WIDTH / 2.0 - MENU_WIDTH / 2.0, 528.0, MENU_WIDTH, ROW)
 }
 pub fn back_rect() -> Rect {
     Rect::new(56.0, 46.0, 150.0, 36.0)

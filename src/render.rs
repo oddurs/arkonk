@@ -91,10 +91,10 @@ const FOOTER: f32 = 872.0;
 /// Baseline-to-baseline distance between footer rows: captions are smaller
 /// than body text, so the rows need more air to read as separate lines.
 const FOOTER_LINE: f32 = 30.0;
-/// Text width inside the results panels.
-const PANEL: f32 = 432.0;
-/// The width of the pause and results panels.
-const PANEL_W: f32 = 480.0;
+/// Text width inside the pause and results panels: their buttons' width.
+const PANEL: f32 = ui::MENU_WIDTH;
+/// The width of the pause and results panels, padding included.
+const PANEL_W: f32 = PANEL + 2.0 * PAD;
 
 fn opacity(c: Color, alpha: f32) -> Color {
     Color::new(c.r, c.g, c.b, alpha)
@@ -1703,7 +1703,7 @@ fn pause(v: &Scene, game: &Game, focus: usize, profile: &Profile) {
     let title = menu_at.top - GROUP;
     let eyebrow = title - cap_height(Role::Display) - S12;
     let top = eyebrow - cap_height(Role::Label) - PAD;
-    let text = PANEL_W - 2.0 * PAD;
+    let text = PANEL;
     let note = menu_at.bottom() + S16 + cap_height(Role::Caption);
     let notes = v
         .lines((TextId::RetryNote, &[]), Role::Caption, text)
@@ -2084,13 +2084,14 @@ fn sector_detail(v: &Scene, id: SectorId, profile: &Profile) {
     let par = [Arg::Clock(level.par_seconds)];
     let rows = tip + LINE + GROUP;
     for (i, (medal, how)) in medals.into_iter().enumerate() {
-        let earned = record.medals.contains(MEDAL_ORDER[i]);
         let top = rows + i as f32 * S32;
-        let tone = if earned { AMBER } else { MUTED };
-        v.rounded(x, top, chip, S24, S12, opacity(tone, 0.16));
+        medal_chip(
+            v,
+            medal,
+            (x, top, chip),
+            record.medals.contains(MEDAL_ORDER[i]),
+        );
         let cy = top + S12;
-        let label = Slot::centered(x + chip / 2.0, chip - S8, cy + v.cap(Role::Label) / 2.0);
-        v.say(medal, &[], Role::Label, label, tone);
         let args: &[Arg] = if how == TextId::SwiftWithin {
             &par
         } else {
@@ -2162,101 +2163,91 @@ fn sector_detail(v: &Scene, id: SectorId, profile: &Profile) {
 /// grows: three chips at most 136 wide leave at least 14 between them.
 const CLEAR_COLUMN: f32 = 150.0;
 const CHIP_MAX: f32 = 136.0;
+/// A medal as a pill, `w` wide from `x`: amber when earned, muted when not.
+fn medal_chip(v: &Scene, medal: TextId, (x, top, w): (f32, f32, f32), earned: bool) {
+    let tone = if earned { AMBER } else { MUTED };
+    v.rounded(x, top, w, S24, S12, opacity(tone, 0.16));
+    let y = top + S12 + v.cap(Role::Label) / 2.0;
+    v.say(
+        medal,
+        &[],
+        Role::Label,
+        Slot::centered(x + w / 2.0, w - S8, y),
+        tone,
+    );
+}
+/// The sector-clear card, stacked up from its one button, whose place the
+/// hit area fixes: the extra-life line, when there is one, grows the card
+/// upward instead of leaving a gap.
 fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
     v.scrim();
-    v.panel(240.0, 290.0, 480.0, 350.0);
-    v.say(
-        TextId::SectorClear,
-        &[],
-        Role::Display,
-        Slot::centered(WIDTH / 2.0, PANEL, 342.0),
-        INK,
-    );
-    // Without the extra-life line the stats and medals drop into its space,
-    // so the button never sits under an empty gap.
-    let shift = if summary.life_earned { 0.0 } else { 14.0 };
-    for (i, label) in [TextId::StatTime, TextId::StatBonus, TextId::StatBestChain]
+    let button = ui::next_rect();
+    let life = summary.life_earned.then_some(button.y - GROUP);
+    let chips = life.map_or(button.y, |y| y - cap_height(Role::Body)) - GROUP - S24;
+    let value = chips - GROUP;
+    let label = value - cap_height(Role::Body) - PAIR;
+    let title = label - cap_height(Role::Label) - GROUP;
+    let top = title - cap_height(Role::Display) - PAD;
+    let hint = button.y + button.h + S16 + cap_height(Role::Caption);
+    let bottom = hint + PAD;
+    v.panel(WIDTH / 2.0 - PANEL_W / 2.0, top, PANEL_W, bottom - top);
+    let line = |y| Slot::centered(WIDTH / 2.0, PANEL, y);
+    v.say(TextId::SectorClear, &[], Role::Display, line(title), INK);
+    for (i, name) in [TextId::StatTime, TextId::StatBonus, TextId::StatBestChain]
         .into_iter()
         .enumerate()
     {
         let x = WIDTH / 2.0 + (i as f32 - 1.0) * CLEAR_COLUMN;
         v.say(
-            label,
+            name,
             &[],
             Role::Label,
-            Slot::centered(x, CHIP_MAX, 386.0 + shift),
+            Slot::centered(x, CHIP_MAX, label),
             DIM,
         );
-        let value = Slot::centered(x, CHIP_MAX, 414.0 + shift);
+        let at = Slot::centered(x, CHIP_MAX, value);
         match i {
             0 => {
                 let t = Figures::of(|f| write!(f, "{}", Clock(summary.ticks)));
-                v.put(t.as_str(), Role::Body, value, INK);
+                v.put(t.as_str(), Role::Body, at, INK);
             }
             1 => v.say(
                 TextId::Plus,
                 &[Arg::Count(summary.bonus)],
                 Role::Body,
-                value,
+                at,
                 INK,
             ),
             _ => {
                 let combo = Figures::count(v.locale, summary.best_combo);
-                v.put(combo.as_str(), Role::Body, value, INK);
+                v.put(combo.as_str(), Role::Body, at, INK);
             }
         }
     }
-    for (i, label) in [TextId::MedalClear, TextId::MedalClean, TextId::MedalSwift]
+    for (i, medal) in [TextId::MedalClear, TextId::MedalClean, TextId::MedalSwift]
         .into_iter()
         .enumerate()
     {
         let x = WIDTH / 2.0 + (i as f32 - 1.0) * CLEAR_COLUMN;
+        let w = (v.width_of(medal, &[], Role::Label) + 2.0 * S16).min(CHIP_MAX);
         let earned = summary.medals.contains(MEDAL_ORDER[i]);
-        let w = (v.width_of(label, &[], Role::Label) + 32.0).min(CHIP_MAX);
-        v.rounded(
-            x - w / 2.0,
-            436.0 + shift,
-            w,
-            28.0,
-            14.0,
-            opacity(if earned { AMBER } else { MUTED }, 0.16),
-        );
-        let y = 450.0 + shift + v.cap(Role::Label) / 2.0;
-        v.say(
-            label,
-            &[],
-            Role::Label,
-            Slot::centered(x, CHIP_MAX - 12.0, y),
-            if earned { AMBER } else { MUTED },
-        );
+        medal_chip(v, medal, (x - w / 2.0, chips, w), earned);
     }
-    if summary.life_earned {
-        v.say(
-            TextId::ExtraLife,
-            &[],
-            Role::Body,
-            Slot::centered(WIDTH / 2.0, PANEL, 494.0),
-            CYAN,
-        );
+    if let Some(y) = life {
+        v.say(TextId::ExtraLife, &[], Role::Body, line(y), AMBER);
     }
     let next = if game.mode() == Mode::Practice {
         TextId::BackToSectors
     } else {
         TextId::NextSector
     };
-    v.button(ui::next_rect(), next, &[], (true, true), None);
+    v.button(button, next, &[], (true, true), None);
     match v.device {
-        Device::KeyboardMouse => v.say(
-            TextId::KeysContinue,
-            &[],
-            Role::Caption,
-            Slot::centered(WIDTH / 2.0, PANEL, 602.0),
-            MUTED,
-        ),
+        Device::KeyboardMouse => v.say(TextId::KeysContinue, &[], Role::Caption, line(hint), DIM),
         Device::Gamepad => {
             let items = [pad(Glyph::A, TextId::ActionContinue)];
-            v.pack(&items, Role::Caption, FULL, |line, w| {
-                v.hint_line(line, w, 602.0, MUTED, Role::Caption)
+            v.pack(&items, Role::Caption, PANEL, |row, w| {
+                v.hint_line(row, w, hint, DIM, Role::Caption)
             });
         }
     }
