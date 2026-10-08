@@ -138,7 +138,7 @@ mod tests {
                 continue;
             }
             let atlas = Atlas::build(&ark_glyphs::fonts(locale).unwrap()).unwrap();
-            assert!(atlas.height <= 2048, "{locale:?}: {} rows", atlas.height);
+            assert!(atlas.height <= 4096, "{locale:?}: {} rows", atlas.height);
             let (wx, wy) = Atlas::WHITE;
             assert_eq!(atlas.alpha[wy as usize * atlas.width + wx as usize], 255);
             let mut cells: Vec<_> = atlas.glyphs.values().filter(|c| c.w > 0).collect();

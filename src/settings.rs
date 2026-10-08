@@ -1,6 +1,6 @@
 //! Player settings, saved in the same file as progress.
 use ark::progress::Entry;
-use ark_text::Locale;
+use ark_text::{Locale, TextId};
 use std::fmt;
 
 /// The loudest volume step.
@@ -58,6 +58,95 @@ impl Settings {
         match self.locale {
             Some(locale) => writeln!(out, "locale {}", locale.tag()),
             None => Ok(()),
+        }
+    }
+}
+
+/// One row of the Settings sheet. The sheet lists [`ROWS`] in order, so a
+/// new setting is a variant here, a row there, and its arms below.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Row {
+    Sound,
+    Volume,
+    Display,
+    Language,
+}
+
+/// The Settings sheet, top to bottom.
+pub const ROWS: &[Row] = &[Row::Sound, Row::Volume, Row::Display, Row::Language];
+
+/// How a row shows its value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Value {
+    /// A switch, on or off.
+    Toggle(bool),
+    /// A level from 0 to its maximum.
+    Level(u8, u8),
+    /// A word from the string tables.
+    Text(TextId),
+    /// A language's own name, never translated.
+    Native(&'static str),
+}
+
+impl Row {
+    pub const fn name(self) -> TextId {
+        match self {
+            Row::Sound => TextId::SettingSound,
+            Row::Volume => TextId::SettingVolume,
+            Row::Display => TextId::SettingDisplay,
+            Row::Language => TextId::SettingLanguage,
+        }
+    }
+    /// What the help line calls changing it: a choice from a list is
+    /// selected, a level or switch adjusted.
+    pub const fn verb(self) -> TextId {
+        match self {
+            Row::Language => TextId::ActionSelect,
+            _ => TextId::ActionAdjust,
+        }
+    }
+    pub fn value(self, s: &Settings) -> Value {
+        match self {
+            Row::Sound => Value::Toggle(!s.muted),
+            Row::Volume => Value::Level(s.volume, MAX_VOLUME),
+            Row::Display => Value::Text(if s.fullscreen {
+                TextId::Fullscreen
+            } else {
+                TextId::DisplayWindow
+            }),
+            Row::Language => match s.locale {
+                Some(locale) => Value::Native(locale.native_name()),
+                None => Value::Text(TextId::LanguageSystem),
+            },
+        }
+    }
+    /// Moves the value one step forward or back; switches and lists wrap,
+    /// levels stop at their ends. Applied live by the caller.
+    pub fn step(self, s: &mut Settings, forward: bool, drawable: impl Fn(Locale) -> bool) {
+        match self {
+            Row::Sound => s.muted = !s.muted,
+            Row::Display => s.fullscreen = !s.fullscreen,
+            Row::Volume if forward => s.volume = (s.volume + 1).min(MAX_VOLUME),
+            Row::Volume => s.volume = s.volume.saturating_sub(1),
+            Row::Language => {
+                // Following Steam or the system comes first; the test
+                // locale is never offered.
+                let choices: Vec<Option<Locale>> = std::iter::once(None)
+                    .chain(
+                        Locale::ALL
+                            .into_iter()
+                            .filter(|&l| l != Locale::Pseudo && drawable(l))
+                            .map(Some),
+                    )
+                    .collect();
+                let at = choices.iter().position(|&c| c == s.locale).unwrap_or(0);
+                let n = choices.len();
+                s.locale = choices[if forward {
+                    (at + 1) % n
+                } else {
+                    (at + n - 1) % n
+                }];
+            }
         }
     }
 }
@@ -122,6 +211,42 @@ mod tests {
                 .unwrap()
                 .all(|e| e.key() != "locale")
         );
+    }
+
+    #[test]
+    fn rows_step_their_values() {
+        let mut s = Settings::default();
+        Row::Sound.step(&mut s, true, |_| true);
+        assert_eq!(Row::Sound.value(&s), Value::Toggle(false));
+        for _ in 0..20 {
+            Row::Volume.step(&mut s, true, |_| true);
+        }
+        assert_eq!(Row::Volume.value(&s), Value::Level(MAX_VOLUME, MAX_VOLUME));
+        Row::Volume.step(&mut s, false, |_| true);
+        assert_eq!(s.volume, MAX_VOLUME - 1);
+        Row::Display.step(&mut s, true, |_| true);
+        assert_eq!(Row::Display.value(&s), Value::Text(TextId::Fullscreen));
+    }
+
+    #[test]
+    fn languages_cycle_from_system_through_what_can_be_drawn() {
+        let mut s = Settings::default();
+        assert_eq!(Row::Language.value(&s), Value::Text(TextId::LanguageSystem));
+        let latin = |l: Locale| !matches!(l, Locale::ZhHans | Locale::Ja | Locale::Ko);
+        let mut seen = Vec::new();
+        for _ in 0..12 {
+            Row::Language.step(&mut s, true, latin);
+            seen.push(s.locale);
+        }
+        // Nine drawable languages, then back to System.
+        assert_eq!(seen[0], Some(Locale::En));
+        assert_eq!(seen[9], None);
+        assert!(!seen.contains(&Some(Locale::Pseudo)));
+        assert!(!seen.contains(&Some(Locale::Ja)));
+        // Back from System wraps to the last language.
+        s.locale = None;
+        Row::Language.step(&mut s, false, latin);
+        assert_eq!(s.locale, Some(Locale::Ru));
     }
 
     #[test]

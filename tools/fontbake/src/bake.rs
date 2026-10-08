@@ -1,7 +1,7 @@
 //! Shapes, rasterizes and encodes one group's faces. The byte layout is
 //! documented in `crates/ark-glyphs/src/data.rs`, which reads it.
 use crate::{
-    charsets::{Group, Sets},
+    charsets::{Group, Sets, Style},
     spec::{self, Weight},
 };
 use ark_text::Role;
@@ -77,7 +77,7 @@ pub fn group(group: &Group, sets: &Sets, fonts: &BTreeMap<&str, Vec<u8>>) -> Res
     let mut report = String::new();
     let weights: Vec<Weight> = Weight::ALL
         .into_iter()
-        .filter(|&w| roles(sets, w).next().is_some())
+        .filter(|&w| styles(sets, w).next().is_some())
         .collect();
     bytes.push(put(weights.len(), "face count")?);
     let mut shaper = ShapeContext::new();
@@ -88,8 +88,8 @@ pub fn group(group: &Group, sets: &Sets, fonts: &BTreeMap<&str, Vec<u8>>) -> Res
             .get(file)
             .ok_or_else(|| format!("{file} not fetched"))?;
         let font = FontRef::from_index(data, 0).ok_or_else(|| format!("{file} is not a font"))?;
-        let chars: BTreeSet<char> = roles(sets, weight)
-            .flat_map(|r| sets.chars[&r].iter().copied())
+        let chars: BTreeSet<char> = styles(sets, weight)
+            .flat_map(|s| sets.chars[&s].iter().copied())
             .collect();
         let glyphs = glyphs(&mut shaper, font, file, &chars)?;
         let kerns = kerns(&mut shaper, font, &glyphs, sets.pairs.get(&weight))?;
@@ -130,11 +130,11 @@ pub fn group(group: &Group, sets: &Sets, fonts: &BTreeMap<&str, Vec<u8>>) -> Res
         // Each ladder size a role in this weight needs, holding the union
         // of those roles' characters.
         let mut strikes: BTreeMap<u8, (u8, BTreeSet<char>)> = BTreeMap::new();
-        for role in roles(sets, weight) {
-            for ppem in spec::rungs(role) {
+        for style in styles(sets, weight) {
+            for ppem in spec::rungs(style.0) {
                 let strike = strikes.entry(ppem).or_default();
-                strike.0 |= role_bit(role);
-                strike.1.extend(sets.chars[&role].iter().copied());
+                strike.0 |= role_bit(style.0);
+                strike.1.extend(sets.chars[&style].iter().copied());
             }
         }
         bytes.push(put(strikes.len(), "strike count")?);
@@ -190,7 +190,7 @@ pub fn group(group: &Group, sets: &Sets, fonts: &BTreeMap<&str, Vec<u8>>) -> Res
             bytes.extend(&packed);
             let _ = writeln!(
                 report,
-                "  {ppem:>2} px {:<15} {count:>4} glyphs {:>7} B unpacked {:>7} B deflated",
+                "  {ppem:>2} px {:<22} {count:>4} glyphs {:>7} B unpacked {:>7} B deflated",
                 role_names(*roles),
                 unpacked.len(),
                 packed.len(),
@@ -200,11 +200,12 @@ pub fn group(group: &Group, sets: &Sets, fonts: &BTreeMap<&str, Vec<u8>>) -> Res
     Ok(Baked { bytes, report })
 }
 
-/// The roles set in `weight` that have characters in this group.
-fn roles(sets: &Sets, weight: Weight) -> impl Iterator<Item = Role> + '_ {
-    spec::ROLES.into_iter().filter(move |r| {
-        spec::style(*r).1 == weight && sets.chars.get(r).is_some_and(|c| !c.is_empty())
-    })
+/// The styles set in `weight` that have characters in this group.
+fn styles(sets: &Sets, weight: Weight) -> impl Iterator<Item = Style> + '_ {
+    sets.chars
+        .iter()
+        .filter(move |(s, c)| s.1 == weight && !c.is_empty())
+        .map(|(&s, _)| s)
 }
 
 /// One glyph and advance per character, each shaped alone.

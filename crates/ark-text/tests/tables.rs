@@ -2,7 +2,8 @@
 //! no combining marks, and short forms that are actually shorter.
 use ark::Power;
 use ark_text::{
-    Arg, Form, Locale, Role, Script, TextId, capsule, grouped, short_template, template, write,
+    Arg, Form, Locale, Role, Script, TextId, capsule, grouped, icon, icon_power, short_template,
+    template, write, write_icons,
 };
 
 /// The `{…}` slots in a template, sorted.
@@ -29,29 +30,94 @@ fn every_translation_has_the_sources_slots() {
         let numbered = source.iter().filter(|s| s.parse::<usize>().is_ok()).count();
         assert_eq!(numbered, id.arity(), "{id:?} in English");
         for locale in real_locales() {
-            for (form, text) in [
-                ("full", Some(template(locale, id))),
-                ("short", short_template(locale, id)),
-            ] {
-                let Some(text) = text else { continue };
-                assert!(!text.trim().is_empty(), "{locale:?} {id:?} {form} is blank");
-                assert_eq!(slots(text), source, "{locale:?} {id:?} {form}");
+            let full = template(locale, id);
+            assert!(!full.trim().is_empty(), "{locale:?} {id:?} is blank");
+            assert_eq!(slots(full), source, "{locale:?} {id:?}");
+            // A short form may leave a slot out to save room; it never adds one.
+            if let Some(short) = short_template(locale, id) {
+                assert!(!short.trim().is_empty(), "{locale:?} {id:?} short is blank");
+                let mut left = source.clone();
+                for slot in slots(short) {
+                    let at = left.iter().position(|&s| s == slot);
+                    let at = at.unwrap_or_else(|| panic!("{locale:?} {id:?} short adds {slot}"));
+                    left.remove(at);
+                }
             }
         }
     }
 }
 
+/// A short form is never longer than the full one. Where the full one is
+/// already as short as the word can be ("Sound"), the short form repeats
+/// it, so the fit chain finds one for every action and band item.
 #[test]
-fn short_forms_are_shorter() {
+fn short_forms_are_never_longer() {
     for locale in real_locales() {
         for id in TextId::all() {
             if let Some(short) = short_template(locale, id) {
                 let full = template(locale, id);
                 assert!(
-                    short.chars().count() < full.chars().count(),
-                    "{locale:?} {id:?}: {short:?} is not shorter than {full:?}"
+                    short.chars().count() <= full.chars().count(),
+                    "{locale:?} {id:?}: {short:?} is longer than {full:?}"
                 );
             }
+        }
+    }
+}
+
+/// The fit chain's second step needs a short form for every action, for
+/// everything the band shows, and for the help lines, settings and news.
+#[test]
+fn every_action_and_band_item_has_a_short_form() {
+    use TextId::*;
+    let ids = [
+        ContinueJourney,
+        NewJourney,
+        SectorSelect,
+        ActionResume,
+        RetrySector,
+        MainMenu,
+        NextSector,
+        BackToSectors,
+        PlaySector,
+        Settings,
+        ActionServe,
+        ActionRelease,
+        ActionSelect,
+        ActionBack,
+        ActionAdjust,
+        StatBest,
+        StatMedals,
+        SectorsOf,
+        SectorsHeading,
+        SaveFailed,
+        LifeGained,
+        KeyEsc,
+        KeySpace,
+        HelpResume,
+        HelpRetry,
+        HelpMainMenu,
+        HelpSectors,
+        HelpNewJourney,
+        HelpSettings,
+        SettingSound,
+        SettingVolume,
+        SettingDisplay,
+        SettingLanguage,
+        DisplayWindow,
+        Fullscreen,
+        LanguageSystem,
+        ExtraLife,
+        ReadyEyebrow,
+    ]
+    .into_iter()
+    .chain(ark::sectors::SectorId::all().map(SectorName));
+    for id in ids {
+        for locale in real_locales() {
+            assert!(
+                short_template(locale, id).is_some(),
+                "{locale:?} {id:?} has no short form"
+            );
         }
     }
 }
@@ -126,17 +192,27 @@ fn arguments_follow_each_languages_word_order() {
         format(Locale::Ja, TextId::PlaySector, &[Arg::Sector(sector)]),
         "セクター 03 をプレイ"
     );
+    let saved = [Arg::Text(TextId::SectorName(sector)), Arg::Count(2450)];
     assert_eq!(
-        format(
-            Locale::En,
-            TextId::SavedAt,
-            &[Arg::Sector(sector), Arg::Text(TextId::SectorName(sector))]
-        ),
-        "Saved at sector 03 · Slipstream"
+        format(Locale::En, TextId::ContinueDetail, &saved),
+        "Slipstream · 2,450"
     );
     assert_eq!(
-        format(Locale::Fr, TextId::BestTime, &[Arg::Clock(83)]),
-        "Record 01:23"
+        format(Locale::Ja, TextId::ContinueDetail, &saved),
+        "スリップストリーム・2,450"
+    );
+    let open = [Arg::Count(4), Arg::Count(12)];
+    assert_eq!(
+        format(Locale::Ko, TextId::SectorsOf, &open),
+        "12개 섹터 중 4개"
+    );
+    assert_eq!(
+        format(
+            Locale::De,
+            TextId::TargetBest,
+            &[Arg::Clock(110), Arg::Clock(129)]
+        ),
+        "01:50 · Bestzeit 02:09"
     );
 }
 
@@ -171,4 +247,25 @@ fn pseudo_locale_expands_accents_and_brackets() {
         &[],
     );
     assert!(tip.starts_with("[W ") && tip.contains(" S "), "{tip}");
+}
+
+#[test]
+fn icons_can_come_out_as_marks_for_the_renderer() {
+    let tip = TextId::SectorTip(ark::sectors::SectorId::FIRST);
+    for locale in Locale::ALL {
+        let mut marked = String::new();
+        write_icons(&mut marked, locale, Form::Full, tip, &[]).unwrap();
+        let marks: Vec<_> = marked.chars().filter_map(icon_power).collect();
+        assert_eq!(marks, [Power::Wide, Power::Slow], "{locale:?}: {marked}");
+        // Everything else reads as the lettered text does.
+        let lettered: String = marked
+            .chars()
+            .map(|c| icon_power(c).map_or(c, capsule))
+            .collect();
+        assert_eq!(lettered, format(locale, tip, &[]));
+    }
+    for power in Power::ALL {
+        assert_eq!(icon_power(icon(power)), Some(power));
+    }
+    assert_eq!(icon_power('W'), None);
 }

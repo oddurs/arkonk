@@ -36,6 +36,24 @@ pub const fn capsule(power: Power) -> char {
     }
 }
 
+/// The character standing for a capsule in text from [`write_icons`]: a
+/// private-use code point that no font has, so a renderer can draw the
+/// capsule itself where the text puts it.
+pub const fn icon(power: Power) -> char {
+    match power {
+        Power::Wide => '\u{E000}',
+        Power::Slow => '\u{E001}',
+        Power::Multi => '\u{E002}',
+        Power::Anchor => '\u{E003}',
+        Power::Phase => '\u{E004}',
+    }
+}
+
+/// The capsule an [`icon`] character stands for.
+pub fn icon_power(c: char) -> Option<Power> {
+    Power::ALL.into_iter().find(|&p| icon(p) == c)
+}
+
 /// The raw template for `id`. The pseudo locale's templates are English;
 /// [`write`] transforms them.
 pub fn template(locale: Locale, id: TextId) -> &'static str {
@@ -64,16 +82,39 @@ pub fn write(
     id: TextId,
     args: &[Arg],
 ) -> fmt::Result {
+    write_as(out, locale, form, id, args, false)
+}
+
+/// Like [`write`], but capsules come out as [`icon`] characters instead of
+/// their letters, for a renderer that draws them.
+pub fn write_icons(
+    out: &mut impl Write,
+    locale: Locale,
+    form: Form,
+    id: TextId,
+    args: &[Arg],
+) -> fmt::Result {
+    write_as(out, locale, form, id, args, true)
+}
+
+fn write_as(
+    out: &mut impl Write,
+    locale: Locale,
+    form: Form,
+    id: TextId,
+    args: &[Arg],
+    icons: bool,
+) -> fmt::Result {
     let text = match form {
         Form::Short => short_template(locale, id).unwrap_or_else(|| template(locale, id)),
         Form::Full => template(locale, id),
     };
     if locale != Locale::Pseudo {
-        return expand(out, locale, text, args, &mut None);
+        return expand(out, locale, text, args, icons, &mut None);
     }
     out.write_char('[')?;
     let mut letters = Some(0);
-    expand(out, locale, text, args, &mut letters)?;
+    expand(out, locale, text, args, icons, &mut letters)?;
     // About 40 % longer, as long German or Russian text would be.
     for i in 0..(letters.unwrap_or(0) * 2).div_ceil(5) {
         out.write_char(if i % 4 == 3 { ' ' } else { '·' })?;
@@ -88,6 +129,7 @@ fn expand(
     locale: Locale,
     text: &str,
     args: &[Arg],
+    icons: bool,
     letters: &mut Option<usize>,
 ) -> fmt::Result {
     let mut rest = text;
@@ -117,7 +159,7 @@ fn expand(
         if let Some(slug) = slot.strip_prefix("icon:") {
             // Icons and numbers are never accented: they read the same everywhere.
             if let Some(power) = Power::ALL.into_iter().find(|p| p.slug() == slug) {
-                out.write_char(capsule(power))?;
+                out.write_char(if icons { icon(power) } else { capsule(power) })?;
             }
         } else if let Some(arg) = slot.parse::<usize>().ok().and_then(|i| args.get(i)) {
             match *arg {
@@ -125,7 +167,7 @@ fn expand(
                 Arg::Sector(s) => write!(out, "{:02}", s.index() + 1)?,
                 Arg::Clock(seconds) => write!(out, "{:02}:{:02}", seconds / 60, seconds % 60)?,
                 Arg::Text(id) => {
-                    expand(out, locale, template(locale, id), &[], letters)?;
+                    expand(out, locale, template(locale, id), &[], icons, letters)?;
                 }
             }
         }

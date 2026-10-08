@@ -1,5 +1,5 @@
 use super::*;
-use crate::{settings::Settings, ui::Preview};
+use crate::{input::Pad, settings::Settings, ui::Preview};
 use ark::{Input, progress::Checkpoint};
 
 #[test]
@@ -43,10 +43,11 @@ fn scene_fits_every_target_display_and_maps_the_pointer_back() {
     }
 }
 
-/// The checked displays, plus, for every role and baked size, the density
-/// just past where that size takes over from the ladder entry below it:
-/// there its text is widest for its layout, so fitting there means fitting
-/// at every density in between.
+/// The checked densities, plus, for every role and baked size, the
+/// density just past where that size takes over from the ladder entry
+/// below it: there its text is widest for its layout, so fitting there
+/// means fitting at every density in between. Only Regular and Small
+/// frames: a Compact one is laid out from its screen, in [`views`].
 fn densities() -> Vec<f32> {
     let mut out: Vec<f32> = spec::DENSITIES.to_vec();
     for role in spec::ROLES {
@@ -57,15 +58,124 @@ fn densities() -> Vec<f32> {
                 out.push(switch * 1.0005);
             }
         }
-        // The smallest density that still uses Noto.
-        let smallest = spec::rungs(role).min().unwrap();
-        out.push(f32::from(smallest) * 0.87 / size * 1.0005);
     }
+    out.retain(|&d| Class::of(WIDTH * d) != Class::Compact);
     out.sort_by(f32::total_cmp);
     out.dedup();
     out
 }
 
+/// A screen the layout is checked on: its name, its size in pixels, and
+/// the view of the scene it gets.
+struct Screenful {
+    name: String,
+    size: (f32, f32),
+    view: View,
+}
+fn screenful(name: String, (w, h): (f32, f32)) -> Screenful {
+    let view = View::fit(w, h, 1.0).expect("a test screen has an area");
+    Screenful {
+        name,
+        size: (w, h),
+        view,
+    }
+}
+
+/// Every screen size the layout is checked at: the frame widths where
+/// the classes meet, the presets from 4K down to a 160 × 128 handheld,
+/// and every density where a baked size changes.
+fn views() -> Vec<Screenful> {
+    let mut out = Vec::new();
+    for (f, class) in [
+        (399.0, Class::Compact),
+        (400.0, Class::Small),
+        (719.0, Class::Small),
+        (720.0, Class::Regular),
+    ] {
+        // As tall as wide, so the frame's width is exactly `f`.
+        let s = screenful(format!("F = {f}"), (f, f));
+        assert_eq!(s.view.class, class, "{}", s.name);
+        out.push(s);
+    }
+    for (w, h) in [
+        (1920.0, 1080.0),
+        (1280.0, 800.0),
+        (3440.0, 1440.0),
+        (3840.0, 2160.0),
+        (1024.0, 768.0),
+        (1080.0, 1920.0),
+        (240.0, 240.0),
+        (160.0, 128.0),
+    ] {
+        out.push(screenful(format!("{w}x{h}"), (w, h)));
+    }
+    for d in densities() {
+        out.push(screenful(format!("@{d:.3}"), (WIDTH * d, HEIGHT * d)));
+    }
+    out
+}
+
+#[test]
+fn every_class_is_reached_by_the_frame_width() {
+    assert_eq!(
+        View::fit(1920.0, 1080.0, 1.0).unwrap().class,
+        Class::Regular
+    );
+    // The smallest desktop window is Small, at 1x and 2x alike.
+    assert_eq!(View::fit(480.0, 450.0, 1.0).unwrap().class, Class::Small);
+    assert_eq!(View::fit(240.0, 225.0, 2.0).unwrap().class, Class::Small);
+    for (w, h) in [(160.0, 128.0), (240.0, 240.0)] {
+        let v = View::fit(w, h, 1.0).unwrap();
+        assert_eq!(v.class, Class::Compact);
+        // The field fills the screen but for the rails and the strip.
+        let (corner, far) = (v.to_scene(0.0, 0.0), v.to_scene(w, h));
+        assert!(corner.x <= LEFT && far.x >= RIGHT, "{w}x{h}");
+        assert!(far.y >= BOTTOM - 0.01 && corner.y <= TOP - view::STRIP / v.density);
+    }
+}
+
+#[test]
+fn overscan_keeps_the_band_and_sheets_in_the_safe_area() {
+    let fonts = ark_glyphs::fonts(Locale::En).unwrap();
+    let atlas = Atlas::build(&fonts).unwrap();
+    let plain = View::fit(1920.0, 1080.0, 1.0).unwrap();
+    // Desktop reports no overscan: the safe area is the whole screen.
+    assert!(plain.safe.x <= 0.0 && plain.safe.y <= 0.0);
+    let tv = View::fit_inset(1920.0, 1080.0, 1.0, 0.05).unwrap();
+    assert!(tv.safe.y > plain.safe.y && tv.safe.x > plain.safe.x);
+    let ui = Ui {
+        screen: Screen::Play,
+        paused: true,
+        ..Ui::default()
+    };
+    let log = RefCell::new(Log::default());
+    let v = Scene::new(
+        None,
+        (&atlas, &fonts, Locale::En),
+        &tv,
+        &ui,
+        String::new(),
+        Some(&log),
+    );
+    scene(
+        &v,
+        &Fx::default(),
+        &Game::new(),
+        &ui,
+        &Profile::default(),
+        1.0,
+        None,
+    );
+    let safe = tv.safe;
+    for p in &log.borrow().placed {
+        let r = p.rect;
+        let inside = r.x >= safe.x
+            && r.y >= safe.y - 0.5
+            && r.right() <= safe.right()
+            && r.bottom() <= safe.bottom();
+        assert!(inside, "{:?} at {r:?} outside {safe:?}", p.text);
+    }
+}
 /// A profile far along: everything open, medals, best times, a huge best
 /// score, and a checkpoint in `sector`.
 fn veteran(sector: usize) -> Profile {
@@ -77,12 +187,15 @@ fn veteran(sector: usize) -> Profile {
     Profile::decode(file.as_bytes()).unwrap()
 }
 
+/// The widest results a sector can produce: an hour's clock, every bonus,
+/// and a chain longer than any board can hold.
 fn summary(life_earned: bool) -> SectorSummary {
+    use ark::tuning::{CLEAR_BONUS, MEDAL_BONUS};
     SectorSummary {
         ticks: 59 * 60 * 240,
         medals: Medals::ALL,
-        bonus: 2_000_000,
-        best_combo: 99_999,
+        bonus: CLEAR_BONUS + 2 * MEDAL_BONUS,
+        best_combo: 999,
         life_earned,
     }
 }
@@ -100,6 +213,7 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
     for s in SectorId::all() {
         let ui = Ui {
             save_error: s.index() == 0,
+            notice: if s.index() == 0 { 3.0 } else { 0.0 },
             ..Ui::default()
         };
         out.push((
@@ -141,12 +255,28 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
             launch: true,
             ..Input::default()
         });
-        out.push((format!("play, {}", s.index()), practice, play, veteran(0)));
+        let news = Ui {
+            notice: 3.0,
+            ..play.clone()
+        };
+        out.push((
+            format!("play, {}", s.index()),
+            practice.clone(),
+            play,
+            veteran(0),
+        ));
+        out.push((
+            format!("play, {}, life gained", s.index()),
+            practice,
+            news,
+            veteran(0),
+        ));
     }
     let locked = Ui {
         screen: Screen::Sectors,
         sector: SectorId::clamped(5),
         save_error: true,
+        notice: 3.0,
         ..Ui::default()
     };
     out.push((
@@ -182,6 +312,17 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
             play.clone(),
             veteran(0),
         ));
+    }
+    for (row, paused, screen) in [(0, false, Screen::Title), (3, true, Screen::Play)] {
+        let ui = Ui {
+            screen,
+            paused,
+            settings: Some(row),
+            ..Ui::default()
+        };
+        let mut profile = veteran(3);
+        profile.settings.fullscreen = paused;
+        out.push((format!("settings {row}"), held.clone(), ui, profile));
     }
     let profiles = [Profile::default(), veteran(3)];
     for (i, profile) in profiles.iter().enumerate() {
@@ -224,22 +365,24 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
     out
 }
 
-/// Draws every screen, in every locale this build can draw, with both
-/// prompt styles, at every density that matters, and fails on any text
-/// wider than its slot, any wrapped text past its lines, and any glyph
-/// missing from the atlas.
+/// Draws every screen, in every locale this build can draw and the
+/// pseudo locale, with the keyboard, Xbox and PlayStation glyphs, at
+/// every screen in [`views`], and fails on text wider than its place,
+/// wrapped past its lines, cut to an ellipsis or without a glyph; on
+/// text that overlaps other text or leaves its box or the screen; and
+/// on text, glyphs or pointer rows under their physical floors.
 #[test]
-fn every_string_fits_its_place_in_every_locale() {
+fn every_screen_lays_out_in_every_locale_and_class() {
     let screens = screens();
-    let densities = densities();
+    let views = views();
     // One thread per locale: each builds its own atlas and checks alone.
     let failures: Vec<String> = std::thread::scope(|threads| {
         let checks: Vec<_> = Locale::ALL
             .into_iter()
             .filter(|&l| ark_glyphs::supports(l))
             .map(|locale| {
-                let (screens, densities) = (&screens, &densities);
-                threads.spawn(move || check(locale, screens, densities))
+                let (screens, views) = (&screens, &views);
+                threads.spawn(move || check(locale, screens, views))
             })
             .collect();
         checks
@@ -255,44 +398,107 @@ fn every_string_fits_its_place_in_every_locale() {
     );
 }
 
-/// Draws every screen in `locale` with both prompt styles at every density
-/// that matters, and returns any text wider than its slot, any wrapped text
-/// past its lines, and any glyph missing from the atlas.
+/// Whether `inner` lies inside `outer`, give or take `slack`.
+fn contains(outer: Rect, inner: Rect, slack: f32) -> bool {
+    inner.x >= outer.x - slack
+        && inner.y >= outer.y - slack
+        && inner.right() <= outer.right() + slack
+        && inner.bottom() <= outer.bottom() + slack
+}
+/// Whether `a` and `b` share more than `slack` both ways.
+fn overlap(a: Rect, b: Rect, slack: f32) -> bool {
+    a.x + slack < b.right()
+        && b.x + slack < a.right()
+        && a.y + slack < b.bottom()
+        && b.y + slack < a.bottom()
+}
+
+/// Draws every screen in `locale` with each glyph family on each of
+/// `views`, and returns every layout failure.
 fn check(
     locale: Locale,
     screens: &[(String, Game, Ui, Profile)],
-    densities: &[f32],
+    views: &[Screenful],
 ) -> Vec<String> {
     let fonts = ark_glyphs::fonts(locale).unwrap();
     let atlas = Atlas::build(&fonts).unwrap();
     let mut failures = Vec::new();
-    for &density in densities {
-        for device in [Device::KeyboardMouse, Device::Gamepad] {
+    for at in views {
+        let view = &at.view;
+        // One physical pixel, in scene units: what a layout may be off by.
+        let px = 1.0 / view.density;
+        let screen = Rect::new(
+            -view.x / view.scale,
+            -view.y / view.scale,
+            at.size.0 / view.scale,
+            at.size.1 / view.scale,
+        );
+        for device in [
+            Device::KeyboardMouse,
+            Device::Gamepad(Pad::Xbox),
+            Device::Gamepad(Pad::PlayStation),
+        ] {
             for (name, game, ui, profile) in screens {
-                let log = RefCell::new(Vec::new());
-                let v = Scene {
-                    texture: None,
-                    atlas: &atlas,
-                    fonts: &fonts,
-                    locale,
-                    density,
-                    device,
-                    buffer: RefCell::new(String::new()),
-                    misfits: Some(&log),
-                };
                 let ui = Ui {
                     device,
                     ..ui.clone()
                 };
-                scene(&v, &Fx::default(), game, &ui, profile, 1.0, None);
-                for m in log.into_inner() {
-                    let line = match m.missing {
-                        Some(c) => format!("{locale:?} {name}: no glyph for {c:?} in {:?}", m.text),
-                        None => format!(
-                            "{locale:?} {name} {device:?} @{density:.3}: {:?} needs {:.1}, has {:.1}",
-                            m.text, m.need, m.room
-                        ),
-                    };
+                let log = RefCell::new(Log::default());
+                let v = Scene::new(
+                    None,
+                    (&atlas, &fonts, locale),
+                    view,
+                    &ui,
+                    String::new(),
+                    Some(&log),
+                );
+                // The Settings sheet names the language in use in itself.
+                let mut profile = profile.clone();
+                if ui.settings.is_some() && locale != Locale::Pseudo {
+                    profile.settings.locale = Some(locale);
+                }
+                let fx = Fx {
+                    life_gained: if name.ends_with("life gained") {
+                        1.0
+                    } else {
+                        0.0
+                    },
+                    ..Fx::default()
+                };
+                scene(&v, &fx, game, &ui, &profile, 1.0, None);
+                let hits = v.hits.into_inner();
+                let mut found = Vec::new();
+                let log = log.into_inner();
+                found.extend(log.problems);
+                for (i, p) in log.placed.iter().enumerate() {
+                    if !contains(p.within, p.rect, px) {
+                        found.push(format!(
+                            "{:?} at {:?} leaves {:?}",
+                            p.text, p.rect, p.within
+                        ));
+                    } else if !contains(screen, p.rect, px) {
+                        found.push(format!("{:?} at {:?} is off the screen", p.text, p.rect));
+                    }
+                    for q in &log.placed[..i] {
+                        if p.layer == q.layer && overlap(p.rect, q.rect, px) {
+                            found.push(format!("{:?} overlaps {:?}", p.text, q.text));
+                        }
+                    }
+                }
+                let rows = hits.rows();
+                for (i, r) in rows.iter().enumerate() {
+                    // A Compact list is one row per line; its pointer is
+                    // a preview's, not a player's.
+                    if r.h > 0.0 && view.class != Class::Compact && r.h * view.density < 32.0 - 0.5
+                    {
+                        found.push(format!("row {i} is {:.1} px tall", r.h * view.density));
+                    }
+                    if rows[..i].iter().any(|q| overlap(*q, *r, px)) {
+                        found.push(format!("row {i} overlaps another"));
+                    }
+                }
+                for f in found {
+                    let line = format!("{locale:?} {name} {device:?} {}: {f}", at.name);
                     if !failures.contains(&line) {
                         failures.push(line);
                     }
@@ -310,7 +516,7 @@ fn the_smallest_text_is_nine_pixels_tall_on_steam_deck() {
     let fonts = ark_glyphs::fonts(Locale::En).unwrap();
     let deck = 800.0 / 900.0;
     for role in spec::ROLES {
-        let ppem = spec::ppem(role, deck).unwrap();
+        let ppem = spec::ppem(role, deck);
         let (_, weight, _) = spec::style(role);
         let face = fonts.latin.face(weight).unwrap();
         let cap = f32::from(face.cap_height) * f32::from(ppem) / f32::from(face.units_per_em);
@@ -324,4 +530,144 @@ fn figures_group_on_the_stack() {
     assert_eq!(f.as_str(), "4\u{202F}294\u{202F}967\u{202F}295");
     let t = Figures::of(|f| write!(f, "{}", Clock(83 * TICK_HZ)));
     assert_eq!(t.as_str(), "01:23");
+}
+
+/// Each row is hit once, where it was drawn: a click on the second row
+/// must choose the second action.
+#[test]
+fn every_drawn_row_is_one_hit_area() {
+    let fonts = ark_glyphs::fonts(Locale::En).unwrap();
+    let atlas = Atlas::build(&fonts).unwrap();
+    for (ui, menu) in [
+        (
+            Ui {
+                screen: Screen::Play,
+                paused: true,
+                ..Ui::default()
+            },
+            ui::pause_menu(),
+        ),
+        (Ui::default(), ui::title_menu(false)),
+    ] {
+        let view = View::fit(WIDTH, HEIGHT, 1.0).unwrap();
+        let v = Scene::new(
+            None,
+            (&atlas, &fonts, Locale::En),
+            &view,
+            &ui,
+            String::new(),
+            None,
+        );
+        scene(
+            &v,
+            &Fx::default(),
+            &Game::new(),
+            &ui,
+            &Profile::default(),
+            1.0,
+            None,
+        );
+        let hits = v.hits.into_inner();
+        assert_eq!(hits.rows().len(), menu.actions.len());
+        for (i, r) in hits.rows().iter().enumerate() {
+            assert_eq!(hits.row_at(menu, r.center()), Some(i));
+        }
+    }
+}
+
+/// A Small screen's pager glyphs keep their pixel floor, which grows them
+/// past the design's size on the narrowest frames: the row must still sit
+/// inside the field and a gap above the first card.
+#[test]
+fn the_small_pager_stays_in_the_field_above_the_cards() {
+    let fonts = ark_glyphs::fonts(Locale::En).unwrap();
+    let atlas = Atlas::build(&fonts).unwrap();
+    let ui = Ui {
+        screen: Screen::Sectors,
+        ..Ui::default()
+    };
+    let small: Vec<_> = views()
+        .into_iter()
+        .filter(|s| s.view.class == Class::Small)
+        .collect();
+    assert!(!small.is_empty());
+    for at in &small {
+        let v = Scene::new(
+            None,
+            (&atlas, &fonts, Locale::En),
+            &at.view,
+            &ui,
+            String::new(),
+            None,
+        );
+        let (mid, chip) = screens::pager(&v);
+        let first = screens::card_rect(&v, SectorId::FIRST);
+        assert!(
+            mid - chip / 2.0 >= TOP,
+            "{}: pager above the field",
+            at.name
+        );
+        assert!(
+            mid + chip / 2.0 + S8 <= first.y + 1e-3,
+            "{}: pager crowds the first card",
+            at.name
+        );
+    }
+}
+
+/// A locked card's padlock keeps a group's gap from every word around it,
+/// in the longest strings and on every Regular and Small screen.
+#[test]
+fn padlocks_keep_clear_of_text() {
+    for locale in [Locale::En, Locale::Pseudo] {
+        let fonts = ark_glyphs::fonts(locale).unwrap();
+        let atlas = Atlas::build(&fonts).unwrap();
+        for sector in [4, 7] {
+            let ui = Ui {
+                screen: Screen::Sectors,
+                sector: SectorId::clamped(sector),
+                ..Ui::default()
+            };
+            for at in views().iter().filter(|s| s.view.class != Class::Compact) {
+                let log = RefCell::new(Log::default());
+                let v = Scene::new(
+                    None,
+                    (&atlas, &fonts, locale),
+                    &at.view,
+                    &ui,
+                    String::new(),
+                    Some(&log),
+                );
+                let game = Game::new();
+                scene(
+                    &v,
+                    &Fx::default(),
+                    &game,
+                    &ui,
+                    &Profile::default(),
+                    1.0,
+                    None,
+                );
+                let placed = log.into_inner().placed;
+                let locks: Vec<_> = placed.iter().filter(|p| p.text == PADLOCK).collect();
+                assert!(!locks.is_empty(), "{}: no locked card drawn", at.name);
+                for lock in locks {
+                    let near = Rect::new(
+                        lock.rect.x - S8,
+                        lock.rect.y - S8,
+                        lock.rect.w + 2.0 * S8,
+                        lock.rect.h + 2.0 * S8,
+                    );
+                    for p in placed.iter().filter(|p| p.text != PADLOCK) {
+                        assert!(
+                            p.layer != lock.layer || !overlap(near, p.rect, 0.0),
+                            "{locale:?} {}: {:?} crowds a padlock",
+                            at.name,
+                            p.text
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

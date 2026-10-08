@@ -12,6 +12,17 @@ macro_rules! noto_sans {
         )
     };
 }
+/// Noto Sans Display 2.007, hinted TrueType, as last published by the
+/// Noto project (the family has not moved to the notofonts build repository).
+macro_rules! noto_display {
+    ($file:literal) => {
+        concat!(
+            "https://raw.githubusercontent.com/notofonts/noto-fonts/",
+            "503d300da2bbdec7d00e0ff9078876ec7d6dbb92/hinted/ttf/NotoSansDisplay/",
+            $file
+        )
+    };
+}
 /// Noto Sans CJK 2.004 (the commit tagged `Sans2.004`), region subset
 /// OpenType/CFF.
 macro_rules! noto_cjk {
@@ -25,7 +36,7 @@ macro_rules! noto_cjk {
 }
 
 /// Download URL and SHA-256 of every font the atlases come from.
-pub const FONTS: [(&str, &str); 8] = [
+pub const FONTS: [(&str, &str); 9] = [
     (
         noto_sans!("NotoSans-Regular.ttf"),
         "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823",
@@ -33,6 +44,10 @@ pub const FONTS: [(&str, &str); 8] = [
     (
         noto_sans!("NotoSans-Medium.ttf"),
         "635d93d1131d791f2576de90b3bb0f7cdf61929906e8420a61b5f7f8e76420bb",
+    ),
+    (
+        noto_display!("NotoSansDisplay-Medium.ttf"),
+        "96775693878d9436e30b6a9b355bb38b49cdd42b964c98f297706043e4b9f4f5",
     ),
     (
         noto_cjk!("SC/NotoSansSC-Regular.otf"),

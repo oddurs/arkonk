@@ -13,7 +13,7 @@ mod layout;
 pub mod spec;
 
 pub use data::{Error, Face, Font, Image, Images, Strike};
-pub use layout::{Fonts, Placed, Source};
+pub use layout::{Fonts, ICON_EM, Placed, Source};
 
 use ark_text::Locale;
 

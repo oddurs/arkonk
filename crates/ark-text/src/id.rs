@@ -33,70 +33,53 @@ text_ids! {
     ContinueJourney,
     NewJourney,
     SectorSelect,
-    /// `{0}` sector number, `{1}` sector name.
-    SavedAt,
-    JourneyIntro,
-    StatSectors,
+    /// The second line of the Continue button: `{0}` the saved sector's
+    /// name, `{1}` the score saved with it.
+    ContinueDetail,
     StatMedals,
     StatBest,
-    /// `{0}` of `{1}`, such as unlocked sectors of all sectors.
-    Fraction,
+    /// The journey under the title band's pips: `{0}` sectors open of
+    /// `{1}`.
+    SectorsOf,
 
     // Keyboard and mouse hints.
-    KeysMove,
-    KeysServe,
-    KeysPause,
-    KeysRelease,
-    KeysBrowse,
-    KeysPlay,
-    KeysBack,
-    KeysContinue,
+    // Key names on keycap glyphs.
+    KeySpace,
+    KeyEsc,
     // Gamepad hints: a button glyph, then one of these.
-    PadMove,
-    PadBrowse,
     ActionServe,
-    ActionPause,
     ActionRelease,
     ActionSelect,
     ActionResume,
-    ActionRetry,
-    ActionPlay,
     ActionBack,
-    ActionContinue,
 
-    // Settings shortcuts.
-    SoundOn,
-    SoundOff,
-    /// `{0}` volume step.
-    Volume,
+    // Settings.
+    Settings,
+    HelpSettings,
+    SettingSound,
+    SettingVolume,
+    SettingDisplay,
+    SettingLanguage,
+    DisplayWindow,
     Fullscreen,
+    /// Follow Steam's language, then the system's.
+    LanguageSystem,
+    ActionAdjust,
 
     // Sector select.
     SectorsHeading,
     PracticeNote,
-    /// A best time that has not been set.
-    NoTime,
-    /// `{0}` the Swift medal's target time.
-    SwiftTarget,
-    /// `{0}` a time.
-    BestTime,
     MedalClear,
     MedalClean,
     MedalSwift,
-    MedalClearHow,
-    MedalCleanHow,
-    MedalSwiftHow,
+    /// The Swift target, `{0}`, and the best time, `{1}`.
+    TargetBest,
     /// `{0}` sector number.
     PlaySector,
-    ClearPreviousFirst,
+    /// What opens a locked sector: `{0}` the number of the sector before it.
+    UnlockHint,
 
     // Play.
-    Score,
-    Lives,
-    /// `{0}` sector number.
-    SectorNumber,
-    /// `{0}` sector number.
-    PracticeNumber,
     /// `{0}` points.
     Plus,
     /// `{0}` chapter name, `{1}` sector number.
@@ -106,37 +89,49 @@ text_ids! {
     Paused,
     RetrySector,
     MainMenu,
-    RetryNote,
     JourneyComplete,
     OneMoreOrbit,
     StatPoints,
-    ProgressSaved,
     SectorClear,
     StatTime,
     StatBonus,
-    StatBestChain,
+    StatChain,
     ExtraLife,
     NextSector,
     BackToSectors,
 
     SaveFailed,
+    /// Under the band's lives when a chapter earns one.
+    LifeGained,
     PerfTitle,
+
+    // Help for the focused action, one caption line under a sheet's list.
+    HelpResume,
+    HelpRetry,
+    HelpMainMenu,
+    HelpSectors,
+    HelpNewJourney,
 
 }
 
-/// Which text style an id is set in, which decides the glyphs baked for
-/// each size: labels and display lines use few characters, so their sizes
-/// carry only those. Hints are captions. Any id may also be set as
-/// [`Role::Body`].
+/// Which of the six text roles an id is set in, which decides the glyphs
+/// baked for each size: labels and headings use few characters, so their
+/// sizes carry only those. Any id may also be set as [`Role::Body`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Role {
-    /// Small, tracked, authored in capitals where the script has them.
-    Label,
-    Body,
-    /// Control hints and other secondary lines: quieter than body text.
-    Caption,
-    /// Headings and large figures.
+    /// The one hero line on a screen, in the Display cut.
     Display,
+    /// Sheet titles and screen headers, in the Display cut.
+    Title,
+    /// Scores and results, tabular.
+    Figure,
+    /// Actions, names, tips.
+    Body,
+    /// Help lines and notes: quieter than body text.
+    Caption,
+    /// Small, tracked, authored in capitals where the script has them:
+    /// names of values and eyebrows, never actions.
+    Label,
 }
 
 impl TextId {
@@ -155,10 +150,8 @@ impl TextId {
     pub const fn arity(self) -> usize {
         use TextId::*;
         match self {
-            SavedAt | Fraction | ReadyEyebrow => 2,
-            Volume | SwiftTarget | BestTime | PlaySector | SectorNumber | PracticeNumber | Plus => {
-                1
-            }
+            ContinueDetail | SectorsOf | ReadyEyebrow | TargetBest => 2,
+            PlaySector | UnlockHint | Plus => 1,
             _ => 0,
         }
     }
@@ -166,19 +159,61 @@ impl TextId {
     pub const fn role(self) -> Role {
         use TextId::*;
         match self {
-            StatSectors | StatMedals | StatBest | MedalClear | MedalClean | MedalSwift | Score
-            | Lives | SectorNumber | PracticeNumber | ReadyEyebrow | StatPoints | StatTime
-            | StatBonus | StatBestChain | ChapterName(_) => Role::Label,
-            SectorsHeading | Paused | JourneyComplete | OneMoreOrbit | SectorClear
-            | SectorName(_) => Role::Display,
-            KeysMove | KeysServe | KeysPause | KeysRelease | KeysBrowse | KeysPlay | KeysBack
-            | KeysContinue | PadMove | PadBrowse | ActionServe | ActionPause | ActionRelease
-            | ActionSelect | ActionResume | ActionRetry | ActionPlay | ActionBack
-            | ActionContinue | SoundOn | SoundOff | Volume | Fullscreen | SaveFailed => {
+            StatMedals | StatBest | MedalClear | MedalClean | MedalSwift | ReadyEyebrow
+            | StatPoints | StatTime | StatBonus | StatChain | ChapterName(_) | PowerName(_) => {
+                Role::Label
+            }
+            SectorsHeading | Paused | JourneyComplete | OneMoreOrbit | SectorClear => Role::Title,
+            SectorName(_) => Role::Display,
+            ActionServe | ActionRelease | ActionSelect | ActionBack | Fullscreen | SaveFailed
+            | ContinueDetail | PracticeNote | SectorsOf | TargetBest | UnlockHint | Tagline
+            | HelpResume | HelpRetry | HelpMainMenu | HelpSectors | HelpNewJourney | ExtraLife
+            | LifeGained | HelpSettings | DisplayWindow | LanguageSystem | ActionAdjust => {
                 Role::Caption
             }
             _ => Role::Body,
         }
+    }
+
+    /// Other roles this text is set in besides [`Self::role`] and body
+    /// text, including where another string quotes it through an
+    /// [`crate::Arg::Text`] slot: a sector's name is the ready card's hero
+    /// line, the detail sheet's title, and part of the Continue button's
+    /// caption. The atlases bake its characters at those roles' sizes too.
+    pub const fn also(self) -> &'static [Role] {
+        use TextId::*;
+        match self {
+            SectorName(_) => &[Role::Title, Role::Caption],
+            // The ready card sets a tip as body text, the detail sheet as a caption.
+            SectorTip(_) => &[Role::Caption],
+            // Results set points as figures; play floats them as captions.
+            Plus => &[Role::Figure, Role::Caption],
+            Settings => &[Role::Title],
+            // Keycaps set their names in the Label cut, untracked.
+            KeySpace | KeyEsc => &[Role::Label],
+            _ => &[],
+        }
+    }
+
+    /// Whether this text may be set emphasised, in its role's strong cut:
+    /// actions, which are Medium when primary or focused, and the sector
+    /// name in the band.
+    pub const fn strong(self) -> bool {
+        use TextId::*;
+        matches!(
+            self,
+            ContinueJourney
+                | NewJourney
+                | SectorSelect
+                | ActionResume
+                | RetrySector
+                | MainMenu
+                | NextSector
+                | BackToSectors
+                | PlaySector
+                | Settings
+                | SectorName(_)
+        )
     }
 }
 

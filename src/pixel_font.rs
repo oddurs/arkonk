@@ -36,6 +36,35 @@ pub fn has(c: char) -> bool {
     c == ' ' || (c.is_ascii() && glyph(c.to_ascii_uppercase()) != [0; 7])
 }
 
+/// Whether the pixel font can set `c` in a line: a letter it has, a
+/// capsule icon, which it draws as the capsule itself, or one of the
+/// separators the game's strings use.
+pub fn spells(c: char) -> bool {
+    has(c) || ark_text::icon_power(c).is_some() || extra(c).is_some()
+}
+
+/// The non-ASCII characters the game writes between words and figures,
+/// drawn from shapes rather than the atlas block: the middle dot, the
+/// times sign of a chain, and the no-break spaces that group digits.
+pub fn extra(c: char) -> Option<[u8; 7]> {
+    match c {
+        '·' => Some([0, 0, 0, 4, 0, 0, 0]),
+        '×' => Some([0, 17, 10, 4, 10, 17, 0]),
+        '\u{a0}' | '\u{202f}' => Some([0; 7]),
+        _ => None,
+    }
+}
+
+/// How many cells `c` advances: five for the glyph and one between, or
+/// nine for a capsule and its gap.
+pub fn advance(c: char) -> f32 {
+    if ark_text::icon_power(c).is_some() {
+        10.0
+    } else {
+        6.0
+    }
+}
+
 pub fn glyph(character: char) -> [u8; 7] {
     match character {
         'A' => [14, 17, 17, 31, 17, 17, 17],

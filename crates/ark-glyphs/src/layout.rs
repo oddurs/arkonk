@@ -23,11 +23,17 @@ pub enum Source {
     Cjk,
 }
 
+/// How wide a capsule icon is, in em: the in-game capsule's 3:2 pill at
+/// the text's size. Its advance is exactly this; the spaces around it in
+/// the text give it room.
+pub const ICON_EM: f32 = 1.5;
+
 /// One glyph of a laid-out line.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Placed {
     pub source: Source,
-    /// `None` when no baked face has the character; it then takes no space.
+    /// `None` when no baked face has the character; it then takes no space,
+    /// unless it is a capsule [`ark_text::icon`], which takes [`ICON_EM`].
     pub glyph: Option<u16>,
     pub c: char,
     /// The pen position in pixels from the line's start, unrounded.
@@ -66,6 +72,21 @@ impl Fonts {
         let mut previous: Option<(Source, u16)> = None;
         let mut first = true;
         for c in text.chars() {
+            if ark_text::icon_power(c).is_some() {
+                if !first {
+                    pen += tracking;
+                }
+                first = false;
+                place(Placed {
+                    source: Source::Latin,
+                    glyph: None,
+                    c,
+                    x: pen,
+                });
+                pen += ICON_EM * f32::from(ppem);
+                previous = None;
+                continue;
+            }
             let (source, face) = self.face(c, weight);
             let Some((face, glyph)) = face.and_then(|f| Some((f, f.glyph(c)?))) else {
                 place(Placed {

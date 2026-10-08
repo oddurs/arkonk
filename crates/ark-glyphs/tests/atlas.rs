@@ -1,6 +1,6 @@
 //! The committed atlases against the string tables: every character every
 //! string needs is baked at every size its role is drawn at.
-use ark_glyphs::{Fonts, Source, fonts, spec, supports};
+use ark_glyphs::{Fonts, ICON_EM, Source, fonts, spec, supports};
 use ark_text::{Arg, Form, Locale, Role, Script, TextId, write};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -41,8 +41,15 @@ fn every_string_has_its_glyphs_at_every_size_it_is_drawn() {
             for form in [Form::Full, Form::Short] {
                 let mut text = String::new();
                 write(&mut text, locale, form, id, &args).unwrap();
-                for role in [id.role(), Role::Body] {
-                    let (_, weight, _) = spec::style(role);
+                let mut styles: Vec<_> = [id.role(), Role::Body]
+                    .iter()
+                    .chain(id.also())
+                    .map(|&r| (r, spec::style(r).1))
+                    .collect();
+                if id.strong() {
+                    styles.push((Role::Body, spec::strong(Role::Body)));
+                }
+                for (role, weight) in styles {
                     for ppem in spec::rungs(role) {
                         fonts.layout(&text, weight, ppem, 0.0, |p| {
                             let glyph = p.glyph.unwrap_or_else(|| {
@@ -159,18 +166,59 @@ fn lines_wrap_by_script() {
 }
 
 #[test]
-fn every_role_snaps_to_a_baked_size() {
+fn every_role_snaps_to_a_baked_size_above_its_floor() {
     for role in spec::ROLES {
         for d in spec::DENSITIES {
-            let ppem = spec::ppem(role, d).expect("checked densities use Noto");
+            let ppem = spec::ppem(role, d);
             assert!(spec::rungs(role).any(|r| r == ppem));
+            assert!(
+                f32::from(ppem) >= spec::floor(role) - 0.5,
+                "{role:?} at {d}"
+            );
         }
-        // A tiny window falls back to the pixel font.
-        assert_eq!(spec::ppem(role, 0.5), None);
+        // However small the frame, text holds its floor.
+        assert!(f32::from(spec::ppem(role, 0.1)) >= spec::floor(role) - 0.5);
+        if let Some(below) = spec::step_down(role, spec::ppem(role, 1.0)) {
+            assert!(below < spec::ppem(role, 1.0) && f32::from(below) >= spec::floor(role) - 0.5);
+        }
     }
-    assert_eq!(spec::ppem(Role::Body, 2.0), Some(40));
-    assert_eq!(spec::ppem(Role::Label, 800.0 / 900.0), Some(13));
+    assert_eq!(spec::ppem(Role::Body, 2.0), 40);
+    assert_eq!(spec::ppem(Role::Label, 800.0 / 900.0), 13);
     // Steam Deck body text sits on the 18 px strike, lowercase just over 9 px.
-    assert_eq!(spec::ppem(Role::Body, 800.0 / 900.0), Some(18));
-    assert_eq!(spec::ppem(Role::Caption, 800.0 / 900.0), Some(14));
+    assert_eq!(spec::ppem(Role::Body, 800.0 / 900.0), 18);
+    assert_eq!(spec::ppem(Role::Caption, 800.0 / 900.0), 14);
+    // The smallest window holds body text at its 12 px floor.
+    assert_eq!(spec::ppem(Role::Body, 0.5), 12);
+}
+
+#[test]
+fn capsule_icons_take_their_width_and_wrap_like_words() {
+    let fonts = fonts(Locale::En).unwrap();
+    let regular = spec::Weight::Regular;
+    let icon = '\u{E000}';
+    assert!(ark_text::icon_power(icon).is_some());
+    let alone = fonts.measure(&icon.to_string(), regular, 20, 0.0);
+    assert!((alone - ICON_EM * 20.0).abs() < 1e-4);
+    let text = format!("{icon} Wide");
+    let word = fonts.measure(" Wide", regular, 20, 0.0);
+    assert!((fonts.measure(&text, regular, 20, 0.0) - alone - word).abs() < 1e-3);
+    let mut lines = Vec::new();
+    fonts.wrap(&text, regular, 20, 0.0, alone + 1.0, |l| lines.push(l));
+    assert_eq!(lines, [icon.to_string().as_str(), "Wide"]);
+}
+
+/// The compile-time size table holds, for every role, the nearest ladder
+/// entry at each checked density, floor applied, first occurrence only.
+#[test]
+fn baked_sizes_are_the_nearest_rung_at_each_density() {
+    for role in spec::ROLES {
+        let mut want = Vec::new();
+        for d in spec::DENSITIES {
+            let rung = spec::nearest((spec::style(role).0 * d).max(spec::floor(role)));
+            if !want.contains(&rung) {
+                want.push(rung);
+            }
+        }
+        assert_eq!(spec::rungs(role).collect::<Vec<_>>(), want, "{role:?}");
+    }
 }

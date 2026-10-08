@@ -4,7 +4,7 @@ use crate::{
     perf::Perf,
     pixel_font,
     storage::Profile,
-    ui::{self, Screen, Ui},
+    ui::{self, Action, Hits, Menu, Pressed, Screen, Ui},
 };
 use ark::{
     Events, Game, Medals, Mode, Power, SectorSummary, Stage,
@@ -17,12 +17,12 @@ use ark::{
     sectors::{Chapter, SECTOR_COUNT, SectorId},
     tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
-use ark_glyphs::{Fonts, spec};
-use ark_text::{Arg, Form, Locale, Role, TextId, capsule};
+use ark_glyphs::{Fonts, ICON_EM, spec, spec::Weight};
+use ark_text::{Arg, Form, Locale, Role, TextId, capsule, icon_power};
 use macroquad::models::Vertex;
 use macroquad::prelude::*;
 use std::{
-    cell::RefCell,
+    cell::{Cell as Shared, RefCell},
     f32::consts::{FRAC_PI_2, TAU},
     fmt::Write,
 };
@@ -31,15 +31,18 @@ use std::{
 pub const WIDTH: f32 = 960.0;
 pub const HEIGHT: f32 = 900.0;
 
-const BG: Color = Color::new(0.027, 0.033, 0.055, 1.0);
+/// The night around the instrument; everything outside the arch.
+const NIGHT: Color = hex(0x07080e);
+const PEARL_RIM: Color = hex(0xcdd8e8);
 const SURFACE: Color = Color::new(0.050, 0.060, 0.092, 1.0);
-const RAISED: Color = Color::new(0.078, 0.091, 0.135, 1.0);
 const BORDER: Color = Color::new(0.135, 0.155, 0.210, 1.0);
-const INK: Color = Color::new(0.93, 0.95, 0.98, 1.0);
-const DIM: Color = Color::new(0.53, 0.58, 0.67, 1.0);
-const MUTED: Color = Color::new(0.29, 0.33, 0.41, 1.0);
-const CYAN: Color = Color::new(0.33, 0.87, 0.96, 1.0);
-const AMBER: Color = Color::new(1.0, 0.76, 0.30, 1.0);
+const INK: Color = hex(0xedf2fa);
+const DIM: Color = hex(0x8794ab);
+/// Only for what is unavailable.
+const MUTED: Color = hex(0x4a5469);
+const CYAN: Color = hex(0x54def5);
+/// Achievements only.
+const AMBER: Color = hex(0xffc24d);
 const RED: Color = Color::new(1.0, 0.25, 0.33, 1.0);
 const PALETTE: [Color; 7] = [
     RED,
@@ -51,20 +54,81 @@ const PALETTE: [Color; 7] = [
     Color::new(0.95, 0.39, 0.78, 1.0),
 ];
 
+/// The spacing scale, in scene units (4, 8, 12, 16, 24, 32, 48, 64).
+/// Layouts step by these and nothing in between, so related things always
+/// sit visibly closer than unrelated ones: 8 between action rows, 12 from
+/// a chip to its text, 16 band padding and actions to their help line, 24
+/// between groups and from a title to its content, 32 inside a sheet.
+const S8: f32 = 8.0;
+const S12: f32 = 12.0;
+const S16: f32 = 16.0;
+const S24: f32 = 24.0;
+const S32: f32 = 32.0;
+
+/// How a piece of text is set: its role, whether it is emphasised (body
+/// text on a primary or focused action), and its size in scene units,
+/// the role's own unless a place sets it otherwise.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Style {
+    role: Role,
+    strong: bool,
+    size: f32,
+    /// Letter spacing in em; the role's own unless set otherwise.
+    tracking: f32,
+    /// Baked sizes below the role's own, taken by the fit chain.
+    step: u8,
+    /// Set in Noto even where the pixel font could spell it: a line of a
+    /// paragraph that, as a whole, it cannot.
+    noto: bool,
+}
+impl From<Role> for Style {
+    fn from(role: Role) -> Self {
+        Self {
+            role,
+            strong: false,
+            size: spec::style(role).0,
+            tracking: spec::style(role).2,
+            step: 0,
+            noto: false,
+        }
+    }
+}
+impl Style {
+    fn strong(self) -> Self {
+        Self {
+            strong: true,
+            ..self
+        }
+    }
+    /// One baked size smaller: the fit chain's third step.
+    fn smaller(self) -> Self {
+        Self {
+            step: self.step + 1,
+            ..self
+        }
+    }
+    fn sized(self, size: f32) -> Self {
+        Self { size, ..self }
+    }
+    /// Set solid, as a key's label is.
+    fn untracked(self) -> Self {
+        Self {
+            tracking: 0.0,
+            ..self
+        }
+    }
+    fn weight(self) -> Weight {
+        if self.strong {
+            spec::strong(self.role)
+        } else {
+            spec::style(self.role).1
+        }
+    }
+}
+
 /// Side margin for full-width text, and the widest a centred line may be.
 const MARGIN: f32 = 64.0;
 const FULL: f32 = WIDTH - 2.0 * MARGIN;
-/// Baseline-to-baseline for body text.
-const LINE: f32 = 26.0;
-/// Space between the items of a hint row.
-const GAP: f32 = 28.0;
-/// The footer's last baseline; rows stack upward from it.
-const FOOTER: f32 = 872.0;
-/// Baseline-to-baseline distance between footer rows: captions are smaller
-/// than body text, so the rows need more air to read as separate lines.
-const FOOTER_LINE: f32 = 30.0;
-/// Text width inside the pause and results panels.
-const PANEL: f32 = 432.0;
 
 fn opacity(c: Color, alpha: f32) -> Color {
     Color::new(c.r, c.g, c.b, alpha)
@@ -77,58 +141,92 @@ fn mix(a: Color, b: Color, t: f32) -> Color {
         a.r + (b.r - a.r) * t,
         a.g + (b.g - a.g) * t,
         a.b + (b.b - a.b) * t,
-        a.a,
+        a.a + (b.a - a.a) * t,
+    )
+}
+/// A colour from its `0xRRGGBB` code, as the design tokens are written.
+const fn hex(rgb: u32) -> Color {
+    Color::new(
+        ((rgb >> 16) & 0xFF) as f32 / 255.0,
+        ((rgb >> 8) & 0xFF) as f32 / 255.0,
+        (rgb & 0xFF) as f32 / 255.0,
+        1.0,
     )
 }
 
-/// Where the fixed scene sits in the window: uniform scale, centered.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct View {
-    pub scale: f32,
-    pub x: f32,
-    pub y: f32,
+/// A vertical colour ramp: `top` at the top edge to `bottom` at the
+/// bottom, through `mid` at a fraction of the height when there is one.
+#[derive(Clone, Copy)]
+struct Fill {
+    top: Color,
+    mid: Option<(f32, Color)>,
+    bottom: Color,
 }
-impl View {
-    /// `None` while the window has no drawable area (minimized, or zero-sized
-    /// mid-transition): there is nothing to draw and no pointer to map.
-    pub fn fit(width: f32, height: f32, dpi: f32) -> Option<Self> {
-        // `f32::min` ignores NaN, so every input is checked, not just the scale.
-        let usable = |v: f32| v.is_finite() && v > 0.0;
-        if !(usable(width) && usable(height) && usable(dpi)) {
-            return None;
+impl Fill {
+    const fn flat(c: Color) -> Self {
+        Self::ramp(c, c)
+    }
+    const fn ramp(top: Color, bottom: Color) -> Self {
+        Self {
+            top,
+            mid: None,
+            bottom,
         }
-        let scale = (width / WIDTH).min(height / HEIGHT);
-        // A letterbox offset on whole physical pixels keeps glyphs on the pixel grid.
-        let snap = |value: f32| (value * dpi).round() / dpi;
-        Some(Self {
-            scale,
-            x: snap((width - WIDTH * scale) / 2.0),
-            y: snap((height - HEIGHT * scale) / 2.0),
+    }
+    /// A lit edge: light at the top, the colour itself at `at`, dark below.
+    const fn lit(top: Color, at: f32, mid: Color, bottom: Color) -> Self {
+        Self {
+            top,
+            mid: Some((at, mid)),
+            bottom,
+        }
+    }
+    fn at(&self, t: f32) -> Color {
+        let t = t.clamp(0.0, 1.0);
+        match self.mid {
+            Some((m, c)) if t < m => mix(self.top, c, t / m),
+            Some((m, c)) => mix(c, self.bottom, (t - m) / (1.0 - m)),
+            None => mix(self.top, self.bottom, t),
+        }
+    }
+}
+
+/// The edge of a rectangle with rounded corners, clockwise from the
+/// top-left corner. Every path has the same number of points, so two of
+/// them pair up into an outline or a halo.
+#[derive(Clone, Copy)]
+struct Path {
+    rect: Rect,
+    /// Top-left, top-right, bottom-right, bottom-left.
+    radii: [f32; 4],
+}
+impl Path {
+    const STEPS: usize = 6;
+    const LEN: usize = 4 * (Self::STEPS + 1);
+    fn new(rect: Rect, radii: [f32; 4]) -> Self {
+        let most = (rect.w.min(rect.h) / 2.0).max(0.0);
+        Self {
+            rect,
+            radii: radii.map(|r| r.clamp(0.0, most)),
+        }
+    }
+    fn points(&self) -> impl Iterator<Item = Vec2> {
+        let Rect { x, y, w, h } = self.rect;
+        let [a, b, c, d] = self.radii;
+        [
+            (x + a, y + a, a, 2.0),
+            (x + w - b, y + b, b, 3.0),
+            (x + w - c, y + h - c, c, 0.0),
+            (x + d, y + h - d, d, 1.0),
+        ]
+        .into_iter()
+        .flat_map(|(cx, cy, r, start)| {
+            (0..=Self::STEPS).map(move |i| {
+                let a = (start + i as f32 / Self::STEPS as f32) * FRAC_PI_2;
+                vec2(cx, cy) + Vec2::from_angle(a) * r
+            })
         })
     }
-    pub fn current() -> Option<Self> {
-        Self::fit(screen_width(), screen_height(), screen_dpi_scale())
-    }
-    pub fn to_scene(self, x: f32, y: f32) -> V2 {
-        V2::new((x - self.x) / self.scale, (y - self.y) / self.scale)
-    }
-    /// Maps the whole window onto scene units, centering the fixed scene.
-    fn camera(&self, width: f32, height: f32) -> Camera2D {
-        let w = width / self.scale;
-        let h = height / self.scale;
-        Camera2D {
-            target: vec2(w / 2.0 - self.x / self.scale, h / 2.0 - self.y / self.scale),
-            zoom: vec2(2.0 / w, 2.0 / h),
-            ..Default::default()
-        }
-    }
-}
-/// The pointer in scene units; `None` when the window cannot map it, so a
-/// minimized window can never feed a non-finite position to the paddle.
-pub fn mouse() -> Option<V2> {
-    let (x, y) = mouse_position();
-    let p = View::current()?.to_scene(x, y);
-    (p.x.is_finite() && p.y.is_finite()).then_some(p)
 }
 
 /// How a line sits in its slot.
@@ -178,15 +276,30 @@ impl Slot {
     }
 }
 
-/// Text that does not fit where the layout puts it, or has no glyph. The
-/// layout tests collect and read these; a normal frame records nothing.
-#[derive(Debug)]
+/// What a test frame records about its layout: each problem the drawing
+/// noticed (text wider than its place, wrapped past its lines, cut to an
+/// ellipsis, a glyph missing, a size under its floor), and where every
+/// line of text landed, so the tests can find overlaps and clipping. A
+/// normal frame records nothing.
+#[derive(Default)]
 #[cfg_attr(not(test), allow(dead_code))]
-pub struct Misfit {
+pub struct Log {
+    pub problems: Vec<String>,
+    pub placed: Vec<Placed>,
+}
+/// What the layout log calls a padlock.
+#[cfg_attr(not(test), allow(dead_code))]
+const PADLOCK: &str = "padlock";
+
+/// A line of text as drawn: its ink, from the capitals' top to the
+/// descenders, the sheet layer it belongs to, and the box it must keep
+/// inside.
+#[cfg_attr(not(test), allow(dead_code))]
+pub struct Placed {
     pub text: String,
-    pub need: f32,
-    pub room: f32,
-    pub missing: Option<char>,
+    pub rect: Rect,
+    pub layer: u8,
+    pub within: Rect,
 }
 
 /// How one role is set at the current density.
@@ -209,12 +322,67 @@ struct Scene<'a> {
     locale: Locale,
     /// Physical pixels per scene unit.
     density: f32,
+    class: Class,
     device: Device,
+    /// The mouse, not the keyboard, has been driving the paddle.
+    mouse: bool,
+    /// Glyphs whose input just fired.
+    pressed: Pressed,
     buffer: RefCell<String>,
-    misfits: Option<&'a RefCell<Vec<Misfit>>>,
+    log: Option<&'a RefCell<Log>>,
+    /// The part of the scene sure to be seen; the band and sheets keep
+    /// inside it.
+    safe: Rect,
+    /// The sheet layer being drawn (0 under any sheet) and the box its
+    /// text must keep inside, for the layout tests.
+    within: Shared<(u8, Rect)>,
+    /// What this frame drew that the pointer can hit.
+    hits: RefCell<Hits>,
+    /// Opacity and downward offset for what is being drawn: a sheet fades
+    /// and rises into place. Alpha and translation only.
+    motion: Shared<(f32, f32)>,
 }
 
-impl Scene<'_> {
+impl<'a> Scene<'a> {
+    /// A frame's drawing context: the atlas and fonts for `locale`, at
+    /// `density` physical pixels per unit, for a screen of `class`.
+    fn new(
+        texture: Option<&'a Texture2D>,
+        (atlas, fonts, locale): (&'a Atlas, &'a Fonts, Locale),
+        view: &View,
+        ui: &Ui,
+        buffer: String,
+        log: Option<&'a RefCell<Log>>,
+    ) -> Self {
+        Self {
+            texture,
+            atlas,
+            fonts,
+            locale,
+            density: view.density,
+            class: view.class,
+            device: ui.device,
+            mouse: ui.mouse,
+            pressed: ui.pressed,
+            buffer: RefCell::new(buffer),
+            log,
+            safe: view.safe,
+            within: Shared::new((0, Rect::new(0.0, 0.0, WIDTH, HEIGHT))),
+            hits: RefCell::default(),
+            motion: Shared::new((1.0, 0.0)),
+        }
+    }
+    /// Records a layout problem for the tests; free in a normal frame.
+    fn note(&self, problem: impl FnOnce() -> String) {
+        if let Some(log) = self.log {
+            log.borrow_mut().problems.push(problem());
+        }
+    }
+    /// Text drawn from here on belongs to sheet layer `layer` and must
+    /// keep inside `r`.
+    fn region(&self, layer: u8, r: Rect) {
+        self.within.set((layer, r));
+    }
     fn mesh(&self, vertices: &[Vertex], indices: &[u16]) {
         let Some(texture) = self.texture else { return };
         // SAFETY: main-thread draw recording between frames, as Macroquad's own
@@ -229,7 +397,15 @@ impl Scene<'_> {
     }
     fn vertex(&self, p: Vec2, color: Color) -> Vertex {
         let uv = self.uv(Atlas::WHITE.0, Atlas::WHITE.1);
-        Vertex::new(p.x, p.y, 0.0, uv.x, uv.y, color)
+        let (alpha, lift) = self.motion.get();
+        let color = Color {
+            a: color.a * alpha,
+            ..color
+        };
+        Vertex::new(p.x, p.y + lift, 0.0, uv.x, uv.y, color)
+    }
+    fn set_motion(&self, alpha: f32, lift: f32) {
+        self.motion.set((alpha, lift));
     }
     fn quad(&self, corners: [Vec2; 4], color: Color) {
         self.mesh(&corners.map(|p| self.vertex(p, color)), &[0, 1, 2, 0, 2, 3]);
@@ -262,7 +438,12 @@ impl Scene<'_> {
             (vec2(x + w, y + h), vec2(u1.x, u1.y)),
             (vec2(x, y + h), vec2(u0.x, u1.y)),
         ];
-        let vertices = corners.map(|(p, uv)| Vertex::new(p.x, p.y, 0.0, uv.x, uv.y, color));
+        let (alpha, lift) = self.motion.get();
+        let color = Color {
+            a: color.a * alpha,
+            ..color
+        };
+        let vertices = corners.map(|(p, uv)| Vertex::new(p.x, p.y + lift, 0.0, uv.x, uv.y, color));
         self.mesh(&vertices, &[0, 1, 2, 0, 2, 3]);
     }
     /// Non-overlapping pieces, so translucent fills stay even at the corners.
@@ -326,6 +507,115 @@ impl Scene<'_> {
         self.rounded(x - 1.0, y - 1.0, w + 2.0, h + 2.0, 13.0, BORDER);
         self.rounded(x, y, w, h, 12.0, SURFACE);
     }
+
+    // Pixel snapping. Interface shapes land on whole physical pixels, and
+    // nothing thin ever rounds away.
+
+    /// `v` scene units, moved to the nearest physical pixel.
+    fn snap(&self, v: f32) -> f32 {
+        (v * self.density).round() / self.density
+    }
+    /// A thickness of `units`, in whole physical pixels and at least one.
+    fn thick(&self, units: f32) -> f32 {
+        (units * self.density).round().max(1.0) / self.density
+    }
+    fn snap_rect(&self, r: Rect) -> Rect {
+        let (x, y) = (self.snap(r.x), self.snap(r.y));
+        Rect::new(x, y, self.snap(r.x + r.w) - x, self.snap(r.y + r.h) - y)
+    }
+
+    /// A vertical colour ramp across a quad.
+    fn ramp(&self, r: Rect, top: Color, bottom: Color) {
+        let vertices = [
+            self.vertex(vec2(r.x, r.y), top),
+            self.vertex(vec2(r.x + r.w, r.y), top),
+            self.vertex(vec2(r.x + r.w, r.y + r.h), bottom),
+            self.vertex(vec2(r.x, r.y + r.h), bottom),
+        ];
+        self.mesh(&vertices, &[0, 1, 2, 0, 2, 3]);
+    }
+    /// `r` with each corner rounded by its own radius (top-left, top-right,
+    /// bottom-right, bottom-left), filled with `fill`. One fan from the
+    /// centre: a rounded rectangle is convex, so no triangle overlaps
+    /// another and translucent fills stay even.
+    fn shape(&self, r: Rect, radii: [f32; 4], fill: Fill) {
+        let path = Path::new(r, radii);
+        let colour = |p: Vec2| fill.at((p.y - r.y) / r.h);
+        let centre = r.center();
+        let zero = self.vertex(centre, colour(centre));
+        let mut vertices = [zero; 1 + Path::LEN];
+        let mut indices = [0_u16; 3 * Path::LEN];
+        for (i, p) in path.points().enumerate() {
+            vertices[i + 1] = self.vertex(p, colour(p));
+            let next = (i + 1) % Path::LEN + 1;
+            indices[i * 3..i * 3 + 3].copy_from_slice(&[0, i as u16 + 1, next as u16]);
+        }
+        self.mesh(&vertices, &indices);
+    }
+    /// The area between two rounded paths of the same corners, with a
+    /// colour for each: an outline when both are opaque, a soft halo when
+    /// the outer one is transparent.
+    fn between(&self, outer: Path, inner: Path, outer_fill: Fill, inner_fill: Fill) {
+        let at = |path: &Path, fill: Fill, p: Vec2| fill.at((p.y - path.rect.y) / path.rect.h);
+        let zero = self.vertex(Vec2::ZERO, outer_fill.top);
+        let mut vertices = [zero; 2 * Path::LEN];
+        let mut indices = [0_u16; 6 * Path::LEN];
+        for (i, (a, b)) in outer.points().zip(inner.points()).enumerate() {
+            vertices[i * 2] = self.vertex(a, at(&outer, outer_fill, a));
+            vertices[i * 2 + 1] = self.vertex(b, at(&inner, inner_fill, b));
+            let (k, next) = ((i * 2) as u16, ((i + 1) % Path::LEN * 2) as u16);
+            indices[i * 6..i * 6 + 6].copy_from_slice(&[k, k + 1, next, next, k + 1, next + 1]);
+        }
+        self.mesh(&vertices, &indices);
+    }
+    /// The edge of `bounds` rounded by `r`, `t` thick, drawn inside it.
+    fn outline(&self, bounds: Rect, r: f32, t: f32, color: Color) {
+        let inner = Rect::new(
+            bounds.x + t,
+            bounds.y + t,
+            bounds.w - 2.0 * t,
+            bounds.h - 2.0 * t,
+        );
+        self.between(
+            Path::new(bounds, [r; 4]),
+            Path::new(inner, [(r - t).max(0.0); 4]),
+            Fill::flat(color),
+            Fill::flat(color),
+        );
+    }
+    /// A soft light or shadow around `bounds`: `color` at its edge, fading
+    /// to nothing `spread` further out. Vertex colours, so no blur pass.
+    fn halo(&self, bounds: Rect, r: f32, spread: f32, color: Color) {
+        let outer = Rect::new(
+            bounds.x - spread,
+            bounds.y - spread,
+            bounds.w + 2.0 * spread,
+            bounds.h + 2.0 * spread,
+        );
+        self.between(
+            Path::new(outer, [r + spread; 4]),
+            Path::new(bounds, [r; 4]),
+            Fill::flat(opacity(color, 0.0)),
+            Fill::flat(color),
+        );
+    }
+    /// A pearl lit from above: white at a hub above its centre, cooler at
+    /// its rim. The lives in the band are pearls.
+    fn pearl(&self, p: V2, r: f32, alpha: f32) {
+        const SIDES: usize = 20;
+        let hub = vec2(p.x, p.y - 0.4 * r);
+        let mut vertices = [self.vertex(hub, opacity(WHITE, alpha)); SIDES + 2];
+        let mut indices = [0_u16; SIDES * 3];
+        let rim = opacity(PEARL_RIM, alpha);
+        for i in 0..=SIDES {
+            let a = i as f32 / SIDES as f32 * TAU;
+            vertices[i + 1] = self.vertex(vec2(p.x, p.y) + vec2(a.cos(), a.sin()) * r, rim);
+            if i < SIDES {
+                indices[i * 3..i * 3 + 3].copy_from_slice(&[0, i as u16 + 1, i as u16 + 2]);
+            }
+        }
+        self.mesh(&vertices, &indices);
+    }
     /// Oversized so it also covers the letterbox at any aspect ratio.
     fn cover(&self, color: Color) {
         self.rect(
@@ -335,9 +625,6 @@ impl Scene<'_> {
             9.0 * HEIGHT,
             color,
         );
-    }
-    fn scrim(&self) {
-        self.cover(opacity(BG, 0.78));
     }
     fn line(&self, a: V2, b: V2, thickness: f32, color: Color) {
         let (a, b) = (vec2(a.x, a.y), vec2(b.x, b.y));
@@ -405,63 +692,140 @@ impl Scene<'_> {
 
     // Text.
 
-    /// How `role` is set here. Below the smallest legible Noto strike the
-    /// 5×7 font takes over, for text it can spell; the Small and Compact
-    /// layouts will decide the rest.
-    fn face(&self, role: Role, text: &str) -> Face {
-        match spec::ppem(role, self.density) {
-            Some(ppem) => Face::Noto(ppem),
-            None if text.chars().all(pixel_font::has) => {
-                Face::Pixel(if role == Role::Display { 2.0 } else { 1.0 })
-            }
-            None => Face::Noto(spec::rungs(role).min().unwrap_or(spec::LADDER[0])),
+    /// How `style` is set here: the baked strike for its size, raised to
+    /// its floor and lowered by any fit-chain steps. A Compact screen sets
+    /// what the 5×7 font can spell in it, at whole pixels; anything else
+    /// keeps the smallest strike its floor allows.
+    fn face(&self, style: Style, text: &str) -> Face {
+        let role = style.role;
+        if self.class == Class::Compact && !style.noto && text.chars().all(pixel_font::spells) {
+            // Headings are set double until the fit chain steps them down.
+            let big = matches!(role, Role::Display | Role::Title) && style.step == 0;
+            return Face::Pixel(if big { 2.0 } else { 1.0 });
+        }
+        let mut ppem = spec::ppem_px(role, style.size * self.density);
+        for _ in 0..style.step {
+            ppem = spec::step_down(role, ppem).unwrap_or(ppem);
+        }
+        Face::Noto(ppem)
+    }
+    /// How many scene units tall `style` is set: its size, or more where a
+    /// floor raised it.
+    fn size_of(&self, style: impl Into<Style>) -> f32 {
+        let style = style.into();
+        match self.face(style, "A") {
+            Face::Noto(ppem) => style.size.max(f32::from(ppem) / self.density),
+            Face::Pixel(cell) => 7.0 * cell / self.density,
         }
     }
-    /// The advance width of `text`, in scene units.
-    fn measure(&self, text: &str, role: Role) -> f32 {
-        match self.face(role, text) {
+    /// The height of one line of `style` set at its line height.
+    fn line_h(&self, style: impl Into<Style>) -> f32 {
+        let style = style.into();
+        self.snap(self.size_of(style) * spec::line(style.role).max(1.0))
+    }
+    /// The height of one line of `text` in `style`, in the face it is
+    /// actually set in: a Compact screen sets what the pixel font cannot
+    /// spell in Noto, at its floor.
+    fn pitch(&self, style: Style, text: &str) -> f32 {
+        match self.face(style, text) {
             Face::Noto(ppem) => {
-                let (_, weight, tracking) = spec::style(role);
-                let tracking = self.fonts.tracking(tracking, ppem);
-                self.fonts.measure(text, weight, ppem, tracking) / self.density
+                let size = style.size.max(f32::from(ppem) / self.density);
+                self.snap(size * spec::line(style.role).max(1.0))
+            }
+            // Seven rows of glyph and three of gap.
+            Face::Pixel(cell) => 10.0 * cell / self.density,
+        }
+    }
+    /// The height of capitals of `text` in `style`, in its own face.
+    fn cap_of(&self, style: Style, text: &str) -> f32 {
+        match self.face(style, text) {
+            Face::Pixel(cell) => 7.0 * cell / self.density,
+            Face::Noto(_) => self.cap(style.sized(style.size)),
+        }
+    }
+    /// The baseline of a line of `style` whose box starts at `top`: Noto's
+    /// ascender and descender (1.069 and 0.293 em) centred in the box, as a
+    /// browser sets it.
+    fn baseline(&self, style: impl Into<Style>, top: f32) -> f32 {
+        self.baseline_in(style.into(), "A", top)
+    }
+    /// [`Self::baseline`] for `text` in the face it is set in: pixel-font
+    /// text sits on the seventh row of its line.
+    fn baseline_in(&self, style: Style, text: &str, top: f32) -> f32 {
+        match self.face(style, text) {
+            Face::Pixel(cell) => self.snap(top + 7.0 * cell / self.density),
+            Face::Noto(ppem) => {
+                let size = style.size.max(f32::from(ppem) / self.density);
+                let line = spec::line(style.role).max(1.0);
+                self.snap(top + size * (line / 2.0 + (1.069 - 0.293) / 2.0))
+            }
+        }
+    }
+    /// The pitch and baseline of `id` set in `style` from `top`.
+    fn line_of(
+        &self,
+        (id, args): (TextId, &[Arg]),
+        style: impl Into<Style>,
+        top: f32,
+    ) -> (f32, f32) {
+        let style = style.into();
+        self.format(id, args, Form::Full, |t| {
+            (self.pitch(style, t), self.baseline_in(style, t, top))
+        })
+    }
+    /// `units`, or more if that would be under `px` physical pixels: the
+    /// floors for targets, chips and gaps.
+    fn at_least(&self, units: f32, px: f32) -> f32 {
+        units.max(px / self.density)
+    }
+    /// The advance width of `text`, in scene units.
+    fn measure(&self, text: &str, style: impl Into<Style>) -> f32 {
+        let style = style.into();
+        match self.face(style, text) {
+            Face::Noto(ppem) => {
+                let tracking = self.fonts.tracking(style.tracking, ppem);
+                self.fonts.measure(text, style.weight(), ppem, tracking) / self.density
             }
             Face::Pixel(cell) => {
-                let n = text.chars().count() as f32;
-                (n * 6.0 - 1.0).max(0.0) * cell / self.density
+                let n: f32 = text.chars().map(pixel_font::advance).sum();
+                (n - 1.0).max(0.0) * cell / self.density
             }
         }
     }
     /// The height of capitals, in scene units, for centring a line.
-    fn cap(&self, role: Role) -> f32 {
-        let (size, weight, _) = spec::style(role);
-        match (self.face(role, "A"), self.fonts.latin.face(weight)) {
+    fn cap(&self, style: impl Into<Style>) -> f32 {
+        let style = style.into();
+        match (self.face(style, "A"), self.fonts.latin.face(style.weight())) {
             (Face::Noto(ppem), Some(f)) => {
                 f32::from(f.cap_height) * f32::from(ppem) / f32::from(f.units_per_em) / self.density
             }
-            _ => size * 0.7,
+            (Face::Pixel(cell), _) => 7.0 * cell / self.density,
+            (Face::Noto(_), None) => style.size * 0.7,
         }
     }
     fn missing(&self, text: &str, c: char) {
-        if let Some(log) = self.misfits {
-            log.borrow_mut().push(Misfit {
-                text: text.into(),
-                need: 0.0,
-                room: 0.0,
-                missing: Some(c),
-            });
-        }
+        self.note(|| format!("no glyph for {c:?} in {text:?}"));
     }
     /// Draws `text` with its left end at `x` and its baseline at `y`.
-    fn draw(&self, text: &str, role: Role, x: f32, y: f32, color: Color) {
+    fn draw(&self, text: &str, style: impl Into<Style>, x: f32, y: f32, color: Color) {
+        let style = style.into();
         let d = self.density;
         // Whole physical pixels: the view's offset is snapped too, so every
         // glyph lands exactly on the pixel grid.
         let (ox, oy) = ((x * d).round(), (y * d).round());
-        match self.face(role, text) {
+        match self.face(style, text) {
             Face::Noto(ppem) => {
-                let (_, weight, tracking) = spec::style(role);
-                let tracking = self.fonts.tracking(tracking, ppem);
+                if f32::from(ppem) < spec::floor(style.role) - 0.5 {
+                    self.note(|| format!("{text:?} at {ppem} px, under its floor"));
+                }
+                let weight = style.weight();
+                let tracking = self.fonts.tracking(style.tracking, ppem);
                 self.fonts.layout(text, weight, ppem, tracking, |p| {
+                    if let Some(power) = icon_power(p.c) {
+                        let x = (ox + p.x.round()) / d;
+                        self.chip(power, x, y, f32::from(ppem) / d, style);
+                        return;
+                    }
                     let cell = p
                         .glyph
                         .and_then(|g| self.atlas.glyph((p.source, weight, ppem, g)));
@@ -483,255 +847,231 @@ impl Scene<'_> {
                 });
             }
             Face::Pixel(cell) => {
-                for (i, c) in text.chars().enumerate() {
-                    let (sx, sy) = pixel_font::cell(c.to_ascii_uppercase());
-                    self.sprite(
-                        (ox + i as f32 * 6.0 * cell, oy - 7.0 * cell),
-                        (sx as f32, sy as f32, 5.0, 7.0),
-                        cell,
-                        color,
-                    );
+                let mut at = ox;
+                for c in text.chars() {
+                    if let Some(power) = icon_power(c) {
+                        self.pixel_capsule(power, (at / d, oy / d), cell);
+                    } else if let Some(bits) = pixel_font::extra(c) {
+                        let top = (oy - 7.0 * cell) / d;
+                        self.bits(bits, (at / d, top), cell / d, color);
+                    } else {
+                        let (sx, sy) = pixel_font::cell(c.to_ascii_uppercase());
+                        self.sprite(
+                            (at, oy - 7.0 * cell),
+                            (sx as f32, sy as f32, 5.0, 7.0),
+                            cell,
+                            color,
+                        );
+                    }
+                    at += pixel_font::advance(c) * cell;
                 }
             }
         }
     }
+    /// A capsule in pixel-font text: its colour, and its letter in night,
+    /// on whole pixels from `x` on baseline `y`.
+    fn pixel_capsule(&self, power: Power, (x, y): (f32, f32), cell: f32) {
+        let px = cell / self.density;
+        let w = (pixel_font::advance(ark_text::icon(power)) - 1.0) * px;
+        self.rect(x, y - 7.0 * px, w, 7.0 * px, power_color(power));
+        let (sx, sy) = pixel_font::cell(capsule(power));
+        let d = self.density;
+        self.sprite(
+            ((x + 2.0 * px) * d, (y - 7.0 * px) * d),
+            (sx as f32, sy as f32, 5.0, 7.0),
+            cell,
+            NIGHT,
+        );
+    }
+    /// A capsule as the player sees it falling, `size` tall, sitting on the
+    /// capitals of `beside` text whose baseline is `baseline`.
+    fn chip(&self, power: Power, x: f32, baseline: f32, size: f32, beside: Style) {
+        let (w, cy) = (ICON_EM * size, baseline - self.cap(beside) / 2.0);
+        self.rounded(x, cy - size / 2.0, w, size, size / 2.0, power_color(power));
+        let mut letter = [0; 4];
+        let letter = capsule(power).encode_utf8(&mut letter);
+        let y = cy + self.cap(Role::Label) / 2.0;
+        // Drawn rather than put: the letter is part of the line it sits in.
+        let lx = x + (w - self.measure(letter, Role::Label)) / 2.0;
+        self.draw(letter, Role::Label, lx, y, NIGHT);
+    }
     /// Draws `text` aligned in `slot`; text wider than the slot is drawn
     /// anyway and reported to the layout tests.
-    fn put(&self, text: &str, role: Role, slot: Slot, color: Color) -> f32 {
-        let width = self.measure(text, role);
-        if width > slot.w + 0.5
-            && let Some(log) = self.misfits
-        {
-            log.borrow_mut().push(Misfit {
-                text: text.into(),
-                need: width,
-                room: slot.w,
-                missing: None,
-            });
+    fn put(&self, text: &str, style: impl Into<Style>, slot: Slot, color: Color) -> f32 {
+        let style = style.into();
+        let width = self.measure(text, style);
+        if width > slot.w + 0.5 {
+            self.note(|| format!("{text:?} needs {width:.1}, has {:.1}", slot.w));
         }
         let x = match slot.align {
             Align::Left => slot.x,
             Align::Center => slot.x + (slot.w - width) / 2.0,
             Align::Right => slot.x + slot.w - width,
         };
-        self.draw(text, role, x, slot.y, color);
+        if let Some(log) = self.log {
+            let (layer, within) = self.within.get();
+            let descent = match self.face(style, text) {
+                Face::Noto(ppem) => 0.25 * f32::from(ppem) / self.density,
+                Face::Pixel(_) => 0.0,
+            };
+            let top = slot.y - self.cap(style);
+            log.borrow_mut().placed.push(Placed {
+                text: text.into(),
+                rect: Rect::new(x, top, width, slot.y + descent - top),
+                layer,
+                within,
+            });
+        }
+        self.draw(text, style, x, slot.y, color);
         width
     }
     /// Formats `id` into the scene's buffer and hands it to `with`.
     fn format<R>(&self, id: TextId, args: &[Arg], form: Form, with: impl FnOnce(&str) -> R) -> R {
         let mut buffer = self.buffer.borrow_mut();
         buffer.clear();
-        let _ = ark_text::write(&mut *buffer, self.locale, form, id, args);
+        // Capsules come out as icon marks, which `draw` sets as chips.
+        let _ = ark_text::write_icons(&mut *buffer, self.locale, form, id, args);
         with(&buffer)
     }
-    /// Sets `id` in `slot`, switching to its short wording if the full one
-    /// does not fit.
-    fn say(&self, id: TextId, args: &[Arg], role: Role, slot: Slot, color: Color) {
-        let fits = self.format(id, args, Form::Full, |t| self.measure(t, role) <= slot.w);
-        let form = if fits { Form::Full } else { Form::Short };
-        self.format(id, args, form, |t| self.put(t, role, slot, color));
+    /// Sets `id` in `slot` by the fit chain: its full wording, then its
+    /// short one, then one baked size smaller (never under the floor),
+    /// and only then cut with an ellipsis, which the layout tests treat as
+    /// a failure. Wrapping, the first step, is [`Self::paragraph`]'s; the
+    /// container growing, the fourth, is the caller's.
+    fn say(&self, id: TextId, args: &[Arg], style: impl Into<Style>, slot: Slot, color: Color) {
+        let style = style.into();
+        let mut tries = [style, style.smaller()];
+        if !self.can_step(style) {
+            tries[1] = style;
+        }
+        for style in tries {
+            for form in [Form::Full, Form::Short] {
+                let fits = self.format(id, args, form, |t| self.measure(t, style) <= slot.w + 0.5);
+                if fits {
+                    self.format(id, args, form, |t| self.put(t, style, slot, color));
+                    return;
+                }
+            }
+        }
+        self.format(id, args, Form::Short, |t| {
+            self.cut(t, tries[1], slot, color)
+        });
     }
-    fn width_of(&self, id: TextId, args: &[Arg], role: Role) -> f32 {
-        self.format(id, args, Form::Full, |t| self.measure(t, role))
+    /// Whether `style` has a smaller size above its floor: a smaller
+    /// baked strike, or a doubled pixel heading.
+    fn can_step(&self, style: Style) -> bool {
+        match self.face(style, "A") {
+            Face::Noto(ppem) => spec::step_down(style.role, ppem).is_some(),
+            Face::Pixel(cell) => cell > 1.0,
+        }
+    }
+    /// The last resort: as much of `text` as fits with an ellipsis. Never
+    /// used on numbers, which are set with [`Self::put`] and reported.
+    fn cut(&self, text: &str, style: Style, slot: Slot, color: Color) {
+        let mut line = Line::default();
+        for (end, _) in text.char_indices().rev() {
+            line.clear();
+            let _ = write!(line, "{}…", &text[..end]);
+            if self.measure(line.as_str(), style) <= slot.w {
+                break;
+            }
+        }
+        self.note(|| format!("{text:?} cut to an ellipsis in {:.1}", slot.w));
+        self.put(line.as_str(), style, slot, color);
+    }
+    fn width_of(&self, id: TextId, args: &[Arg], style: impl Into<Style>) -> f32 {
+        let style = style.into();
+        self.format(id, args, Form::Full, |t| self.measure(t, style))
+    }
+    /// How many lines `paragraph` would set `id` in, `width` wide, in
+    /// its full wording.
+    fn lines(&self, (id, args): (TextId, &[Arg]), style: impl Into<Style>, width: f32) -> usize {
+        let style = style.into();
+        self.format(id, args, Form::Full, |text| {
+            self.wrap(text, style, width, |_| {})
+        })
+    }
+    /// Breaks `text` into lines no wider than `width`, handing each to
+    /// `line`; returns the count. A Compact screen sets the whole text in
+    /// one face, so no line switches to the pixel font mid-paragraph.
+    fn wrap<'t>(
+        &self,
+        text: &'t str,
+        style: Style,
+        width: f32,
+        line: impl FnMut(&'t str),
+    ) -> usize {
+        match self.face(style, text) {
+            Face::Noto(ppem) => {
+                let tracking = self.fonts.tracking(style.tracking, ppem);
+                let room = width * self.density;
+                self.fonts
+                    .wrap(text, style.weight(), ppem, tracking, room, line)
+            }
+            Face::Pixel(_) => pixel_lines(text, width, |t| self.measure(t, style), line),
+        }
     }
     /// Sets `id` across up to `max` lines from baseline `slot.y`, wrapping
-    /// at word (or, in Chinese and Japanese, character) boundaries.
-    /// Returns the lines used; more than `max` is reported.
-    fn paragraph(&self, id: TextId, role: Role, slot: Slot, max: usize, color: Color) -> usize {
-        self.format(id, &[], Form::Full, |text| {
-            let (_, weight, tracking) = spec::style(role);
-            let ppem = match self.face(role, text) {
-                Face::Noto(ppem) => ppem,
-                // The pixel font does not wrap; one line, reported if long.
-                Face::Pixel(_) => {
-                    self.put(text, role, slot, color);
-                    return 1;
-                }
+    /// at word (or, in Chinese and Japanese, character) boundaries: the fit
+    /// chain's first step. Where the full wording needs more than `max`
+    /// lines, its short one is set instead. Returns the lines used; more
+    /// than `max` is reported.
+    fn paragraph(
+        &self,
+        (id, args): (TextId, &[Arg]),
+        style: impl Into<Style>,
+        slot: Slot,
+        max: usize,
+        color: Color,
+    ) -> usize {
+        let style = style.into();
+        let full = self.format(id, args, Form::Full, |t| {
+            self.wrap(t, style, slot.w, |_| {})
+        });
+        let form = if full > max { Form::Short } else { Form::Full };
+        self.format(id, args, form, |text| {
+            let style = match self.face(style, text) {
+                Face::Noto(_) => Style {
+                    noto: true,
+                    ..style
+                },
+                Face::Pixel(_) => style,
             };
-            let tracking = self.fonts.tracking(tracking, ppem);
-            let room = slot.w * self.density;
             let mut lines = 0;
-            self.fonts.wrap(text, weight, ppem, tracking, room, |line| {
-                let y = slot.y + lines as f32 * LINE;
+            let leading = self.pitch(style, text);
+            let count = self.wrap(text, style, slot.w, |line| {
+                let y = slot.y + lines as f32 * leading;
                 if lines < max {
-                    self.put(line, role, Slot { y, ..slot }, color);
-                } else if let Some(log) = self.misfits {
-                    log.borrow_mut().push(Misfit {
-                        text: text.into(),
-                        need: (lines + 1) as f32,
-                        room: max as f32,
-                        missing: None,
-                    });
+                    self.put(line, style, Slot { y, ..slot }, color);
                 }
                 lines += 1;
             });
-            lines.min(max)
+            if count > max {
+                self.note(|| format!("{text:?} wraps past {max} lines"));
+            }
+            count.min(max)
         })
     }
 
-    // Controls.
-
-    fn cap_width(&self, cap: Cap) -> f32 {
-        match cap {
-            Cap::Key(label) => (self.measure(label, Role::Label) + 12.0).max(24.0),
-            Cap::Pad(Glyph::Start) => 30.0,
-            Cap::Pad(_) => 22.0,
-        }
-    }
-    /// A key or button cap, centred on the capitals of body text at `baseline`.
-    fn cap_glyph(&self, cap: Cap, x: f32, baseline: f32, beside: Role) {
-        let w = self.cap_width(cap);
-        let cy = baseline - self.cap(beside) / 2.0;
-        match cap {
-            Cap::Key(label) => {
-                self.rounded(x, cy - 12.0, w, 24.0, 6.0, BORDER);
-                self.rounded(x + 1.0, cy - 11.0, w - 2.0, 22.0, 5.0, RAISED);
-                let y = cy + self.cap(Role::Label) / 2.0;
-                self.put(label, Role::Label, Slot::centered(x + w / 2.0, w, y), INK);
-            }
-            Cap::Pad(Glyph::Start) => {
-                self.rounded(x, cy - 10.0, w, 20.0, 10.0, DIM);
-                for dy in [-4.0, 0.0, 4.0] {
-                    self.rect(x + 9.0, cy + dy - 0.75, 12.0, 1.5, BG);
+    /// A 5×7 bitmap in `cell`-unit squares from its top-left corner.
+    fn bits(&self, bits: [u8; 7], (x, y): (f32, f32), cell: f32, color: Color) {
+        for (row, &line) in bits.iter().enumerate() {
+            for col in 0..5 {
+                if line & (1 << (4 - col)) != 0 {
+                    let (cx, cy) = (x + col as f32 * cell, y + row as f32 * cell);
+                    self.rect(cx, cy, cell, cell, color);
                 }
             }
-            Cap::Pad(glyph) => {
-                let (label, fill) = match glyph {
-                    Glyph::A => ("A", PALETTE[3]),
-                    Glyph::B => ("B", RED),
-                    _ => ("X", Color::new(0.30, 0.56, 1.0, 1.0)),
-                };
-                self.circle(V2::new(x + w / 2.0, cy), w / 2.0, fill);
-                let y = cy + self.cap(Role::Label) / 2.0;
-                self.put(label, Role::Label, Slot::centered(x + w / 2.0, w, y), BG);
-            }
         }
     }
-    fn item_width(&self, item: &Item, role: Role) -> f32 {
-        let cap = item.cap.map_or(0.0, |c| self.cap_width(c) + 8.0);
-        cap + self.width_of(item.id, item.arg.as_slice(), role)
-    }
-    /// Lays `items` into centred lines of at most `FULL` width; calls
-    /// `line` with each line's items and width. Returns the line count.
-    fn pack(&self, items: &[Item], role: Role, mut line: impl FnMut(&[Item], f32)) -> usize {
-        let mut start = 0;
-        let mut lines = 0;
-        while start < items.len() {
-            let mut width = self.item_width(&items[start], role);
-            let mut end = start + 1;
-            while end < items.len() {
-                let next = width + GAP + self.item_width(&items[end], role);
-                if next > FULL {
-                    break;
-                }
-                width = next;
-                end += 1;
-            }
-            line(&items[start..end], width);
-            lines += 1;
-            start = end;
-        }
-        lines
-    }
-    /// Draws one packed line of hint items, centred, on `baseline`.
-    fn hint_line(&self, items: &[Item], width: f32, baseline: f32, color: Color, role: Role) {
-        let mut x = WIDTH / 2.0 - width.min(FULL) / 2.0;
-        for item in items {
-            if let Some(cap) = item.cap {
-                self.cap_glyph(cap, x, baseline, role);
-                x += self.cap_width(cap) + 8.0;
-            }
-            let w = self.width_of(item.id, item.arg.as_slice(), role);
-            self.say(
-                item.id,
-                item.arg.as_slice(),
-                role,
-                Slot::left(x, w.min(FULL), baseline),
-                color,
-            );
-            x += w + GAP;
-        }
-    }
-    /// Rows of hints stacked up from the bottom of the screen. A save
-    /// failure, when there is one, sits on top.
-    fn footer(&self, rows: &[(&[Item], Color)], save_error: bool) {
-        let count: usize = rows
-            .iter()
-            .map(|(items, _)| self.pack(items, Role::Caption, |_, _| {}))
-            .sum::<usize>()
-            + usize::from(save_error);
-        if count > 4
-            && let Some(log) = self.misfits
-        {
-            log.borrow_mut().push(Misfit {
-                text: "footer".into(),
-                need: count as f32,
-                room: 4.0,
-                missing: None,
-            });
-        }
-        let mut y = FOOTER - (count.saturating_sub(1)) as f32 * FOOTER_LINE;
-        if save_error {
-            self.say(TextId::SaveFailed, &[], Role::Caption, Slot::line(y), AMBER);
-            y += FOOTER_LINE;
-        }
-        for &(items, color) in rows {
-            self.pack(items, Role::Caption, |line, width| {
-                self.hint_line(line, width, y, color, Role::Caption);
-                y += FOOTER_LINE;
-            });
-        }
-    }
-    /// A row of label–value pairs, centred: `POINTS 12,400   MEDALS 7`.
-    fn pairs(&self, pairs: &[(TextId, u32)], baseline: f32, room: f32) {
-        let pair_width = |&(label, n): &(TextId, u32)| {
-            let value = Figures::count(self.locale, n);
-            self.width_of(label, &[], Role::Label) + 8.0 + self.measure(value.as_str(), Role::Body)
-        };
-        let width = pairs.iter().map(pair_width).sum::<f32>() + GAP * (pairs.len() as f32 - 1.0);
-        if width > room
-            && let Some(log) = self.misfits
-        {
-            log.borrow_mut().push(Misfit {
-                text: "label and value pairs".into(),
-                need: width,
-                room,
-                missing: None,
-            });
-        }
-        let mut x = WIDTH / 2.0 - width / 2.0;
-        for &(label, n) in pairs {
-            let w = self.width_of(label, &[], Role::Label);
-            self.say(label, &[], Role::Label, Slot::left(x, w, baseline), DIM);
-            x += w + 8.0;
-            let value = Figures::count(self.locale, n);
-            x += self.put(
-                value.as_str(),
-                Role::Body,
-                Slot::left(x, room, baseline),
-                INK,
-            ) + GAP;
-        }
-    }
-    fn button(&self, r: Rect, id: TextId, args: &[Arg], selected: bool, enabled: bool) {
-        if selected && enabled {
-            self.rounded(r.x, r.y, r.w, r.h, 10.0, opacity(CYAN, 0.13));
-        }
-        let color = match (enabled, selected) {
-            (false, _) => MUTED,
-            (true, true) => CYAN,
-            (true, false) => opacity(INK, 0.82),
-        };
-        let baseline = r.y + r.h / 2.0 + self.cap(Role::Body) / 2.0;
-        self.say(
-            id,
-            args,
-            Role::Body,
-            Slot::centered(r.x + r.w / 2.0, r.w - 32.0, baseline),
-            color,
-        );
-    }
+    /// The 5×7 logo in `cell`-unit squares, the O in cyan. Cells a few
+    /// pixels wide are drawn solid; a gap would round away.
     fn logo(&self, x: f32, y: f32, cell: f32) {
+        let gap = if self.class == Class::Compact {
+            0.0
+        } else {
+            1.5
+        };
         for (letter, character) in "ARKONK".chars().enumerate() {
             let color = if character == 'O' { CYAN } else { INK };
             for (row, &bits) in pixel_font::glyph(character).iter().enumerate() {
@@ -740,8 +1080,8 @@ impl Scene<'_> {
                         self.rect(
                             x + (letter as f32 * 6.0 + col as f32) * cell,
                             y + row as f32 * cell,
-                            cell - 1.5,
-                            cell - 1.5,
+                            cell - gap,
+                            cell - gap,
                             color,
                         );
                     }
@@ -749,47 +1089,49 @@ impl Scene<'_> {
             }
         }
     }
-    /// A small padlock for sectors not yet open.
+    /// A small padlock for sectors not yet open. The layout tests see it
+    /// as a word, so text that crowds or covers it fails them.
     fn padlock(&self, cx: f32, cy: f32, color: Color) {
         self.ring(V2::new(cx, cy - 4.0), 5.0, 2.0, color);
         self.rounded(cx - 8.0, cy - 3.0, 16.0, 12.0, 2.5, color);
+        if let Some(log) = self.log {
+            let (layer, within) = self.within.get();
+            log.borrow_mut().placed.push(Placed {
+                text: PADLOCK.into(),
+                rect: Rect::new(cx - 8.0, cy - 10.0, 16.0, 19.0),
+                layer,
+                within,
+            });
+        }
     }
 }
 
-/// Xbox face-button names; Steam Deck and Steam Input present this layout.
-#[derive(Clone, Copy, PartialEq)]
-enum Glyph {
-    A,
-    B,
-    X,
-    Start,
-}
-/// What sits before a hint: a keyboard key or a gamepad button.
-#[derive(Clone, Copy, PartialEq)]
-enum Cap {
-    Key(&'static str),
-    Pad(Glyph),
-}
-/// One hint: an optional cap, then text.
-#[derive(Clone, Copy)]
-struct Item {
-    cap: Option<Cap>,
-    id: TextId,
-    arg: Option<Arg>,
-}
-const fn hint(id: TextId) -> Item {
-    Item {
-        cap: None,
-        id,
-        arg: None,
+/// Wraps pixel-font text into lines no wider than `room`. The pixel font
+/// spells only Latin, so spaces are the only breaks. Returns the count.
+fn pixel_lines<'t>(
+    text: &'t str,
+    room: f32,
+    measure: impl Fn(&str) -> f32,
+    mut line: impl FnMut(&'t str),
+) -> usize {
+    let mut count = 0;
+    let mut rest = text.trim();
+    while !rest.is_empty() {
+        let fits = |end: usize| measure(&rest[..end]) <= room;
+        let end = if fits(rest.len()) {
+            rest.len()
+        } else {
+            rest.match_indices(' ')
+                .map(|(i, _)| i)
+                .take_while(|&i| fits(i))
+                .last()
+                .unwrap_or(rest.len())
+        };
+        line(&rest[..end]);
+        count += 1;
+        rest = rest[end..].trim_start();
     }
-}
-const fn pad(glyph: Glyph, id: TextId) -> Item {
-    Item {
-        cap: Some(Cap::Pad(glyph)),
-        id,
-        arg: None,
-    }
+    count
 }
 
 #[derive(Clone, Copy, Default)]
@@ -810,6 +1152,11 @@ pub struct Fx {
     popup_cursor: usize,
     previous_score: u32,
     previous_sector: Option<SectorId>,
+    /// Lives when this sector began; the band rings each one lost since.
+    entry_lives: u8,
+    /// Lives a tick ago, and how long a life just gained stays ringed.
+    previous_lives: u8,
+    life_gained: f32,
     paddle_flash: f32,
     wall_flash: f32,
     pickup_flash: f32,
@@ -826,6 +1173,9 @@ impl Default for Fx {
             popup_cursor: 0,
             previous_score: 0,
             previous_sector: None,
+            entry_lives: 0,
+            previous_lives: 0,
+            life_gained: 0.0,
             paddle_flash: 0.0,
             wall_flash: 0.0,
             pickup_flash: 0.0,
@@ -874,6 +1224,7 @@ pub struct Renderer {
     metal: bool,
     text: String,
     fx: Fx,
+    hits: Hits,
 }
 impl Renderer {
     pub fn new(locale: Locale) -> Self {
@@ -889,6 +1240,7 @@ impl Renderer {
             metal,
             text: String::with_capacity(256),
             fx: Fx::default(),
+            hits: Hits::default(),
         };
         renderer.upload();
         renderer
@@ -925,6 +1277,10 @@ impl Renderer {
         }
     }
 
+    /// What the last frame drew that the pointer can hit.
+    pub fn hits(&self) -> &Hits {
+        &self.hits
+    }
     pub fn reset(&mut self) {
         self.fx = Fx::default();
     }
@@ -936,7 +1292,14 @@ impl Renderer {
             fx.previous_sector = Some(game.sector());
             fx.previous_bricks = hp_grid(game);
             fx.previous_score = game.score();
+            fx.entry_lives = game.lives();
+            fx.previous_lives = game.lives();
         }
+        fx.life_gained = (fx.life_gained - DT).max(0.0);
+        if game.lives() > fx.previous_lives {
+            fx.life_gained = 1.0;
+        }
+        fx.previous_lives = game.lives();
         for (i, ball) in game.balls().iter().enumerate() {
             if !ball.active || ball.held || game.stage() != Stage::Playing {
                 fx.trail_len[i] = 0;
@@ -1001,14 +1364,7 @@ impl Renderer {
             return;
         };
         set_camera(&view.camera(screen_width(), screen_height()));
-        self.frame(
-            view.scale * screen_dpi_scale(),
-            game,
-            ui,
-            profile,
-            alpha,
-            perf,
-        );
+        self.frame(view, game, ui, profile, alpha, perf);
     }
     /// OpenGL only: renders one frame offscreen at an exact physical size, as
     /// on a 1x display, and writes it as PNG. Layouts can then be checked at
@@ -1031,7 +1387,10 @@ impl Renderer {
         // Texture readback is bottom-up; render flipped so the PNG is upright.
         camera.zoom.y = -camera.zoom.y;
         set_camera(&camera);
-        self.frame(view.scale, game, ui, profile, 1.0, None);
+        let hits = self.hits;
+        self.frame(view, game, ui, profile, 1.0, None);
+        // An offscreen capture is not what the player sees.
+        self.hits = hits;
         // SAFETY: main thread, between draw calls; executes the batched frame.
         unsafe { get_internal_gl() }.flush();
         target.texture.get_texture_data().export_png(path);
@@ -1039,27 +1398,25 @@ impl Renderer {
     }
     fn frame(
         &mut self,
-        density: f32,
+        view: View,
         game: &Game,
         ui: &Ui,
         profile: &Profile,
         alpha: f32,
         perf: Option<&Perf>,
     ) {
-        let v = Scene {
-            texture: self.texture.as_ref(),
-            atlas: &self.kind.atlas,
-            fonts: &self.kind.fonts,
-            locale: self.kind.locale,
-            density,
-            device: ui.device,
-            buffer: RefCell::new(std::mem::take(&mut self.text)),
-            misfits: None,
-        };
+        let v = Scene::new(
+            self.texture.as_ref(),
+            (&self.kind.atlas, &self.kind.fonts, self.kind.locale),
+            &view,
+            ui,
+            std::mem::take(&mut self.text),
+            None,
+        );
         // Painting the background into the scene batch, rather than with
         // `clear_background`, saves a full-framebuffer pass: Macroquad has
         // already cleared once this frame.
-        v.cover(BG);
+        v.cover(NIGHT);
         scene(&v, &self.fx, game, ui, profile, alpha, perf);
         // Translucent shapes also blend into framebuffer alpha. Restore an
         // opaque frame so the compositor never shows anything through it.
@@ -1068,6 +1425,7 @@ impl Renderer {
             v.cover(WHITE);
             gl_use_default_material();
         }
+        self.hits = v.hits.into_inner();
         self.text = v.buffer.into_inner();
     }
 }
@@ -1085,15 +1443,19 @@ fn scene(
     let (stage, summary) = ui
         .preview
         .map_or((game.stage(), game.summary()), |p| (p.stage, p.summary));
+    frame::arch(v, fx.wall_flash);
     if ui.screen != Screen::Play {
         if ui.screen == Screen::Title {
-            attract(v, ui, profile);
+            screens::title(v, ui, profile);
         } else {
-            sectors(v, ui, profile);
+            screens::sectors(v, ui, profile);
+        }
+        if let Some(row) = ui.settings {
+            sheet::dim(v, ui.sheet_open);
+            sheet::settings(v, ui, profile, row);
         }
         return;
     }
-    playfield(v, fx);
     bricks(v, fx, game);
     effects(v, fx, game);
     paddle(v, fx, game);
@@ -1110,136 +1472,51 @@ fn scene(
         }
     }
     balls(v, fx, game, alpha);
-    hud(v, game, profile);
+    frame::band_play(v, fx, game, profile, ui.notice > 0.0);
+    frame::field_region(v, 0);
     let mut letter = [0; 4];
     for drop in game.capsules() {
         if drop.active {
             let letter = capsule(drop.power).encode_utf8(&mut letter);
             let y = drop.pos.y + v.cap(Role::Label) / 2.0;
-            v.put(letter, Role::Label, Slot::centered(drop.pos.x, 30.0, y), BG);
+            v.put(
+                letter,
+                Role::Label,
+                Slot::centered(drop.pos.x, 30.0, y),
+                NIGHT,
+            );
         }
     }
+    // Points float from the brick in caption-sized figures.
     for popup in &fx.popups {
         if popup.life > 0.0 {
-            let color = opacity(INK, (popup.life * 3.0).min(1.0));
+            let color = opacity(INK, 0.85 * (popup.life * 3.0).min(1.0));
             v.format(TextId::Plus, &[Arg::Count(popup.value)], Form::Full, |t| {
-                v.put(
-                    t,
-                    Role::Label,
-                    Slot::centered(popup.pos.x, 120.0, popup.pos.y),
-                    color,
-                )
+                let slot = Slot::centered(popup.pos.x, 120.0, popup.pos.y);
+                v.put(t, Role::Caption, slot, color)
             });
         }
     }
     if !ui.paused && stage == Stage::Playing {
-        if game.balls().iter().any(|b| b.active && b.held) {
-            match v.device {
-                Device::KeyboardMouse => v.say(
-                    TextId::KeysRelease,
-                    &[],
-                    Role::Body,
-                    Slot::line(720.0),
-                    CYAN,
-                ),
-                Device::Gamepad => {
-                    let items = [pad(Glyph::A, TextId::ActionRelease)];
-                    v.pack(&items, Role::Body, |line, w| {
-                        v.hint_line(line, w, 720.0, CYAN, Role::Body)
-                    });
-                }
-            }
-        }
-        if game.effects().notice_ticks > 0
-            && let Some(power) = game.effects().notice
-        {
-            let fade = (game.effects().notice_ticks as f32 / 60.0).min(1.0);
-            let color = opacity(power_color(power), fade);
-            v.say(
-                TextId::PowerName(power),
-                &[],
-                Role::Body,
-                Slot::line(687.0),
-                color,
-            );
-        }
+        moments::release(v, game);
+        moments::power(v, game);
     }
-    let footer_error = ui.save_error && (ui.paused || stage != Stage::Playing);
-    if ui.paused {
-        v.scrim();
-        v.panel(240.0, 290.0, 480.0, 350.0);
-        v.say(
-            TextId::Paused,
-            &[],
-            Role::Display,
-            Slot::centered(WIDTH / 2.0, PANEL, 342.0),
-            INK,
-        );
-        menu(
-            v,
-            ui.choice,
-            [TextId::ActionResume, TextId::RetrySector, TextId::MainMenu],
-            None,
-        );
-        let note = Slot::centered(WIDTH / 2.0, PANEL, 576.0);
-        v.paragraph(TextId::RetryNote, Role::Body, note, 2, DIM);
-        match v.device {
-            Device::Gamepad => {
-                let items = [
-                    pad(Glyph::A, TextId::ActionSelect),
-                    pad(Glyph::B, TextId::ActionResume),
-                    pad(Glyph::X, TextId::ActionRetry),
-                ];
-                v.footer(&[(&items, DIM)], footer_error);
-            }
-            Device::KeyboardMouse => v.footer(&[(&options(profile, v.device), DIM)], footer_error),
-        }
+    if let Some(row) = ui.settings {
+        sheet::dim(v, ui.sheet_open);
+        sheet::settings(v, ui, profile, row);
+    } else if ui.paused {
+        sheet::dim(v, ui.sheet_open);
+        sheet::pause(v, ui, game);
     } else {
         match stage {
-            Stage::Ready => ready(v, game),
-            Stage::Cleared => cleared(v, game, summary),
+            Stage::Ready => screens::ready(v, game),
+            Stage::Cleared => {
+                sheet::dim(v, ui.sheet_open);
+                sheet::cleared(v, ui, game, summary);
+            }
             Stage::GameOver | Stage::Victory => {
-                v.scrim();
-                v.panel(240.0, 290.0, 480.0, 350.0);
-                let heading = if stage == Stage::Victory {
-                    TextId::JourneyComplete
-                } else {
-                    TextId::OneMoreOrbit
-                };
-                v.say(
-                    heading,
-                    &[],
-                    Role::Display,
-                    Slot::centered(WIDTH / 2.0, PANEL, 338.0),
-                    INK,
-                );
-                v.pairs(
-                    &[
-                        (TextId::StatPoints, game.score()),
-                        (TextId::StatMedals, profile.progress.medal_count()),
-                    ],
-                    368.0,
-                    PANEL,
-                );
-                let second = if stage == Stage::Victory {
-                    TextId::NewJourney
-                } else {
-                    TextId::RetrySector
-                };
-                menu(
-                    v,
-                    ui.choice,
-                    [TextId::SectorSelect, second, TextId::MainMenu],
-                    None,
-                );
-                v.say(
-                    TextId::ProgressSaved,
-                    &[],
-                    Role::Body,
-                    Slot::centered(WIDTH / 2.0, PANEL, 590.0),
-                    DIM,
-                );
-                v.footer(&[], footer_error);
+                sheet::dim(v, ui.sheet_open);
+                sheet::results(v, ui, game, stage == Stage::Victory);
             }
             Stage::Playing => {}
         }
@@ -1260,14 +1537,6 @@ fn scene(
     }
 }
 
-fn playfield(v: &Scene, fx: &Fx) {
-    v.rect(LEFT, TOP, RIGHT - LEFT, BOTTOM - TOP, SURFACE);
-    // Three walls; the open bottom edge is where a ball drains.
-    let edge = mix(BORDER, CYAN, (fx.wall_flash * 4.0).min(0.6));
-    v.rect(LEFT, TOP, RIGHT - LEFT, 1.0, edge);
-    v.rect(LEFT, TOP, 1.0, BOTTOM - TOP, edge);
-    v.rect(RIGHT - 1.0, TOP, 1.0, BOTTOM - TOP, edge);
-}
 fn bricks(v: &Scene, fx: &Fx, game: &Game) {
     // Quiet connections make the actual orthogonal blast routes readable.
     for cell in FieldCell::all() {
@@ -1498,601 +1767,44 @@ fn balls(v: &Scene, fx: &Fx, game: &Game, alpha: f32) {
         v.circle(pos, RADIUS, INK);
     }
 }
-/// Score left, sector centre, lives right. Labels are small tracked
-/// capitals; figures are tabular, so the score never shifts as it grows.
-fn hud(v: &Scene, game: &Game, profile: &Profile) {
-    let side = WIDTH / 2.0 - 160.0 - LEFT;
-    v.say(
-        TextId::Score,
-        &[],
-        Role::Label,
-        Slot::left(LEFT, side, 70.0),
-        DIM,
-    );
-    let score = Figures::count(v.locale, game.score());
-    v.put(
-        score.as_str(),
-        Role::Display,
-        Slot::left(LEFT, side, 108.0),
-        INK,
-    );
-
-    let eyebrow = if game.mode() == Mode::Practice {
-        TextId::PracticeNumber
-    } else {
-        TextId::SectorNumber
-    };
-    v.say(
-        eyebrow,
-        &[Arg::Sector(game.sector())],
-        Role::Label,
-        Slot::centered(WIDTH / 2.0, 300.0, 70.0),
-        DIM,
-    );
-    v.say(
-        TextId::SectorName(game.sector()),
-        &[],
-        Role::Body,
-        Slot::centered(WIDTH / 2.0, 300.0, 100.0),
-        INK,
-    );
-    for id in SectorId::all() {
-        v.rect(
-            WIDTH / 2.0 - 94.0 + id.index() as f32 * 16.0,
-            116.0,
-            12.0,
-            2.0,
-            if id == game.sector() {
-                CYAN
-            } else if profile.progress.record(id).medals != Medals::NONE {
-                DIM
-            } else {
-                MUTED
-            },
-        );
-    }
-
-    v.say(
-        TextId::Lives,
-        &[],
-        Role::Label,
-        Slot::right(RIGHT, side, 70.0),
-        DIM,
-    );
-    let shown = game.lives().max(3);
-    for i in 0..shown {
-        v.circle(
-            V2::new(RIGHT - 5.0 - f32::from(shown - 1 - i) * 16.0, 97.0),
-            5.0,
-            if i < game.lives() { INK } else { MUTED },
-        );
-    }
-}
-fn ready(v: &Scene, game: &Game) {
-    let id = game.sector();
-    let chapter = id.sector().chapter;
-    let eyebrow = [Arg::Text(TextId::ChapterName(chapter)), Arg::Sector(id)];
-    v.say(
-        TextId::ReadyEyebrow,
-        &eyebrow,
-        Role::Label,
-        Slot::line(540.0),
-        sector_color(0, chapter),
-    );
-    v.say(
-        TextId::SectorName(id),
-        &[],
-        Role::Display,
-        Slot::line(586.0),
-        INK,
-    );
-    let tip = Slot::centered(WIDTH / 2.0, 720.0, 622.0);
-    let lines = v.paragraph(TextId::SectorTip(id), Role::Body, tip, 2, DIM);
-    let y = 622.0 + lines as f32 * LINE + 22.0;
-    match v.device {
-        Device::KeyboardMouse => v.say(TextId::KeysServe, &[], Role::Body, Slot::line(y), CYAN),
-        Device::Gamepad => {
-            let items = [pad(Glyph::A, TextId::ActionServe)];
-            v.pack(&items, Role::Body, |line, w| {
-                v.hint_line(line, w, y, CYAN, Role::Body)
-            });
-        }
-    }
-    let start = game.balls()[0].pos;
-    let direction = game.launch_velocity().normalized();
-    for i in 1..=5 {
-        v.circle(
-            start + direction * (14.0 * i as f32),
-            1.5,
-            opacity(CYAN, 0.45 - i as f32 * 0.06),
-        );
-    }
-}
-/// The sound, volume and display shortcuts. They are keyboard keys; a pad
-/// player still sees the levels.
-fn options(profile: &Profile, device: Device) -> [Item; 3] {
-    let sound = if profile.settings.muted {
-        TextId::SoundOff
-    } else {
-        TextId::SoundOn
-    };
-    let volume = Some(Arg::Count(u32::from(profile.settings.volume)));
-    let key = |k| match device {
-        Device::KeyboardMouse => Some(Cap::Key(k)),
-        Device::Gamepad => None,
-    };
-    [
-        Item {
-            cap: key("M"),
-            id: sound,
-            arg: None,
-        },
-        Item {
-            cap: key("[ ]"),
-            id: TextId::Volume,
-            arg: volume,
-        },
-        Item {
-            cap: key("F"),
-            id: TextId::Fullscreen,
-            arg: None,
-        },
-    ]
-}
-fn menu(v: &Scene, selected: usize, labels: [TextId; 3], disabled: Option<usize>) {
-    for (i, label) in labels.into_iter().enumerate() {
-        v.button(
-            ui::menu_rect(i),
-            label,
-            &[],
-            i == selected,
-            disabled != Some(i),
-        );
-    }
-}
-fn attract(v: &Scene, ui: &Ui, profile: &Profile) {
-    v.logo(270.0, 170.0, 12.0);
-    v.say(TextId::Tagline, &[], Role::Body, Slot::line(300.0), DIM);
-    menu(
-        v,
-        ui.choice,
-        [
-            TextId::ContinueJourney,
-            TextId::NewJourney,
-            TextId::SectorSelect,
-        ],
-        profile.progress.checkpoint().is_none().then_some(0),
-    );
-    match profile.progress.checkpoint() {
-        Some(c) => {
-            let args = [
-                Arg::Sector(c.sector),
-                Arg::Text(TextId::SectorName(c.sector)),
-            ];
-            v.say(TextId::SavedAt, &args, Role::Body, Slot::line(590.0), DIM);
-        }
-        None => v.say(
-            TextId::JourneyIntro,
-            &[],
-            Role::Body,
-            Slot::line(590.0),
-            DIM,
-        ),
-    }
-    for (i, label) in [TextId::StatSectors, TextId::StatMedals, TextId::StatBest]
-        .into_iter()
-        .enumerate()
-    {
-        // Wide enough for the largest possible best score at body size.
-        let x = WIDTH / 2.0 + (i as f32 - 1.0) * 180.0;
-        v.say(
-            label,
-            &[],
-            Role::Label,
-            Slot::centered(x, 170.0, 668.0),
-            DIM,
-        );
-        let value = Slot::centered(x, 170.0, 698.0);
-        match i {
-            0 => {
-                let args = [
-                    Arg::Count(profile.progress.unlocked_count() as u32),
-                    Arg::Count(SECTOR_COUNT as u32),
-                ];
-                v.say(TextId::Fraction, &args, Role::Body, value, INK);
-            }
-            1 => {
-                let args = [
-                    Arg::Count(profile.progress.medal_count()),
-                    Arg::Count(SECTOR_COUNT as u32 * 3),
-                ];
-                v.say(TextId::Fraction, &args, Role::Body, value, INK);
-            }
-            _ => {
-                let best = Figures::count(v.locale, profile.progress.best_score());
-                v.put(best.as_str(), Role::Body, value, INK);
-            }
-        }
-    }
-    let hints = match v.device {
-        Device::KeyboardMouse => [
-            hint(TextId::KeysMove),
-            hint(TextId::KeysServe),
-            hint(TextId::KeysPause),
-        ],
-        Device::Gamepad => [
-            hint(TextId::PadMove),
-            pad(Glyph::A, TextId::ActionServe),
-            Item {
-                cap: Some(Cap::Pad(Glyph::Start)),
-                id: TextId::ActionPause,
-                arg: None,
-            },
-        ],
-    };
-    let options = options(profile, v.device);
-    v.footer(&[(&hints, DIM), (&options, MUTED)], ui.save_error);
-}
-fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
-    let back = ui::back_rect();
-    v.rounded(back.x, back.y, back.w, back.h, 8.0, RAISED);
-    let baseline = back.y + back.h / 2.0 + v.cap(Role::Body) / 2.0;
-    match v.device {
-        Device::KeyboardMouse => {
-            let cy = back.y + back.h / 2.0;
-            v.line(
-                V2::new(back.x + 20.0, cy - 5.0),
-                V2::new(back.x + 15.0, cy),
-                1.5,
-                DIM,
-            );
-            v.line(
-                V2::new(back.x + 15.0, cy),
-                V2::new(back.x + 20.0, cy + 5.0),
-                1.5,
-                DIM,
-            );
-            let slot = Slot::left(back.x + 28.0, back.w - 38.0, baseline);
-            v.say(TextId::ActionBack, &[], Role::Body, slot, DIM);
-        }
-        Device::Gamepad => {
-            v.cap_glyph(Cap::Pad(Glyph::B), back.x + 10.0, baseline, Role::Body);
-            let slot = Slot::left(back.x + 40.0, back.w - 50.0, baseline);
-            v.say(TextId::ActionBack, &[], Role::Body, slot, DIM);
-        }
-    }
-    v.say(
-        TextId::SectorsHeading,
-        &[],
-        Role::Display,
-        Slot::centered(WIDTH / 2.0, 480.0, 80.0),
-        INK,
-    );
-    v.say(
-        TextId::PracticeNote,
-        &[],
-        Role::Body,
-        Slot::line(114.0),
-        DIM,
-    );
-    for chapter in Chapter::ALL {
-        let r = ui::sector_rect(chapter.first_sector().index());
-        let slot = Slot::left(r.x + 2.0, r.w, r.y - 14.0);
-        v.say(
-            TextId::ChapterName(chapter),
-            &[],
-            Role::Label,
-            slot,
-            sector_color(0, chapter),
-        );
-    }
-    for id in SectorId::all() {
-        let (i, level) = (id.index(), id.sector());
-        let r = ui::sector_rect(i);
-        let unlocked = i < profile.progress.unlocked_count();
-        let selected = id == ui.sector;
-        if selected {
-            v.rounded(
-                r.x - 1.5,
-                r.y - 1.5,
-                r.w + 3.0,
-                r.h + 3.0,
-                9.5,
-                if unlocked { CYAN } else { MUTED },
-            );
-        }
-        v.rounded(
-            r.x,
-            r.y,
-            r.w,
-            r.h,
-            8.0,
-            if selected { RAISED } else { SURFACE },
-        );
-        // The card's place in its chapter column and the "Play sector 03"
-        // button already carry the number; the name gets the full width.
-        let name = Slot::left(r.x + 14.0, r.w - 28.0, r.y + 27.0);
-        v.say(
-            TextId::SectorName(id),
-            &[],
-            Role::Body,
-            name,
-            if unlocked { INK } else { MUTED },
-        );
-        for cell in FieldCell::all() {
-            if level.layout.hp[cell.index()] > 0 {
-                v.rect(
-                    r.x + 14.0 + cell.col() as f32 * 9.0,
-                    r.y + 40.0 + cell.row() as f32 * 7.0,
-                    7.0,
-                    4.0,
-                    if !unlocked {
-                        opacity(MUTED, 0.45)
-                    } else if level.layout.cores.contains(cell) {
-                        AMBER
-                    } else {
-                        shade(sector_color(cell.row(), level.chapter), 0.8)
-                    },
-                );
-            }
-        }
-        if unlocked {
-            let record = profile.progress.record(id);
-            for (j, medal) in MEDAL_ORDER.into_iter().enumerate() {
-                v.circle(
-                    V2::new(r.x + 164.0 + j as f32 * 16.0, r.y + 54.0),
-                    4.0,
-                    if record.medals.contains(medal) {
-                        AMBER
-                    } else {
-                        MUTED
-                    },
-                );
-            }
-            let time = Slot::left(r.x + 156.0, r.w - 166.0, r.y + 86.0);
-            if record.best_ticks > 0 {
-                let t = Figures::of(|f| write!(f, "{}", Clock(record.best_ticks)));
-                v.put(t.as_str(), Role::Body, time, INK);
-            } else {
-                v.say(TextId::NoTime, &[], Role::Body, time, MUTED);
-            }
-        } else {
-            v.padlock(r.x + 180.0, r.y + 64.0, MUTED);
-        }
-    }
-
-    let level = ui.sector.sector();
-    let record = profile.progress.record(ui.sector);
-    let name = Item {
-        cap: None,
-        id: TextId::SectorName(ui.sector),
-        arg: None,
-    };
-    let swift = Item {
-        cap: None,
-        id: TextId::SwiftTarget,
-        arg: Some(Arg::Clock(level.par_seconds)),
-    };
-    let best = Item {
-        cap: None,
-        id: TextId::BestTime,
-        arg: Some(Arg::Clock(record.best_ticks / TICK_HZ)),
-    };
-    let detail: &[Item] = if record.best_ticks > 0 {
-        &[name, swift, best]
-    } else {
-        &[name, swift]
-    };
-    let legend = [
-        (TextId::MedalClear, TextId::MedalClearHow),
-        (TextId::MedalClean, TextId::MedalCleanHow),
-        (TextId::MedalSwift, TextId::MedalSwiftHow),
-    ];
-    let mut y = 676.0;
-    let lines = v.pack(detail, Role::Body, |line, w| {
-        v.hint_line(line, w, y, INK, Role::Body);
-        y += LINE;
-    });
-    let mut legend_lines = 0;
-    let widths = legend.map(|(medal, how)| {
-        v.width_of(medal, &[], Role::Label) + 8.0 + v.width_of(how, &[], Role::Body)
-    });
-    let mut start = 0;
-    while start < legend.len() {
-        let mut width = widths[start];
-        let mut end = start + 1;
-        while end < legend.len() && width + GAP + widths[end] <= FULL {
-            width += GAP + widths[end];
-            end += 1;
-        }
-        let mut x = WIDTH / 2.0 - width / 2.0;
-        for (k, &(medal, how)) in legend[start..end].iter().enumerate() {
-            let label = v.width_of(medal, &[], Role::Label);
-            v.say(medal, &[], Role::Label, Slot::left(x, label, y), AMBER);
-            let text = widths[start + k] - label - 8.0;
-            v.say(
-                how,
-                &[],
-                Role::Body,
-                Slot::left(x + label + 8.0, text, y),
-                DIM,
-            );
-            x += widths[start + k] + GAP;
-        }
-        y += LINE;
-        legend_lines += 1;
-        start = end;
-    }
-    if lines + legend_lines > 4
-        && let Some(log) = v.misfits
-    {
-        log.borrow_mut().push(Misfit {
-            text: "sector details".into(),
-            need: (lines + legend_lines) as f32,
-            room: 4.0,
-            missing: None,
-        });
-    }
-    let open = ui.sector.index() < profile.progress.unlocked_count();
-    if open {
-        v.button(
-            ui::play_rect(),
-            TextId::PlaySector,
-            &[Arg::Sector(ui.sector)],
-            true,
-            true,
-        );
-    } else {
-        v.button(
-            ui::play_rect(),
-            TextId::ClearPreviousFirst,
-            &[],
-            true,
-            false,
-        );
-    }
-    let hints = match v.device {
-        Device::KeyboardMouse => [
-            hint(TextId::KeysBrowse),
-            hint(TextId::KeysPlay),
-            hint(TextId::KeysBack),
-        ],
-        Device::Gamepad => [
-            hint(TextId::PadBrowse),
-            pad(Glyph::A, TextId::ActionPlay),
-            pad(Glyph::B, TextId::ActionBack),
-        ],
-    };
-    v.footer(&[(&hints, MUTED)], ui.save_error);
-}
-/// Distance between the sector-clear columns, and the widest a medal chip
-/// grows: three chips at most 136 wide leave at least 14 between them.
-const CLEAR_COLUMN: f32 = 150.0;
-const CHIP_MAX: f32 = 136.0;
-fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
-    v.scrim();
-    v.panel(240.0, 290.0, 480.0, 350.0);
-    v.say(
-        TextId::SectorClear,
-        &[],
-        Role::Display,
-        Slot::centered(WIDTH / 2.0, PANEL, 342.0),
-        INK,
-    );
-    // Without the extra-life line the stats and medals drop into its space,
-    // so the button never sits under an empty gap.
-    let shift = if summary.life_earned { 0.0 } else { 14.0 };
-    for (i, label) in [TextId::StatTime, TextId::StatBonus, TextId::StatBestChain]
-        .into_iter()
-        .enumerate()
-    {
-        let x = WIDTH / 2.0 + (i as f32 - 1.0) * CLEAR_COLUMN;
-        v.say(
-            label,
-            &[],
-            Role::Label,
-            Slot::centered(x, CHIP_MAX, 386.0 + shift),
-            DIM,
-        );
-        let value = Slot::centered(x, CHIP_MAX, 414.0 + shift);
-        match i {
-            0 => {
-                let t = Figures::of(|f| write!(f, "{}", Clock(summary.ticks)));
-                v.put(t.as_str(), Role::Body, value, INK);
-            }
-            1 => v.say(
-                TextId::Plus,
-                &[Arg::Count(summary.bonus)],
-                Role::Body,
-                value,
-                INK,
-            ),
-            _ => {
-                let combo = Figures::count(v.locale, summary.best_combo);
-                v.put(combo.as_str(), Role::Body, value, INK);
-            }
-        }
-    }
-    for (i, label) in [TextId::MedalClear, TextId::MedalClean, TextId::MedalSwift]
-        .into_iter()
-        .enumerate()
-    {
-        let x = WIDTH / 2.0 + (i as f32 - 1.0) * CLEAR_COLUMN;
-        let earned = summary.medals.contains(MEDAL_ORDER[i]);
-        let w = (v.width_of(label, &[], Role::Label) + 32.0).min(CHIP_MAX);
-        v.rounded(
-            x - w / 2.0,
-            436.0 + shift,
-            w,
-            28.0,
-            14.0,
-            opacity(if earned { AMBER } else { MUTED }, 0.16),
-        );
-        let y = 450.0 + shift + v.cap(Role::Label) / 2.0;
-        v.say(
-            label,
-            &[],
-            Role::Label,
-            Slot::centered(x, CHIP_MAX - 12.0, y),
-            if earned { AMBER } else { MUTED },
-        );
-    }
-    if summary.life_earned {
-        v.say(
-            TextId::ExtraLife,
-            &[],
-            Role::Body,
-            Slot::centered(WIDTH / 2.0, PANEL, 494.0),
-            CYAN,
-        );
-    }
-    let next = if game.mode() == Mode::Practice {
-        TextId::BackToSectors
-    } else {
-        TextId::NextSector
-    };
-    v.button(ui::next_rect(), next, &[], true, true);
-    match v.device {
-        Device::KeyboardMouse => v.say(
-            TextId::KeysContinue,
-            &[],
-            Role::Caption,
-            Slot::centered(WIDTH / 2.0, PANEL, 602.0),
-            MUTED,
-        ),
-        Device::Gamepad => {
-            let items = [pad(Glyph::A, TextId::ActionContinue)];
-            v.pack(&items, Role::Caption, |line, w| {
-                v.hint_line(line, w, 602.0, MUTED, Role::Caption)
-            });
-        }
-    }
-}
-
-/// A short run of figures formatted on the stack, so drawing scores and
-/// times allocates nothing.
-struct Figures {
-    bytes: [u8; 48],
+/// Text formatted on the stack, so drawing scores, times and the rare
+/// cut line allocates nothing. Overflow only truncates.
+struct Stack<const N: usize> {
+    bytes: [u8; N],
     len: usize,
 }
-impl Figures {
-    fn of(write: impl FnOnce(&mut Self) -> std::fmt::Result) -> Self {
-        let mut out = Self {
-            bytes: [0; 48],
+/// A run of figures: 48 bytes hold any u32 in any locale.
+type Figures = Stack<48>;
+/// One line of text, for the fit chain's ellipsis.
+type Line = Stack<256>;
+impl<const N: usize> Default for Stack<N> {
+    fn default() -> Self {
+        Self {
+            bytes: [0; N],
             len: 0,
-        };
-        // Overflow only truncates; 48 bytes hold any u32 in any locale.
+        }
+    }
+}
+impl<const N: usize> Stack<N> {
+    fn of(write: impl FnOnce(&mut Self) -> std::fmt::Result) -> Self {
+        let mut out = Self::default();
+        // A run longer than the buffer is cut short, never a panic.
         let _ = write(&mut out);
         out
     }
-    fn count(locale: Locale, n: u32) -> Self {
-        Self::of(|f| ark_text::grouped(f, locale, n))
+    fn clear(&mut self) {
+        self.len = 0;
     }
     fn as_str(&self) -> &str {
         std::str::from_utf8(&self.bytes[..self.len]).unwrap_or_default()
     }
 }
-impl Write for Figures {
+impl Figures {
+    fn count(locale: Locale, n: u32) -> Self {
+        Self::of(|f| ark_text::grouped(f, locale, n))
+    }
+}
+impl<const N: usize> Write for Stack<N> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         let end = self.len + s.len();
         let room = self.bytes.get_mut(self.len..end).ok_or(std::fmt::Error)?;
@@ -2202,5 +1914,13 @@ fn power_color(power: Power) -> Color {
     }
 }
 
+mod chips;
+mod compact;
+mod frame;
+mod view;
+pub use view::{Class, View, mouse, preview};
+mod moments;
+mod screens;
+mod sheet;
 #[cfg(test)]
 mod tests;

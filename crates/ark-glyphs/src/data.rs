@@ -5,7 +5,7 @@
 //!
 //! ```text
 //! file    "ARKG" version:u8=1 faces:u8 face…
-//! face    weight:u8 upem:u16 ascent:i16 descent:i16 cap_height:i16 x_height:i16
+//! face    weight:u8 (0 Regular, 1 Medium, 2 Display) upem:u16 ascent:i16 descent:i16 cap_height:i16 x_height:i16
 //!         glyphs:u16 chars:[u32; glyphs] advances:[u16; glyphs]   (sorted by char)
 //!         kerns:u16 [left:u16 right:u16 value:i16; kerns]          (sorted by pair)
 //!         strikes:u8 strike…
@@ -74,7 +74,7 @@ fn u32_at(bytes: &[u8], i: usize) -> Option<u32> {
 /// One atlas file: a script group's faces.
 #[derive(Clone, Copy, Debug)]
 pub struct Font {
-    faces: [Option<Face>; 2],
+    faces: [Option<Face>; 3],
 }
 
 impl Font {
@@ -85,7 +85,7 @@ impl Font {
         if r.take(4)? != b"ARKG" || r.u8()? != 1 {
             return Err(Error::Header);
         }
-        let mut faces = [None; 2];
+        let mut faces = [None; 3];
         for _ in 0..r.u8()? {
             let face = Face::parse(&mut r)?;
             *faces.get_mut(face.weight as usize).ok_or(Error::Header)? = Some(face);
@@ -124,6 +124,7 @@ impl Face {
         let weight = match r.u8()? {
             0 => Weight::Regular,
             1 => Weight::Medium,
+            2 => Weight::Display,
             _ => return Err(Error::Header),
         };
         let units_per_em = r.u16()?;

@@ -2,12 +2,13 @@
 use crate::{
     display::MIN_PHYSICAL,
     input::{Dir, Presses, pad_controls},
+    settings::Settings,
     storage::Profile,
     ui::{Controls, Screen, Ui},
 };
 use ark::{
     Game, Input, Medals, Mode, Particle, Power, Stage,
-    field::{BALL_RADIUS as RADIUS, Cell, CellSet, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
+    field::{BALL_RADIUS as RADIUS, BOTTOM, Cell, CellSet, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
     geom::V2,
     sectors::SectorId,
     tuning::{ADVANCE_DELAY_TICKS, MAX_BALLS, MAX_CAPSULES},
@@ -30,7 +31,9 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
     );
     match frame {
         1 | 2 | 5 | 9 | 10 | 14 | 17 | 18 | 19 | 22 | 24 | 25 | 28 => keys.confirm = true,
-        7 | 8 | 12 | 13 | 15 | 16 => keys.down = true,
+        // Main menu is the pause sheet's last row: up wraps to it.
+        7 | 12 => keys.up = true,
+        15 | 16 => keys.down = true,
         6 | 11 | 23 | 30 => {
             keys.escape = true;
             keys.pause = true;
@@ -151,6 +154,53 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
             assert!(ui.paused);
             keys = pad_controls(west, None, true);
         }
+        // Serve and drain three times: the results menu opens on Retry.
+        59..=67 => match (frame - 59) % 3 {
+            0 => keys = pad_controls(south, None, false),
+            1 => {
+                assert_eq!(game.stage(), Stage::Playing);
+                let below = V2::new(GRID_X, BOTTOM - RADIUS);
+                game.sandbox().place_ball(0, below, V2::new(0.0, 2400.0));
+            }
+            _ => assert_eq!(game.lives(), 2 - ((frame - 59) / 3) as u8),
+        },
+        68 => {
+            assert_eq!(game.stage(), Stage::GameOver);
+            assert_eq!(ui.choice, 0, "the focus opens on the primary action");
+            keys = pad_controls(south, None, true);
+        }
+        69 => {
+            assert!(ui.screen == Screen::Play && !ui.paused);
+            assert_eq!(game.stage(), Stage::Ready);
+            assert!(game.sector().index() == 8 && game.mode() == Mode::Practice);
+            println!("Results flow passed: game over focuses Retry, A retries");
+            keys.pause = true;
+        }
+        // Settings from the pause sheet: the volume changes live, and
+        // leaving returns to the pause sheet on its Settings row.
+        70 | 71 => {
+            assert!(ui.paused);
+            keys.down = true;
+        }
+        72 => {
+            assert_eq!(ui.choice, 2);
+            keys.confirm = true;
+        }
+        73 => {
+            assert_eq!(ui.settings, Some(0));
+            keys.down = true;
+        }
+        74 => keys.right = true,
+        75 => {
+            assert_eq!(ui.settings, Some(1));
+            assert_eq!(profile.settings.volume, Settings::default().volume + 1);
+            keys.escape = true;
+        }
+        76 => {
+            assert!(ui.settings.is_none() && ui.paused);
+            assert_eq!(ui.choice, 2);
+            println!("Settings flow passed: open from pause, adjust volume live, back to pause");
+        }
         _ => {}
     }
     keys
@@ -210,14 +260,45 @@ pub fn effects(game: &mut Game, frame: u32) {
     }
 }
 
+/// A player partway through: four sectors open, a mix of medals and best
+/// times, and a journey saved in sector 03. The smoke run starts from an
+/// empty profile, so without this its captures would never show a saved
+/// journey, earned medals or a locked selection.
+pub fn showcase() -> Profile {
+    const SAVE: &str = "ARKONK 1\nbest 18450\nunlocked 4\n\
+        record 0 7 21840\nrecord 1 3 30960\nrecord 2 1 41520\n\
+        checkpoint 2 2450 3 0\n";
+    Profile::decode(SAVE.as_bytes()).expect("a fixed version-1 save decodes")
+}
+
+/// Smoke frames drawn with [`showcase`] progress, the screen and sector to
+/// show, and where the capture goes.
+pub const SHOWCASE: [(u32, Screen, usize, bool, &str); 5] = [
+    (300, Screen::Title, 0, false, "target/attract-saved.png"),
+    (310, Screen::Sectors, 1, false, "target/sectors-medals.png"),
+    (320, Screen::Sectors, 6, false, "target/sectors-locked.png"),
+    (330, Screen::Title, 0, true, "target/attract-saved-pad.png"),
+    (
+        340,
+        Screen::Sectors,
+        6,
+        true,
+        "target/sectors-locked-pad.png",
+    ),
+];
+
 /// Physical sizes rendered offscreen after the main smoke run: Steam Deck,
-/// 1080p, 1440p, ultrawide, and 4:3.
-pub const LAYOUTS: [(&str, u32, u32); 5] = [
+/// 1080p, 1440p, ultrawide, 4:3, the smallest desktop window (Small), and
+/// two handheld screens (Compact).
+pub const LAYOUTS: [(&str, u32, u32); 8] = [
     ("deck", 1280, 800),
     ("1080p", 1920, 1080),
     ("1440p", 2560, 1440),
     ("ultrawide", 3440, 1440),
     ("4x3", 1024, 768),
+    ("small", 480, 450),
+    ("compact", 240, 240),
+    ("compact-160", 160, 128),
 ];
 /// Frames after the main run: one per layout and screen, then a too-small
 /// window request that the minimum size must refuse.
