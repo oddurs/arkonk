@@ -671,3 +671,83 @@ fn padlocks_keep_clear_of_text() {
         }
     }
 }
+
+/// In Arabic a sheet mirrors: its title and row labels end at the right,
+/// the back glyph sits at the title's left, and the focused row's confirm
+/// glyph at the row's left. English keeps them the other way round.
+#[test]
+fn arabic_sheets_mirror() {
+    let ui = Ui {
+        screen: Screen::Play,
+        paused: true,
+        device: Device::Gamepad(Pad::Xbox),
+        ..Ui::default()
+    };
+    let view = View::fit(1920.0, 1080.0, 1.0).unwrap();
+    for locale in [Locale::En, Locale::Ar] {
+        if !ark_glyphs::supports(locale) {
+            continue;
+        }
+        let rtl = locale == Locale::Ar;
+        let fonts = ark_glyphs::fonts(locale).unwrap();
+        let atlas = Atlas::build(&fonts).unwrap();
+        let log = RefCell::new(Log::default());
+        let v = Scene::new(
+            None,
+            (&atlas, &fonts, locale),
+            &view,
+            &ui,
+            String::new(),
+            Some(&log),
+        );
+        scene(
+            &v,
+            &Fx::default(),
+            &Game::new(),
+            &ui,
+            &Profile::default(),
+            1.0,
+            None,
+        );
+        let hits = v.hits.into_inner();
+        let back = hits.back.expect("the pause sheet has a back glyph");
+        let row = hits.rows()[0];
+        let placed = log.into_inner().placed;
+        let text = |id: TextId| {
+            let mut s = String::new();
+            ark_text::write(&mut s, locale, Form::Full, id, &[]).unwrap();
+            let p = placed.iter().find(|p| p.text == s);
+            p.unwrap_or_else(|| panic!("{locale:?}: {s:?} not drawn"))
+                .rect
+        };
+        let title = text(TextId::Paused);
+        let label = text(TextId::ActionResume);
+        // The Xbox confirm glyph's letter, inside the first row.
+        let glyph = placed
+            .iter()
+            .find(|p| p.text == "A" && contains(row, p.rect, 0.0))
+            .expect("the focused row carries its confirm glyph")
+            .rect;
+        if rtl {
+            assert!(back.right() < title.x, "{locale:?}: back glyph not left");
+            assert!(
+                glyph.right() < label.x,
+                "{locale:?}: confirm glyph not left"
+            );
+            assert!(
+                label.x > row.center().x,
+                "{locale:?}: label not at the right"
+            );
+        } else {
+            assert!(title.right() < back.x, "{locale:?}: back glyph not right");
+            assert!(
+                label.right() < glyph.x,
+                "{locale:?}: confirm glyph not right"
+            );
+            assert!(
+                label.right() < row.center().x,
+                "{locale:?}: label not at the left"
+            );
+        }
+    }
+}

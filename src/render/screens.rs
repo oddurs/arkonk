@@ -66,6 +66,7 @@ pub(super) fn title(v: &Scene, ui: &Ui, profile: &Profile) {
             MENU_W - ROW_TEXT,
             v.baseline(Role::Caption, top),
         );
+        let slot = v.lead((MENU_X, MENU_W), slot);
         v.paragraph((help, &[]), Role::Caption, slot, 2, DIM);
     }
 }
@@ -133,7 +134,7 @@ pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
                 TextId::ChapterName(chapter),
                 &[],
                 Role::Label,
-                Slot::left(x, 252.0, at),
+                v.lead((x, 252.0), Slot::left(x, 252.0, at)),
                 colour,
             );
         }
@@ -210,6 +211,9 @@ fn card(v: &Scene, id: SectorId, selected: bool, profile: &Profile) {
         v.outline(r, 12.0, v.thick(1.5), CYAN);
     }
     let (x, w) = (r.x + S16, r.w - 2.0 * S16);
+    // In Arabic the card mirrors: the name at the right, the board and
+    // medals swapping ends. The board itself is a map and never flips.
+    let span = (r.x, r.w);
     let style = Style::from(Role::Body).sized(18.0);
     // A Small screen's short card sets the board at its right end,
     // beside the name, and its medals under the name.
@@ -224,7 +228,7 @@ fn card(v: &Scene, id: SectorId, selected: bool, profile: &Profile) {
         TextId::SectorName(id),
         &[],
         style,
-        Slot::left(x, w, name),
+        v.lead(span, Slot::left(x, w, name)),
         if open { INK } else { MUTED },
     );
     // The bricks at their field proportions, bottom-left, or right on a
@@ -235,6 +239,7 @@ fn card(v: &Scene, id: SectorId, selected: bool, profile: &Profile) {
     } else {
         (x, bottom - 7.0 * 4.0 + 1.0)
     };
+    let bx = v.mirror(span, bx, board);
     for cell in FieldCell::all() {
         if level.layout.hp[cell.index()] == 0 {
             continue;
@@ -264,18 +269,25 @@ fn card(v: &Scene, id: SectorId, selected: bool, profile: &Profile) {
     if open {
         let record = profile.progress.record(id);
         for (j, medal) in MEDAL_ORDER.into_iter().enumerate() {
-            let pip = Rect::new(
-                right - 12.0 - (2 - j) as f32 * 16.0,
-                bottom - 5.0,
-                12.0,
-                3.0,
-            );
+            let px = v.mirror(span, right - 12.0 - (2 - j) as f32 * 16.0, 12.0);
+            let pip = Rect::new(px, bottom - 5.0, 12.0, 3.0);
             sheet::medal_pip(v, pip, record.medals.contains(medal));
         }
-    } else if short {
-        v.padlock(bx - S12 - LOCK_W / 2.0, r.y + r.h / 2.0, MUTED);
     } else {
-        v.padlock(right - LOCK_W / 2.0, bottom - 8.0, MUTED);
+        let (cx, cy) = if short {
+            // Beside the board, on the side towards the name.
+            let lx = bx - S12 - LOCK_W / 2.0;
+            let lx = if v.rtl() {
+                bx + board + S12 + LOCK_W / 2.0
+            } else {
+                lx
+            };
+            (lx, r.y + r.h / 2.0)
+        } else {
+            let lx = v.mirror(span, right - LOCK_W, LOCK_W) + LOCK_W / 2.0;
+            (lx, bottom - 8.0)
+        };
+        v.padlock(cx, cy, MUTED);
     }
 }
 /// A padlock's width.
@@ -337,6 +349,8 @@ fn detail(v: &Scene, id: SectorId, profile: &Profile, top: f32) {
     v.region(0, r);
 
     let mut y = r.y + py;
+    // In Arabic the text column takes the right and Play the left.
+    let span = (r.x, r.w);
     let args = [
         Arg::Text(TextId::ChapterName(level.chapter)),
         Arg::Sector(id),
@@ -346,7 +360,7 @@ fn detail(v: &Scene, id: SectorId, profile: &Profile, top: f32) {
         TextId::ReadyEyebrow,
         &args,
         Role::Label,
-        Slot::left(x, w, at),
+        v.lead(span, Slot::left(x, w, at)),
         sector_color(0, level.chapter),
     );
     y += label + 10.0;
@@ -355,7 +369,7 @@ fn detail(v: &Scene, id: SectorId, profile: &Profile, top: f32) {
         TextId::SectorName(id),
         &[],
         Role::Title,
-        Slot::left(x, w, at),
+        v.lead(span, Slot::left(x, w, at)),
         INK,
     );
     y += title + 10.0;
@@ -363,14 +377,16 @@ fn detail(v: &Scene, id: SectorId, profile: &Profile, top: f32) {
     v.paragraph(
         (TextId::SectorTip(id), &[]),
         Role::Caption,
-        Slot::left(x, w, at),
+        v.lead(span, Slot::left(x, w, at)),
         tip_lines,
         DIM,
     );
     y += tip_lines as f32 * line + 16.0;
     medal_line(v, id, profile, Some(y), w);
 
-    let column = Rect::new(r.x + r.w - px - DETAIL_ACTION, r.y, DETAIL_ACTION, r.h);
+    let column_x = v.mirror(span, r.x + r.w - px - DETAIL_ACTION, DETAIL_ACTION);
+    let column = Rect::new(column_x, r.y, DETAIL_ACTION, r.h);
+    let inside = (column.x, column.w);
     let mid = column.y + column.h / 2.0;
     if profile.progress.is_unlocked(id) {
         let top = mid - action / 2.0;
@@ -384,12 +400,13 @@ fn detail(v: &Scene, id: SectorId, profile: &Profile, top: f32) {
         );
         v.hits.borrow_mut().play = Some(button);
         let at = v.baseline(note, top + play + 12.0);
-        let slot = Slot::left(column.x + ROW_TEXT, note_w, at);
+        let slot = v.lead(inside, Slot::left(column.x + ROW_TEXT, note_w, at));
         v.paragraph((TextId::PracticeNote, &[]), note, slot, note_lines, DIM);
     } else {
         let before = [Arg::Sector(SectorId::clamped(id.index().saturating_sub(1)))];
         let at = v.snap(mid + v.cap(Role::Caption) / 2.0);
         let slot = Slot::left(column.x + ROW_TEXT, column.w - ROW_TEXT, at);
+        let slot = v.lead(inside, slot);
         v.paragraph((TextId::UnlockHint, &before), Role::Caption, slot, 2, DIM);
     }
 }
@@ -433,17 +450,20 @@ fn medal_line(v: &Scene, id: SectorId, profile: &Profile, top: Option<f32>, w: f
     let one_line = pairs + S8 + time_w <= w;
     let Some(top) = top else { return one_line };
     let x0 = DETAIL.x + DETAIL_PAD.0;
+    let span = (DETAIL.x, DETAIL.w);
     let mid = top + medal_h(v) / 2.0;
     let label = v.snap(mid + v.cap(Role::Label) / 2.0);
     let mut x = x0;
     for (i, &name) in names.iter().enumerate() {
         let earned = record.medals.contains(MEDAL_ORDER[i]);
-        sheet::medal_pip(v, Rect::new(x, mid - 2.0, 16.0, 4.0), earned);
+        let pip = Rect::new(v.mirror(span, x, 16.0), mid - 2.0, 16.0, 4.0);
+        sheet::medal_pip(v, pip, earned);
         x += 16.0 + S8;
         if labelled {
             let lw = v.width_of(name, &[], Role::Label);
             let ink = if earned { INK } else { DIM };
-            v.say(name, &[], Role::Label, Slot::left(x, lw, label), ink);
+            let slot = v.lead(span, Slot::left(x, lw, label));
+            v.say(name, &[], Role::Label, slot, ink);
             x += lw + 18.0;
         }
     }
@@ -460,7 +480,7 @@ fn medal_line(v: &Scene, id: SectorId, profile: &Profile, top: Option<f32>, w: f
             TextId::TargetBest,
             &times,
             Role::Caption,
-            Slot::left(tx, room, ty),
+            v.lead(span, Slot::left(tx, room, ty)),
             DIM,
         );
     } else {
@@ -468,7 +488,7 @@ fn medal_line(v: &Scene, id: SectorId, profile: &Profile, top: Option<f32>, w: f
         v.put(
             target.as_str(),
             Role::Caption,
-            Slot::left(tx, room, ty),
+            v.lead(span, Slot::left(tx, room, ty)),
             DIM,
         );
     }

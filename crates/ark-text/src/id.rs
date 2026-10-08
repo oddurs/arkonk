@@ -112,6 +112,13 @@ text_ids! {
     HelpSectors,
     HelpNewJourney,
 
+    // Steam rich presence, shown in friends' lists in their own language.
+    PresenceMenus,
+    /// `{0}` sector number, `{1}` sector name.
+    PresenceJourney,
+    /// `{0}` sector number, `{1}` sector name.
+    PresencePractice,
+
 }
 
 /// Which of the six text roles an id is set in, which decides the glyphs
@@ -150,7 +157,8 @@ impl TextId {
     pub const fn arity(self) -> usize {
         use TextId::*;
         match self {
-            ContinueDetail | SectorsOf | ReadyEyebrow | TargetBest => 2,
+            ContinueDetail | SectorsOf | ReadyEyebrow | TargetBest | PresenceJourney
+            | PresencePractice => 2,
             PlaySector | UnlockHint | Plus => 1,
             _ => 0,
         }

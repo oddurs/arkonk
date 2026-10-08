@@ -1,7 +1,7 @@
 //! Which language the game speaks: an explicit `--locale`, then the player's
 //! saved choice, then Steam's game language, then the operating system's
-//! preferences, then English. A candidate this build cannot draw (CJK
-//! without the `cjk` feature) is skipped.
+//! preferences, then English. A candidate this build cannot draw (CJK, Thai
+//! or Arabic without the `scripts` feature) is skipped.
 use ark_text::Locale;
 
 /// Where the chosen locale came from, for the log.
@@ -88,8 +88,15 @@ mod tests {
 
     #[test]
     fn system_preferences_skip_unshipped_languages() {
-        let os = tags(&["tr-TR", "zh-Hant-TW", "pt-PT", "en-US"]);
-        assert_eq!(choose(None, None, None, os), (Locale::PtBr, Origin::System));
+        let os = tags(&["tlh", "zu-ZA", "pt-PT", "en-US"]);
+        assert_eq!(choose(None, None, None, os), (Locale::PtPt, Origin::System));
+        let os = tags(&["zh-Hant-TW", "en-US"]);
+        let expected = if ark_glyphs::supports(Locale::ZhHant) {
+            Locale::ZhHant
+        } else {
+            Locale::En
+        };
+        assert_eq!(choose(None, None, None, os).0, expected);
         assert_eq!(
             choose(None, None, None, tags(&["en-XA"])),
             (Locale::En, Origin::Default)

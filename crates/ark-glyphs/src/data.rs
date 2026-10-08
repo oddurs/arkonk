@@ -4,16 +4,18 @@
 //! Layout, little-endian throughout:
 //!
 //! ```text
-//! file    "ARKG" version:u8=1 faces:u8 face…
-//! face    weight:u8 (0 Regular, 1 Medium, 2 Display) upem:u16 ascent:i16 descent:i16 cap_height:i16 x_height:i16
-//!         glyphs:u16 chars:[u32; glyphs] advances:[u16; glyphs]   (sorted by char)
+//! file    "ARKG" version:u8=2 faces:u8 face…
+//! face    weight:u8 (0 Regular, 1 Medium, 2 Display) key:u8 upem:u16 ascent:i16 descent:i16 cap_height:i16 x_height:i16
+//!         glyphs:u16 keys:[[u32; key]; glyphs] advances:[u16; glyphs]   (sorted by key)
 //!         kerns:u16 [left:u16 right:u16 value:i16; kerns]          (sorted by pair)
 //!         strikes:u8 strike…
 //! strike  ppem:u8 unpacked:u32 packed:u32 deflate(unpacked)[packed]
 //! unpacked  count:u16 [glyph:u16 w:u8 h:u8 left:i8 top:i8; count] pixels
 //! ```
 //!
-//! Glyph indices count into the face's `chars`. Each glyph's pixels are
+//! A glyph's key is the text it draws: one character, or for Thai a
+//! consonant and its marks (`key` characters, zero-padded). Glyph indices
+//! count into the face's `keys`. Each glyph's pixels are
 //! `w × h` coverage bytes, row by row, following the previous glyph's.
 //! Advances and kerning are in font units; `left` and `top` place the
 //! bitmap relative to the pen on the baseline, in pixels, `top` upward.
@@ -82,7 +84,7 @@ impl Font {
     /// later, by [`Strike::unpack`].
     pub fn parse(bytes: &'static [u8]) -> Result<Self, Error> {
         let mut r = Reader { bytes };
-        if r.take(4)? != b"ARKG" || r.u8()? != 1 {
+        if r.take(4)? != b"ARKG" || r.u8()? != 2 {
             return Err(Error::Header);
         }
         let mut faces = [None; 3];
@@ -106,6 +108,8 @@ impl Font {
 #[derive(Clone, Copy, Debug)]
 pub struct Face {
     pub weight: Weight,
+    /// Characters per glyph key.
+    pub key: u8,
     pub units_per_em: u16,
     pub ascent: i16,
     /// Negative: below the baseline.
@@ -127,13 +131,17 @@ impl Face {
             2 => Weight::Display,
             _ => return Err(Error::Header),
         };
+        let key = r.u8()?;
+        if key == 0 || usize::from(key) > crate::script::CLUSTER {
+            return Err(Error::Header);
+        }
         let units_per_em = r.u16()?;
         let (ascent, descent, cap_height, x_height) = (r.i16()?, r.i16()?, r.i16()?, r.i16()?);
         if units_per_em == 0 {
             return Err(Error::Header);
         }
         let glyphs = usize::from(r.u16()?);
-        let chars = r.take(glyphs * 4)?;
+        let chars = r.take(glyphs * 4 * usize::from(key))?;
         let advances = r.take(glyphs * 2)?;
         let kern_count = usize::from(r.u16()?);
         let kerns = r.take(kern_count * 6)?;
@@ -145,6 +153,7 @@ impl Face {
         let strikes = &start[..start.len() - r.bytes.len()];
         Ok(Self {
             weight,
+            key,
             units_per_em,
             ascent,
             descent,
@@ -158,32 +167,42 @@ impl Face {
         })
     }
 
-    /// How many characters the face holds.
+    /// How many glyphs the face holds.
     pub fn len(&self) -> usize {
-        self.chars.len() / 4
+        self.chars.len() / (4 * usize::from(self.key))
     }
 
     pub fn is_empty(&self) -> bool {
         self.chars.is_empty()
     }
 
-    /// The glyph index for `c`, if the face has it.
+    /// The glyph index for `c` alone, if the face has it.
     pub fn glyph(&self, c: char) -> Option<u16> {
+        self.cluster(&[c])
+    }
+
+    /// The glyph index for a cluster of characters, if the face has it.
+    pub fn cluster(&self, text: &[char]) -> Option<u16> {
+        let key = usize::from(self.key);
+        if text.is_empty() || text.len() > key {
+            return None;
+        }
+        let at = |glyph: usize, k: usize| u32_at(self.chars, glyph * key + k).unwrap_or(0);
+        let wanted = |k: usize| text.get(k).map_or(0, |&c| u32::from(c));
         let (mut low, mut high) = (0, self.len());
         while low < high {
             let mid = low + (high - low) / 2;
-            match u32_at(self.chars, mid)?.cmp(&u32::from(c)) {
+            let order = (0..key)
+                .map(|k| at(mid, k).cmp(&wanted(k)))
+                .find(|o| o.is_ne())
+                .unwrap_or(core::cmp::Ordering::Equal);
+            match order {
                 core::cmp::Ordering::Less => low = mid + 1,
                 core::cmp::Ordering::Greater => high = mid,
                 core::cmp::Ordering::Equal => return u16::try_from(mid).ok(),
             }
         }
         None
-    }
-
-    /// The character at a glyph index.
-    pub fn char(&self, glyph: u16) -> Option<char> {
-        char::from_u32(u32_at(self.chars, usize::from(glyph))?)
     }
 
     /// The advance, in font units.

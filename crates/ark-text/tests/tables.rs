@@ -141,7 +141,9 @@ fn text_is_precomposed() {
             let text = template(locale, id);
             let combining = text
                 .chars()
-                .find(|c| matches!(u32::from(*c), 0x300..=0x36F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0x20D0..=0x20FF | 0xFE20..=0xFE2F | 0x3099..=0x309A));
+                .find(|c| matches!(u32::from(*c), 0x300..=0x36F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0x20D0..=0x20FF | 0xFE20..=0xFE2F | 0x3099..=0x309A
+                    // Arabic short vowels, shadda and Quranic marks.
+                    | 0x0610..=0x061A | 0x064B..=0x065F | 0x0670 | 0x06D6..=0x06ED));
             assert_eq!(combining, None, "{locale:?} {id:?}: {text:?}");
         }
     }
@@ -166,6 +168,17 @@ fn numbers_group_in_each_locales_style() {
         (Locale::EsEs, 1000, "1000"),
         (Locale::EsEs, 10_000, "10.000"),
         (Locale::Es419, 1000, "1,000"),
+        // Italian also has CLDR minimum grouping digits of 2; this was once
+        // written "1.000".
+        (Locale::It, 1000, "1000"),
+        (Locale::It, 12_000, "12.000"),
+        (Locale::PtPt, 1000, "1000"),
+        (Locale::PtPt, 12_000, "12\u{A0}000"),
+        (Locale::Hu, 9999, "9999"),
+        (Locale::Bg, 10_000, "10\u{A0}000"),
+        (Locale::Sv, 1000, "1\u{A0}000"),
+        (Locale::Tr, 1000, "1.000"),
+        (Locale::Ar, 1000, "1,000"),
         (Locale::Pl, 9999, "9999"),
         (Locale::Pl, 12_000, "12\u{A0}000"),
         (Locale::Ja, 0, "0"),
@@ -268,4 +281,26 @@ fn icons_can_come_out_as_marks_for_the_renderer() {
         assert_eq!(icon_power(icon(power)), Some(power));
     }
     assert_eq!(icon_power('W'), None);
+}
+
+#[test]
+fn thai_marks_where_lines_may_break_and_nothing_else_does() {
+    for id in TextId::all() {
+        for locale in real_locales() {
+            let text = template(locale, id);
+            let has_break = text.contains('\u{200B}');
+            assert!(
+                !has_break || locale == Locale::Th,
+                "{locale:?} {id:?} holds a zero width space"
+            );
+        }
+        // Long Thai text must offer somewhere to wrap.
+        let thai = template(Locale::Th, id);
+        if thai.chars().count() > 12 {
+            assert!(
+                thai.contains('\u{200B}') || thai.contains(' '),
+                "{id:?} cannot wrap: {thai}"
+            );
+        }
+    }
 }

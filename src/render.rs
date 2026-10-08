@@ -18,7 +18,7 @@ use ark::{
     tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
 use ark_glyphs::{Fonts, ICON_EM, spec, spec::Weight};
-use ark_text::{Arg, Form, Locale, Role, TextId, capsule, icon_power};
+use ark_text::{Arg, Form, Locale, Role, Script, TextId, capsule, icon_power};
 use macroquad::models::Vertex;
 use macroquad::prelude::*;
 use std::{
@@ -772,6 +772,40 @@ impl<'a> Scene<'a> {
         self.format(id, args, Form::Full, |t| {
             (self.pitch(style, t), self.baseline_in(style, t, top))
         })
+    }
+    /// Whether the locale reads right to left. Sheets, rows, cards and
+    /// help lines then mirror; the band keeps its order, an instrument
+    /// read the same way in every language.
+    fn rtl(&self) -> bool {
+        self.locale.script() == Script::Arabic
+    }
+    /// Where something `w` wide placed at `x` goes in the span from
+    /// `left`, `width` wide: at `x`, or mirrored across the span in a
+    /// right-to-left locale.
+    fn mirror(&self, (left, width): (f32, f32), x: f32, w: f32) -> f32 {
+        if self.rtl() {
+            2.0 * left + width - x - w
+        } else {
+            x
+        }
+    }
+    /// `slot` mirrored across the span, its alignment flipped with it, in
+    /// a right-to-left locale: a line that starts at the left ends at the
+    /// right.
+    fn lead(&self, span: (f32, f32), slot: Slot) -> Slot {
+        if !self.rtl() {
+            return slot;
+        }
+        let align = match slot.align {
+            Align::Left => Align::Right,
+            Align::Right => Align::Left,
+            Align::Center => Align::Center,
+        };
+        Slot {
+            x: self.mirror(span, slot.x, slot.w),
+            align,
+            ..slot
+        }
     }
     /// `units`, or more if that would be under `px` physical pixels: the
     /// floors for targets, chips and gaps.

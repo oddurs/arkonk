@@ -8,10 +8,10 @@ keep the focus on the next bounce.
 The presentation is flat and quiet: rounded bricks, a pill paddle, Noto Sans
 type, an original 5×7 pixel logo, and a dark field. Each chapter has its own
 palette. The HUD shows only the score, the sector with a progress strip, and
-remaining lives. ARKONK speaks English, French, German, Spanish (Spain and
-Latin America), Brazilian Portuguese, Italian, Polish, Russian, Simplified
-Chinese, Japanese and Korean; the translations are drafts awaiting native
-review ([docs/localization.md](docs/localization.md)).
+remaining lives. ARKONK speaks every language Steam offers, thirty in all,
+including Arabic (right to left), Thai and both Chinese scripts; the
+translations are drafts awaiting native review
+([docs/localization.md](docs/localization.md)).
 [Start screen](docs/attract.png) · [Sector map](docs/sectors.png)
 
 ![ARKONK in play](docs/screenshot.png)

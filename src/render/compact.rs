@@ -63,7 +63,7 @@ impl<'s, 'a> Page<'s, 'a> {
         let slot = if centred {
             Slot::centered(self.x + self.w / 2.0, room, at)
         } else {
-            Slot::left(self.x, room, at)
+            self.v.lead(self.span(), Slot::left(self.x, room, at))
         };
         self.v.say(text.0, text.1, style, slot, color);
         self.advance(self.pitch(text, style))
@@ -72,7 +72,7 @@ impl<'s, 'a> Page<'s, 'a> {
     fn paragraph(&mut self, text: (TextId, &[Arg]), style: Style, max: usize, color: Color) {
         let lines = self.v.lines(text, style, self.w).min(max);
         let at = self.baseline(text, style);
-        let slot = Slot::left(self.x, self.w, at);
+        let slot = self.v.lead(self.span(), Slot::left(self.x, self.w, at));
         self.v.paragraph(text, style, slot, lines, color);
         let pitch = self
             .v
@@ -90,6 +90,17 @@ impl<'s, 'a> Page<'s, 'a> {
         if lines >= 1.0 {
             self.paragraph(text, style, lines as usize, color);
         }
+    }
+    /// The column, for mirroring across it in Arabic.
+    fn span(&self) -> (f32, f32) {
+        (self.x, self.w)
+    }
+    /// Where the focus mark sits: in the inset before a line, which is
+    /// the right in Arabic.
+    fn mark(&self) -> f32 {
+        let inset = INSET * self.px;
+        let outer = (self.x - inset, self.w + 2.0 * inset);
+        self.v.mirror(outer, self.x - inset, self.px)
     }
     /// Moves the cursor down `h` and returns the band it passed.
     fn advance(&mut self, h: f32) -> Rect {
@@ -121,7 +132,7 @@ fn heading(page: &mut Page, id: TextId, back: bool) {
     let top = page.y;
     let r = page.line((id, &[]), style, (room, false), INK);
     if back {
-        let at = v.snap(page.x + page.w - chip);
+        let at = v.snap(v.mirror(page.span(), page.x + page.w - chip, chip));
         chips::chip(
             v,
             Prompt::Back,
@@ -155,10 +166,10 @@ fn row(page: &mut Page, text: (TextId, &[Arg]), (primary, focused): (bool, bool)
     let mid = top + (r.h - LEAD * page.px) / 2.0;
     if focused {
         // The mark sits in the inset, two pixels clear of the letters.
-        let bar = page.x - INSET * page.px;
-        v.rect(bar, top, page.px, r.h - LEAD * page.px, color);
+        v.rect(page.mark(), top, page.px, r.h - LEAD * page.px, color);
         let lit = if primary { Lit::Primary } else { Lit::Neutral };
-        chips::chip(v, Prompt::Confirm, (page.x + page.w - chip, mid), 0.0, lit);
+        let x = v.mirror(page.span(), page.x + page.w - chip, chip);
+        chips::chip(v, Prompt::Confirm, (x, mid), 0.0, lit);
     }
     r
 }
@@ -173,7 +184,7 @@ fn medal_line(page: &mut Page, medals: Medals) {
         } else {
             hex(0x232836)
         };
-        let x = page.x + i as f32 * 7.0 * px;
+        let x = v.mirror(page.span(), page.x + i as f32 * 7.0 * px, 5.0 * px);
         v.rect(x, page.y + 2.0 * px, 5.0 * px, 2.0 * px, colour);
     }
     page.gap(7.0);
@@ -196,18 +207,19 @@ pub(super) fn sheet(
         match *info {
             Info::Figure(name, value) => {
                 let at = page.baseline((name, &[]), Role::Label.into());
+                let span = page.span();
                 v.say(
                     name,
                     &[],
                     Role::Label,
-                    Slot::left(page.x, page.w / 2.0, at),
+                    v.lead(span, Slot::left(page.x, page.w / 2.0, at)),
                     DIM,
                 );
                 let w = v.measure(value, Role::Figure);
                 v.put(
                     value,
                     Role::Figure,
-                    Slot::right(page.x + page.w, w, at),
+                    v.lead(span, Slot::right(page.x + page.w, w, at)),
                     INK,
                 );
                 page.advance(page.pitch((name, &[]), Role::Label.into()));
@@ -277,6 +289,9 @@ pub(super) fn settings(v: &Scene, profile: &Profile, focus: usize) {
         let mut r = page.line((setting.name(), &[]), style, (room, false), colour);
         let value_top = if alone { page.y } else { top };
         let right = page.x + page.w;
+        // Values end the line: at the right, or the left in Arabic.
+        let span = page.span();
+        let flip = |x: f32, w: f32| v.mirror(span, x, w);
         let mid = value_top + 3.5 * px;
         let at = |text: &str| v.snap(value_top + v.cap_of(caption, text));
         match value {
@@ -287,7 +302,8 @@ pub(super) fn settings(v: &Scene, profile: &Profile, focus: usize) {
                 } else {
                     (hex(0x2a3142), right - 8.0 * px)
                 };
-                v.rect(right - 9.0 * px, mid - 2.0 * px, 9.0 * px, 5.0 * px, fill);
+                let (x, knob) = (flip(right - 9.0 * px, 9.0 * px), flip(knob, 3.0 * px));
+                v.rect(x, mid - 2.0 * px, 9.0 * px, 5.0 * px, fill);
                 v.rect(knob, mid - px, 3.0 * px, 3.0 * px, INK);
             }
             Value::Level(on, max) => {
@@ -295,14 +311,14 @@ pub(super) fn settings(v: &Scene, profile: &Profile, focus: usize) {
                 v.put(
                     level.as_str(),
                     caption,
-                    Slot::right(right, fw, at(level.as_str())),
+                    v.lead(span, Slot::right(right, fw, at(level.as_str()))),
                     INK,
                 );
                 let first = right - value_w;
                 for k in 0..max {
                     let lit = if k < on { CYAN } else { hex(0x232836) };
                     v.rect(
-                        first + f32::from(k) * 2.0 * px,
+                        flip(first + f32::from(k) * 2.0 * px, px),
                         mid - 2.0 * px,
                         px,
                         5.0 * px,
@@ -312,10 +328,12 @@ pub(super) fn settings(v: &Scene, profile: &Profile, focus: usize) {
             }
             Value::Text(id) => {
                 let baseline = v.format(id, &[], Form::Full, at);
-                v.say(id, &[], caption, Slot::right(right, value_w, baseline), DIM);
+                let slot = v.lead(span, Slot::right(right, value_w, baseline));
+                v.say(id, &[], caption, slot, DIM);
             }
             Value::Native(name) => {
-                v.put(name, caption, Slot::right(right, value_w, at(name)), DIM);
+                let slot = v.lead(span, Slot::right(right, value_w, at(name)));
+                v.put(name, caption, slot, DIM);
             }
         }
         if alone {
@@ -328,24 +346,26 @@ pub(super) fn settings(v: &Scene, profile: &Profile, focus: usize) {
             r.h += below.h;
         }
         if focused {
-            v.rect(page.x - INSET * px, top, px, r.h - LEAD * px, INK);
+            v.rect(page.mark(), top, px, r.h - LEAD * px, INK);
         }
         v.hits.borrow_mut().push(r);
     }
     page.gap(2.0);
     let verb = settings::ROWS[focus.min(settings::ROWS.len() - 1)].verb();
     let mid = page.y + 3.5 * px;
-    let mut x = page.x;
+    let pair = chips::width(v, Prompt::Left, 0.0) + 2.0 * px + chips::width(v, Prompt::Right, 0.0);
+    let mut at = v.mirror(page.span(), page.x, pair);
     for prompt in [Prompt::Left, Prompt::Right] {
-        x += chips::chip(v, prompt, (x, mid), 0.0, Lit::Neutral) + 2.0 * px;
+        at += chips::chip(v, prompt, (at, mid), 0.0, Lit::Neutral) + 2.0 * px;
     }
-    let at = page.baseline((verb, &[]), Role::Caption.into());
+    let x = page.x + pair + 2.0 * px;
+    let baseline = page.baseline((verb, &[]), Role::Caption.into());
     let room = page.x + page.w - x - 2.0 * px;
     v.say(
         verb,
         &[],
         Role::Caption,
-        Slot::left(x + 2.0 * px, room, at),
+        v.lead(page.span(), Slot::left(x + 2.0 * px, room, baseline)),
         DIM,
     );
 }
@@ -426,7 +446,9 @@ pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
         } else {
             sector_color(cell.row(), level.chapter)
         };
-        let x = page.x + cell.col() as f32 * 3.0 * px;
+        // The board is a map and never flips; in Arabic it sits at the right.
+        let board = (3.0 * ark::field::COLS as f32 - 1.0) * px;
+        let x = v.mirror(page.span(), page.x, board) + cell.col() as f32 * 3.0 * px;
         v.rect(
             x,
             page.y + cell.row() as f32 * 2.0 * px,

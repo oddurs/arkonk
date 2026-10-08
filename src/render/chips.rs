@@ -307,8 +307,11 @@ pub(super) fn prompt(
     color: Color,
 ) {
     let mid = baseline - v.cap(style) / 2.0;
-    let w = chip(v, prompt, (x, mid), size, Lit::Neutral);
-    let text = x + w + S12;
+    let w = width(v, prompt, size);
     let room = v.width_of(id, &[], style);
+    // The glyph leads: at the left, or the right in Arabic.
+    let span = (x, w + S12 + room);
+    chip(v, prompt, (v.mirror(span, x, w), mid), size, Lit::Neutral);
+    let text = v.mirror(span, x + w + S12, room);
     v.say(id, &[], style, Slot::left(text, room, baseline), color);
 }

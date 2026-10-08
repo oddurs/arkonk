@@ -1,8 +1,8 @@
 //! The languages ARKONK ships, and how a BCP 47 tag or a Steam language
 //! name chooses one.
 
-/// A shipped language. English is the source; every other table is a
-/// translation of it.
+/// A shipped language: every language Steam offers. English is the
+/// source; every other table is a translation of it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Locale {
     #[default]
@@ -22,6 +22,28 @@ pub enum Locale {
     ZhHans,
     Ja,
     Ko,
+    /// Arabic: written right to left.
+    Ar,
+    Bg,
+    /// Traditional Chinese, as written in Taiwan.
+    ZhHant,
+    Cs,
+    Da,
+    Nl,
+    Fi,
+    El,
+    Hu,
+    Id,
+    /// Norwegian Bokmål; also chosen for Nynorsk and plain Norwegian.
+    Nb,
+    /// European Portuguese.
+    PtPt,
+    Ro,
+    Sv,
+    Th,
+    Tr,
+    Uk,
+    Vi,
     /// English, accented, bracketed and about 40 % longer, so untranslated,
     /// clipped or concatenated text stands out. For testing only.
     Pseudo,
@@ -36,11 +58,16 @@ pub enum Script {
     Ideographic,
     /// Korean: spaces between words, no case.
     Hangul,
+    /// Thai: no spaces between words; the tables mark where a line may
+    /// break with U+200B ZERO WIDTH SPACE. Vowel and tone marks stack.
+    Thai,
+    /// Arabic: right to left, letters join their neighbours.
+    Arabic,
 }
 
 impl Locale {
     /// Every locale, the source first and the test locale last.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 31] = [
         Self::En,
         Self::Fr,
         Self::De,
@@ -53,6 +80,24 @@ impl Locale {
         Self::ZhHans,
         Self::Ja,
         Self::Ko,
+        Self::Ar,
+        Self::Bg,
+        Self::ZhHant,
+        Self::Cs,
+        Self::Da,
+        Self::Nl,
+        Self::Fi,
+        Self::El,
+        Self::Hu,
+        Self::Id,
+        Self::Nb,
+        Self::PtPt,
+        Self::Ro,
+        Self::Sv,
+        Self::Th,
+        Self::Tr,
+        Self::Uk,
+        Self::Vi,
         Self::Pseudo,
     ];
 
@@ -72,6 +117,24 @@ impl Locale {
             Self::ZhHans => "zh-Hans",
             Self::Ja => "ja",
             Self::Ko => "ko",
+            Self::Ar => "ar",
+            Self::Bg => "bg",
+            Self::ZhHant => "zh-Hant",
+            Self::Cs => "cs",
+            Self::Da => "da",
+            Self::Nl => "nl",
+            Self::Fi => "fi",
+            Self::El => "el",
+            Self::Hu => "hu",
+            Self::Id => "id",
+            Self::Nb => "nb",
+            Self::PtPt => "pt-PT",
+            Self::Ro => "ro",
+            Self::Sv => "sv",
+            Self::Th => "th",
+            Self::Tr => "tr",
+            Self::Uk => "uk",
+            Self::Vi => "vi",
             Self::Pseudo => "en-XA",
         }
     }
@@ -91,14 +154,34 @@ impl Locale {
             Self::ZhHans => "简体中文",
             Self::Ja => "日本語",
             Self::Ko => "한국어",
+            Self::Ar => "العربية",
+            Self::Bg => "Български",
+            Self::ZhHant => "繁體中文",
+            Self::Cs => "Čeština",
+            Self::Da => "Dansk",
+            Self::Nl => "Nederlands",
+            Self::Fi => "Suomi",
+            Self::El => "Ελληνικά",
+            Self::Hu => "Magyar",
+            Self::Id => "Bahasa Indonesia",
+            Self::Nb => "Norsk",
+            Self::PtPt => "Português (Portugal)",
+            Self::Ro => "Română",
+            Self::Sv => "Svenska",
+            Self::Th => "ไทย",
+            Self::Tr => "Türkçe",
+            Self::Uk => "Українська",
+            Self::Vi => "Tiếng Việt",
             Self::Pseudo => "[Ƥśéúðö]",
         }
     }
 
     pub const fn script(self) -> Script {
         match self {
-            Self::ZhHans | Self::Ja => Script::Ideographic,
+            Self::ZhHans | Self::ZhHant | Self::Ja => Script::Ideographic,
             Self::Ko => Script::Hangul,
+            Self::Th => Script::Thai,
+            Self::Ar => Script::Arabic,
             _ => Script::Alphabetic,
         }
     }
@@ -136,7 +219,10 @@ impl Locale {
                 Some(r) if LATIN_AMERICA.iter().any(|&code| r.eq(code)) => Self::Es419,
                 _ => Self::EsEs,
             },
-            l if l.eq("pt") => Self::PtBr,
+            l if l.eq("pt") => match region {
+                Some(r) if EUROPEAN_PORTUGUESE.iter().any(|&code| r.eq(code)) => Self::PtPt,
+                _ => Self::PtBr,
+            },
             l if l.eq("it") => Self::It,
             l if l.eq("pl") => Self::Pl,
             l if l.eq("ru") => Self::Ru,
@@ -144,52 +230,119 @@ impl Locale {
                 let traditional = is(script, "hant")
                     || (script.is_none() && ["tw", "hk", "mo"].iter().any(|&r| is(region, r)));
                 if traditional {
-                    return None;
+                    Self::ZhHant
+                } else {
+                    Self::ZhHans
                 }
-                Self::ZhHans
             }
             l if l.eq("ja") => Self::Ja,
             l if l.eq("ko") => Self::Ko,
+            l if l.eq("ar") => Self::Ar,
+            l if l.eq("bg") => Self::Bg,
+            l if l.eq("cs") => Self::Cs,
+            l if l.eq("da") => Self::Da,
+            l if l.eq("nl") => Self::Nl,
+            l if l.eq("fi") => Self::Fi,
+            l if l.eq("el") => Self::El,
+            l if l.eq("hu") => Self::Hu,
+            // "in" is Indonesian's withdrawn code, still reported by old Java and Android.
+            l if l.eq("id") || l.eq("in") => Self::Id,
+            l if l.eq("nb") || l.eq("no") || l.eq("nn") => Self::Nb,
+            l if l.eq("ro") => Self::Ro,
+            l if l.eq("sv") => Self::Sv,
+            l if l.eq("th") => Self::Th,
+            l if l.eq("tr") => Self::Tr,
+            l if l.eq("uk") => Self::Uk,
+            l if l.eq("vi") => Self::Vi,
             _ => return None,
         })
     }
 
-    /// The locale for a Steam language API name (`ISteamApps::GetCurrentGameLanguage`).
+    /// Steam's API language name (`ISteamApps::GetCurrentGameLanguage`,
+    /// and the `Language` of a rich presence file). The pseudo locale has none.
+    pub const fn steam_name(self) -> Option<&'static str> {
+        Some(match self {
+            Self::En => "english",
+            Self::Fr => "french",
+            Self::De => "german",
+            Self::EsEs => "spanish",
+            Self::Es419 => "latam",
+            Self::PtBr => "brazilian",
+            Self::It => "italian",
+            Self::Pl => "polish",
+            Self::Ru => "russian",
+            Self::ZhHans => "schinese",
+            Self::Ja => "japanese",
+            Self::Ko => "koreana",
+            Self::Ar => "arabic",
+            Self::Bg => "bulgarian",
+            Self::ZhHant => "tchinese",
+            Self::Cs => "czech",
+            Self::Da => "danish",
+            Self::Nl => "dutch",
+            Self::Fi => "finnish",
+            Self::El => "greek",
+            Self::Hu => "hungarian",
+            Self::Id => "indonesian",
+            Self::Nb => "norwegian",
+            Self::PtPt => "portuguese",
+            Self::Ro => "romanian",
+            Self::Sv => "swedish",
+            Self::Th => "thai",
+            Self::Tr => "turkish",
+            Self::Uk => "ukrainian",
+            Self::Vi => "vietnamese",
+            Self::Pseudo => return None,
+        })
+    }
+
+    /// The locale for a Steam language API name.
     pub fn from_steam(language: &str) -> Option<Self> {
-        Some(match language {
-            "english" => Self::En,
-            "french" => Self::Fr,
-            "german" => Self::De,
-            "spanish" => Self::EsEs,
-            "latam" => Self::Es419,
-            "brazilian" | "portuguese" => Self::PtBr,
-            "italian" => Self::It,
-            "polish" => Self::Pl,
-            "russian" => Self::Ru,
-            "schinese" => Self::ZhHans,
-            "japanese" => Self::Ja,
-            "koreana" => Self::Ko,
-            _ => return None,
-        })
+        Self::ALL
+            .into_iter()
+            .find(|l| l.steam_name() == Some(language))
     }
 
-    /// The thousands separator and the fewest integer digits that get one:
-    /// CLDR's `minimumGroupingDigits` is 2 for Spanish and Polish, so they
-    /// write 4-digit numbers ungrouped.
+    /// The thousands separator and the fewest integer digits that get one,
+    /// from CLDR (`symbols-numberSystem-latn.group` and
+    /// `minimumGroupingDigits`). Where the minimum is 2, as in Spanish,
+    /// Italian or Polish, four-digit numbers stay ungrouped. Arabic uses
+    /// Latin digits, CLDR's default numbering system for `ar`.
     pub(crate) const fn grouping(self) -> (char, usize) {
+        const NBSP: char = '\u{A0}';
         match self {
-            Self::En | Self::Es419 | Self::ZhHans | Self::Ja | Self::Ko | Self::Pseudo => (',', 4),
-            // CLDR: narrow no-break space.
+            Self::En
+            | Self::Es419
+            | Self::ZhHans
+            | Self::ZhHant
+            | Self::Ja
+            | Self::Ko
+            | Self::Ar
+            | Self::Th
+            | Self::Pseudo => (',', 4),
+            // A narrow no-break space.
             Self::Fr => ('\u{202F}', 4),
-            Self::De | Self::PtBr | Self::It => ('.', 4),
-            Self::EsEs => ('.', 5),
-            Self::Pl => ('\u{A0}', 5),
-            Self::Ru => ('\u{A0}', 4),
+            Self::De
+            | Self::PtBr
+            | Self::Da
+            | Self::Nl
+            | Self::El
+            | Self::Id
+            | Self::Ro
+            | Self::Tr
+            | Self::Vi => ('.', 4),
+            Self::EsEs | Self::It => ('.', 5),
+            Self::Ru | Self::Cs | Self::Fi | Self::Nb | Self::Sv | Self::Uk => (NBSP, 4),
+            Self::Pl | Self::PtPt | Self::Bg | Self::Hu => (NBSP, 5),
         }
     }
 }
 
 /// Region subtags that read Latin American Spanish, plus the UN M.49 code.
+/// Region subtags whose Portuguese follows Portugal's norm rather than Brazil's.
+const EUROPEAN_PORTUGUESE: [&str; 10] =
+    ["pt", "ao", "mz", "cv", "gw", "st", "tl", "mo", "lu", "gq"];
+
 const LATIN_AMERICA: [&str; 21] = [
     "419", "ar", "bo", "cl", "co", "cr", "cu", "do", "ec", "gt", "hn", "mx", "ni", "pa", "pe",
     "pr", "py", "sv", "us", "uy", "ve",
@@ -226,15 +379,23 @@ mod tests {
             ("es-MX", Some(Locale::Es419)),
             ("es_ES", Some(Locale::EsEs)),
             ("es", Some(Locale::EsEs)),
-            ("pt-PT", Some(Locale::PtBr)),
+            ("pt-PT", Some(Locale::PtPt)),
+            ("pt-AO", Some(Locale::PtPt)),
+            ("pt", Some(Locale::PtBr)),
+            ("nn-NO", Some(Locale::Nb)),
+            ("no", Some(Locale::Nb)),
+            ("in-ID", Some(Locale::Id)),
+            ("tr-TR", Some(Locale::Tr)),
+            ("ar-EG", Some(Locale::Ar)),
             ("zh-Hans-CN", Some(Locale::ZhHans)),
             ("zh-CN", Some(Locale::ZhHans)),
-            ("zh-TW", None),
-            ("zh-Hant-HK", None),
+            ("zh-TW", Some(Locale::ZhHant)),
+            ("zh-Hant-HK", Some(Locale::ZhHant)),
+            ("zh-HK", Some(Locale::ZhHant)),
             ("ja-JP", Some(Locale::Ja)),
             ("KO-kr", Some(Locale::Ko)),
             ("pseudo", Some(Locale::Pseudo)),
-            ("tr-TR", None),
+            ("tlh", None),
             ("", None),
             ("C", None),
         ] {
@@ -246,6 +407,15 @@ mod tests {
     fn steam_languages_map() {
         assert_eq!(Locale::from_steam("latam"), Some(Locale::Es419));
         assert_eq!(Locale::from_steam("koreana"), Some(Locale::Ko));
-        assert_eq!(Locale::from_steam("tchinese"), None);
+        assert_eq!(Locale::from_steam("tchinese"), Some(Locale::ZhHant));
+        assert_eq!(Locale::from_steam("portuguese"), Some(Locale::PtPt));
+        assert_eq!(Locale::from_steam("brazilian"), Some(Locale::PtBr));
+        assert_eq!(Locale::from_steam("klingon"), None);
+        // Steam names are distinct, so each maps back to its locale.
+        for locale in Locale::ALL {
+            if let Some(name) = locale.steam_name() {
+                assert_eq!(Locale::from_steam(name), Some(locale), "{name}");
+            }
+        }
     }
 }

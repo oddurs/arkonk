@@ -64,6 +64,9 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorsOf => "{1}개 섹터 중 {0}개",
         TargetBest => "{0} · 최고 {1}",
         LifeGained => "생명 +1",
+        PresenceMenus => "메뉴 화면",
+        PresenceJourney => "섹터 {0} · {1}",
+        PresencePractice => "섹터 {0} · {1} 연습 중",
         SectorName(s) => NAMES[s.index()],
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
