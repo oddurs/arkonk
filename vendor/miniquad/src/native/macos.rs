@@ -17,17 +17,34 @@ use {
         os::raw::c_void,
         sync::{
             Condvar, Mutex,
+            atomic::{AtomicBool, Ordering},
             mpsc::Receiver,
         },
         time::{Duration, Instant},
     },
 };
 
+static HIDDEN: AtomicBool = AtomicBool::new(false);
+
+/// Runs the window that `run` opens invisibly, for automated tests on a desktop
+/// someone is using: no activation, focus, Dock icon, cursor changes or Space
+/// switches. Call before the window opens.
+pub fn run_hidden() {
+    HIDDEN.store(true, Ordering::Relaxed);
+}
+
+fn hidden() -> bool {
+    HIDDEN.load(Ordering::Relaxed)
+}
+
 pub struct MacosDisplay {
     window: ObjcId,
     view: ObjcId,
     gl_context: ObjcId,
     fullscreen: bool,
+    // Hidden runs stand in for a fullscreen Space by resizing; this is the
+    // frame and style mask to return to.
+    windowed: Option<(NSRect, u64)>,
     occluded: bool,
     // [NSCursor hide]/unhide calls should be balanced
     // hide/hide/unhide will keep cursor hidden
@@ -49,7 +66,8 @@ pub struct MacosDisplay {
 
 impl MacosDisplay {
     fn set_cursor_grab(&mut self, window: *mut Object, grab: bool) {
-        if grab == self.cursor_grabbed {
+        // The cursor is system-wide; a hidden run must leave it alone.
+        if grab == self.cursor_grabbed || hidden() {
             return;
         }
 
@@ -67,6 +85,10 @@ impl MacosDisplay {
         }
     }
     fn show_mouse(&mut self, show: bool) {
+        if hidden() {
+            self.cursor_shown = show;
+            return;
+        }
         if show && !self.cursor_shown {
             unsafe {
                 let () = msg_send![class!(NSCursor), unhide];
@@ -109,9 +131,34 @@ impl MacosDisplay {
     fn set_fullscreen(&mut self, fullscreen: bool) {
         if self.fullscreen != fullscreen {
             self.fullscreen = fullscreen;
+            if hidden() {
+                self.resize_for_fullscreen(fullscreen);
+                return;
+            }
             unsafe {
                 let () = msg_send![self.window, toggleFullScreen: nil];
             }
+        }
+    }
+    // A fullscreen Space would take over the desktop. Giving the hidden window
+    // the screen's size still sends the game the resize a real switch does.
+    // Borderless, because AppKit keeps a titled window below the menu bar.
+    fn resize_for_fullscreen(&mut self, fullscreen: bool) {
+        unsafe {
+            let (frame, mask) = if fullscreen {
+                let frame: NSRect = msg_send![self.window, frame];
+                let mask: u64 = msg_send![self.window, styleMask];
+                self.windowed = Some((frame, mask));
+                let screen: ObjcId = msg_send![self.window, screen];
+                let screen: NSRect = msg_send![screen, frame];
+                (screen, NSWindowStyleMask::NSBorderlessWindowMask as u64)
+            } else if let Some(windowed) = self.windowed.take() {
+                windowed
+            } else {
+                return;
+            };
+            let () = msg_send![self.window, setStyleMask: mask];
+            let () = msg_send![self.window, setFrame: frame display: YES];
         }
     }
     fn clipboard_get(&mut self) -> Option<String> {
@@ -986,6 +1033,10 @@ pub fn define_metal_view_class() -> *const Class {
 /// Initial focus state for diagnostics registered after window creation.
 /// Call on the window thread, like other AppKit window operations.
 pub fn window_has_focus() -> bool {
+    // A hidden window is never key, yet tests must run as if it were.
+    if hidden() {
+        return true;
+    }
     let view = native_display().lock().unwrap().view;
     if view.is_null() {
         return false;
@@ -1339,6 +1390,22 @@ unsafe fn perform_redraw(
     }
 }
 
+// Transparent and click-through, so it covers nothing; on every Space and above
+// normal windows, so AppKit never reports it occluded and throttles it.
+unsafe fn hide_window(window: ObjcId) {
+    let () = msg_send![window, setAlphaValue: 0.0f64];
+    let () = msg_send![window, setIgnoresMouseEvents: YES];
+    let () = msg_send![window, setHasShadow: NO];
+    // CanJoinAllSpaces | Transient | IgnoresCycle | FullScreenAuxiliary: it
+    // follows the user to any Space, fullscreen apps included, and stays out of
+    // Mission Control and Cmd-`.
+    let behavior: u64 = (1 << 0) | (1 << 3) | (1 << 6) | (1 << 8);
+    let () = msg_send![window, setCollectionBehavior: behavior];
+    // NSFloatingWindowLevel: no ordinary window can cover it.
+    let () = msg_send![window, setLevel: 3i64];
+    let () = msg_send![window, orderFrontRegardless];
+}
+
 // Shell-launched games can inherit utility QoS. Foreground input/render work
 // needs interactive scheduling; background windows return to utility priority.
 unsafe fn set_frame_thread_priority(active: bool) {
@@ -1366,6 +1433,7 @@ where
         window: std::ptr::null_mut(),
         gl_context: std::ptr::null_mut(),
         fullscreen: false,
+        windowed: None,
         occluded: false,
         cursor_shown: true,
         current_cursor: CursorIcon::Default,
@@ -1382,15 +1450,18 @@ where
 
     let app_delegate_class = define_app_delegate();
     let app_delegate_instance: ObjcId = msg_send![app_delegate_class, new];
-    (*app_delegate_instance).set_ivar("activated", false);
+    // Marking a hidden run as already activated keeps it from taking focus.
+    (*app_delegate_instance).set_ivar("activated", hidden());
 
     let ns_app: ObjcId = msg_send![class!(NSApplication), sharedApplication];
     let () = msg_send![ns_app, setDelegate: app_delegate_instance];
-    let () = msg_send![
-        ns_app,
-        setActivationPolicy: NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular
-            as i64
-    ];
+    // An accessory app has no Dock icon and never shows its menu bar.
+    let policy = if hidden() {
+        NSApplicationActivationPolicy::NSApplicationActivationPolicyAccessory
+    } else {
+        NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular
+    };
+    let () = msg_send![ns_app, setActivationPolicy: policy as i64];
 
     if let Some(icon) = &conf.icon {
         set_icon(ns_app, icon);
@@ -1474,12 +1545,19 @@ where
     let () = msg_send![window, center];
     let () = msg_send![window, setAcceptsMouseMovedEvents: YES];
 
-    if conf.fullscreen {
-        let () = msg_send![window, toggleFullScreen: nil];
-    }
+    if hidden() {
+        hide_window(window);
+        if conf.fullscreen {
+            display.set_fullscreen(true);
+        }
+    } else {
+        if conf.fullscreen {
+            let () = msg_send![window, toggleFullScreen: nil];
+        }
 
-    msg_send_![window, orderFront: nil];
-    let () = msg_send![window, makeKeyAndOrderFront: nil];
+        msg_send_![window, orderFront: nil];
+        let () = msg_send![window, makeKeyAndOrderFront: nil];
+    }
 
     let () = msg_send![ns_app, finishLaunching];
 

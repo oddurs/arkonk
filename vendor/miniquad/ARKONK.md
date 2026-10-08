@@ -38,6 +38,17 @@ There is no free-running render loop.
 The total vertex/index buffer allocation is unchanged; uniform storage is reduced
 from three buffers to two. A guard catches exhausting a slot's rotation budget.
 
+`run_hidden()`, called before the window opens, runs automated tests without
+touching the desktop. The process uses the accessory activation policy (no
+Dock icon or menu bar) and never activates. The window is alpha 0,
+click-through and shadowless, at floating level on every Space, and never
+becomes key. It is ordered front, so AppKit keeps reporting it visible and
+does not throttle it as occluded; frame rate stays at the display rate.
+`window_has_focus` reports true, cursor hide and grab are skipped, and
+fullscreen becomes a screen-sized borderless frame instead of a Space switch.
+Rendering is unchanged, so OpenGL captures match a visible run. Only the macOS
+backend has this; Windows and Linux test runs open a normal window.
+
 This is an application-specific patch, not a general replacement for Miniquad.
 Adding depth rendering, MSAA, or multiple render targets requires revisiting it.
 Keep the diff small when upgrading the dependency. Validate changes with:

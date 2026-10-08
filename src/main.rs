@@ -192,6 +192,11 @@ fn main() {
     }
     let (mut profile, path, save_blocked) = load_progress(data.map(|d| d.join("progress.txt")));
     profile.settings.fullscreen |= flag("--fullscreen");
+    // Tests run on a desktop someone is using; `--show` is for watching one.
+    #[cfg(target_os = "macos")]
+    if smoke && !flag("--show") {
+        miniquad::native::macos::run_hidden();
+    }
     macroquad::Window::from_config(
         config(profile.settings.fullscreen),
         run(profile, path, save_blocked),

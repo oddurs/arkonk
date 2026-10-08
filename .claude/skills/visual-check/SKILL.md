@@ -5,8 +5,10 @@ description: Use after changing anything drawn, laid out, or driven by input. Ru
 
 # Visual check
 
-These tests open real windows on the desktop and take focus. Only one agent runs them
-at a time. Never take a full-screen screenshot; use the captures the game writes.
+On macOS these tests run hidden: the window is transparent and click-through, never
+takes focus, and the game behaves as focused. Add `--show` to watch one in a normal
+window. Timings still skew when runs overlap, so only one agent runs them at a time.
+Never take a full-screen screenshot; use the captures the game writes.
 
 1. Build once:
    ```sh
@@ -33,5 +35,8 @@ at a time. Never take a full-screen screenshot; use the captures the game writes
 5. For the PR: copy the relevant captures out of `target/` (it is cleaned) and attach
    them. Name them `<screen>-<locale>.png`.
 
-Static screens (title, sectors, pause, sheets) are byte-stable between runs. Live
-play follows the wall clock and is not, so don't diff those.
+Static screens are byte-stable between runs, hidden or shown: `attract`, `sectors`,
+`sectors-pad` and the `layout-*-title` and `layout-*-sectors` captures. Live play
+follows the wall clock and is not, so don't diff those, nor anything drawn over it
+(`paused`, `clear`, `game-over`). `locale-switch` lands mid-way through an animated
+resize, so its size can vary by a few pixels.

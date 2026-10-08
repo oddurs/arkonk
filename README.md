@@ -237,8 +237,10 @@ p95, p99, worst frame, and counts above 16.7, 25, and 50 ms. The stress scene
 repeatedly ignites 84 connected cores with all powers and full effect pools.
 There are no screenshot writes or window resizes in this measurement. Run with
 `--opengl` on macOS to compare backends.
-Add `--fullscreen` to measure fullscreen presentation. Keep the window visible
-and focused; run graphics comparisons sequentially.
+On macOS the run is hidden (see Development) and counts as focused. Hidden
+`--fullscreen` uses a screen-sized borderless window instead of a fullscreen
+Space, so measure fullscreen presentation with `--fullscreen --show`, kept
+visible and focused. Run graphics comparisons sequentially.
 The report counts unfocused frames and retains them in its timings so background
 throttling cannot silently produce a misleading foreground comparison.
 
@@ -315,7 +317,11 @@ cargo run --locked --release --bin arkonk -- --locale de   # any shipped tag, or
 
 The smoke test opens a window, launches a ball, follows it with the paddle,
 reports frame statistics,
-and exits automatically. On OpenGL it also writes `target/smoke-test.png` and
+and exits automatically. On macOS every test mode runs hidden so it never takes
+over the desktop: the window is transparent and click-through, the process has no
+Dock icon or menu bar, it never takes focus, and the game behaves as if focused.
+Add `--show` to watch a run in a normal, focused window. Windows and Linux test
+runs still open a normal window. On OpenGL it also writes `target/smoke-test.png` and
 presentation captures. Metal texture readback is not implemented by Miniquad;
 use macOS window capture for Metal screenshots. To check Metal correctness, run the smoke/effects and flow tests
 with `MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1`; disable validation for timings.
