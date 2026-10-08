@@ -288,13 +288,17 @@ pub const SHOWCASE: [(u32, Screen, usize, bool, &str); 5] = [
 ];
 
 /// Physical sizes rendered offscreen after the main smoke run: Steam Deck,
-/// 1080p, 1440p, ultrawide, and 4:3.
-pub const LAYOUTS: [(&str, u32, u32); 5] = [
+/// 1080p, 1440p, ultrawide, 4:3, the smallest desktop window (Small), and
+/// two handheld screens (Compact).
+pub const LAYOUTS: [(&str, u32, u32); 8] = [
     ("deck", 1280, 800),
     ("1080p", 1920, 1080),
     ("1440p", 2560, 1440),
     ("ultrawide", 3440, 1440),
     ("4x3", 1024, 768),
+    ("small", 480, 450),
+    ("compact", 240, 240),
+    ("compact-160", 160, 128),
 ];
 /// Frames after the main run: one per layout and screen, then a too-small
 /// window request that the minimum size must refuse.

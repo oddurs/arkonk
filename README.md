@@ -355,7 +355,8 @@ with `MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1`; disable validation for timings
 Both graphical checks need a desktop session and leave your saved progress and
 logs alone.
 The OpenGL smoke test also renders play, title, and sector screens offscreen at
-1280×800 (Steam Deck), 1920×1080, 2560×1440, 3440×1440, and 1024×768 into
+1280×800 (Steam Deck), 1920×1080, 2560×1440, 3440×1440 and 1024×768, the
+Small layout at 480×450 and the Compact one at 240×240 and 160×128, into
 `target/layout-*.png`, then checks that a 10×10 window request is refused.
 
 `--frame-preview WxH` is a development aid for the Small and Compact layouts,
