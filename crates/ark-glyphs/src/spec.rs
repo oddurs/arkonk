@@ -103,37 +103,70 @@ pub const fn floor(role: Role) -> f32 {
 }
 
 /// The ladder entry nearest `px`, comparing ratios rather than differences.
-pub fn nearest(px: f32) -> u8 {
-    closest(px, LADDER).unwrap_or(LADDER[0])
+pub const fn nearest(px: f32) -> u8 {
+    let mut best = LADDER[0];
+    let mut i = 1;
+    while i < LADDER.len() {
+        if spread(px, LADDER[i]) < spread(px, best) {
+            best = LADDER[i];
+        }
+        i += 1;
+    }
+    best
 }
 
 /// How far apart two sizes are, as a ratio of at least 1.
-fn spread(px: f32, rung: u8) -> f32 {
-    let ratio = px / f32::from(rung);
+const fn spread(px: f32, rung: u8) -> f32 {
+    let ratio = px / rung as f32;
     if ratio >= 1.0 { ratio } else { 1.0 / ratio }
-}
-
-fn closest(px: f32, rungs: impl IntoIterator<Item = u8>) -> Option<u8> {
-    let mut best: Option<u8> = None;
-    for rung in rungs {
-        if best.is_none_or(|b| spread(px, rung) < spread(px, b)) {
-            best = Some(rung);
-        }
-    }
-    best
 }
 
 /// The sizes baked for `role`: the nearest ladder entry at each density,
 /// never below the role's floor.
 pub fn rungs(role: Role) -> impl Iterator<Item = u8> {
-    let (size, _, _) = style(role);
-    let mut seen = [0_u8; DENSITIES.len()];
-    DENSITIES.into_iter().enumerate().filter_map(move |(i, d)| {
-        let rung = nearest((size * d).max(floor(role)));
-        let fresh = !seen[..i].contains(&rung);
-        seen[i] = rung;
-        fresh.then_some(rung)
-    })
+    let (sizes, count) = RUNGS[role_index(role)];
+    sizes.into_iter().take(count)
+}
+
+/// [`rungs`] for every role in [`ROLES`] order, worked out at compile
+/// time: drawing asks for a role's sizes several times for every word.
+const RUNGS: [([u8; DENSITIES.len()], usize); ROLES.len()] = {
+    let mut out = [([0; DENSITIES.len()], 0); ROLES.len()];
+    let mut r = 0;
+    while r < ROLES.len() {
+        let role = ROLES[r];
+        let (mut sizes, mut count) = ([0; DENSITIES.len()], 0);
+        let mut d = 0;
+        while d < DENSITIES.len() {
+            let rung = nearest(f32::max(style(role).0 * DENSITIES[d], floor(role)));
+            let mut seen = false;
+            let mut j = 0;
+            while j < count {
+                seen |= sizes[j] == rung;
+                j += 1;
+            }
+            if !seen {
+                sizes[count] = rung;
+                count += 1;
+            }
+            d += 1;
+        }
+        out[r] = (sizes, count);
+        r += 1;
+    }
+    out
+};
+
+/// Where `role` sits in [`ROLES`].
+const fn role_index(role: Role) -> usize {
+    match role {
+        Role::Display => 0,
+        Role::Title => 1,
+        Role::Figure => 2,
+        Role::Body => 3,
+        Role::Caption => 4,
+        Role::Label => 5,
+    }
 }
 
 /// The baked size for `role` at `density`: the nearest ladder entry, or

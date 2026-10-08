@@ -206,3 +206,19 @@ fn capsule_icons_take_their_width_and_wrap_like_words() {
     fonts.wrap(&text, regular, 20, 0.0, alone + 1.0, |l| lines.push(l));
     assert_eq!(lines, [icon.to_string().as_str(), "Wide"]);
 }
+
+/// The compile-time size table holds, for every role, the nearest ladder
+/// entry at each checked density, floor applied, first occurrence only.
+#[test]
+fn baked_sizes_are_the_nearest_rung_at_each_density() {
+    for role in spec::ROLES {
+        let mut want = Vec::new();
+        for d in spec::DENSITIES {
+            let rung = spec::nearest((spec::style(role).0 * d).max(spec::floor(role)));
+            if !want.contains(&rung) {
+                want.push(rung);
+            }
+        }
+        assert_eq!(spec::rungs(role).collect::<Vec<_>>(), want, "{role:?}");
+    }
+}
