@@ -20,12 +20,15 @@ impl Weight {
 pub const fn style(role: Role) -> (f32, Weight, f32) {
     match role {
         Role::Label => (15.0, Weight::Regular, 0.06),
-        Role::Body => (18.0, Weight::Regular, 0.0),
+        // 20 puts Steam Deck body text on the 18 px strike, whose lowercase
+        // is just over 9 px tall.
+        Role::Body => (20.0, Weight::Regular, 0.0),
+        Role::Caption => (16.0, Weight::Regular, 0.0),
         Role::Display => (32.0, Weight::Medium, 0.0),
     }
 }
 
-pub const ROLES: [Role; 3] = [Role::Label, Role::Body, Role::Display];
+pub const ROLES: [Role; 4] = [Role::Label, Role::Body, Role::Caption, Role::Display];
 
 /// Every pixel size a strike may be baked at. Steps stay within about 10 %
 /// up to 32 px, then widen where a pixel matters less.
@@ -34,9 +37,11 @@ pub const LADDER: [u8; 22] = [
 ];
 
 /// Physical pixels per scene unit on the displays the layouts are checked
-/// at: Steam Deck (1280 × 800), a 960 × 900 window at 100 %, 1080p, 1440p,
-/// a Retina window at 200 %, and 4K.
-pub const DENSITIES: [f32; 6] = [800.0 / 900.0, 1.0, 1.2, 1.6, 2.0, 2.4];
+/// at: 720p (1280 × 720), Steam Deck (1280 × 800), a 960 × 900 window at
+/// 100 %, 1080p, 1440p, a Retina window at 200 %, and 4K. The 720p strikes
+/// keep body text in small windows near its planned size instead of a
+/// fifth larger.
+pub const DENSITIES: [f32; 7] = [0.8, 800.0 / 900.0, 1.0, 1.2, 1.6, 2.0, 2.4];
 
 /// The ladder entry nearest `px`, comparing ratios rather than differences.
 pub fn nearest(px: f32) -> u8 {

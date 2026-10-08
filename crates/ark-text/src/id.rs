@@ -126,12 +126,15 @@ text_ids! {
 
 /// Which text style an id is set in, which decides the glyphs baked for
 /// each size: labels and display lines use few characters, so their sizes
-/// carry only those. Any id may also be set as [`Role::Body`].
+/// carry only those. Hints are captions. Any id may also be set as
+/// [`Role::Body`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Role {
     /// Small, tracked, authored in capitals where the script has them.
     Label,
     Body,
+    /// Control hints and other secondary lines: quieter than body text.
+    Caption,
     /// Headings and large figures.
     Display,
 }
@@ -168,6 +171,12 @@ impl TextId {
             | StatBonus | StatBestChain | ChapterName(_) => Role::Label,
             SectorsHeading | Paused | JourneyComplete | OneMoreOrbit | SectorClear
             | SectorName(_) => Role::Display,
+            KeysMove | KeysServe | KeysPause | KeysRelease | KeysBrowse | KeysPlay | KeysBack
+            | KeysContinue | PadMove | PadBrowse | ActionServe | ActionPause | ActionRelease
+            | ActionSelect | ActionResume | ActionRetry | ActionPlay | ActionBack
+            | ActionContinue | SoundOn | SoundOff | Volume | Fullscreen | SaveFailed => {
+                Role::Caption
+            }
             _ => Role::Body,
         }
     }

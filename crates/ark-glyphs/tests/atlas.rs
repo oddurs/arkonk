@@ -168,6 +168,9 @@ fn every_role_snaps_to_a_baked_size() {
         // A tiny window falls back to the pixel font.
         assert_eq!(spec::ppem(role, 0.5), None);
     }
-    assert_eq!(spec::ppem(Role::Body, 2.0), Some(36));
+    assert_eq!(spec::ppem(Role::Body, 2.0), Some(40));
     assert_eq!(spec::ppem(Role::Label, 800.0 / 900.0), Some(13));
+    // Steam Deck body text sits on the 18 px strike, lowercase just over 9 px.
+    assert_eq!(spec::ppem(Role::Body, 800.0 / 900.0), Some(18));
+    assert_eq!(spec::ppem(Role::Caption, 800.0 / 900.0), Some(14));
 }

@@ -72,7 +72,7 @@ pub(super) fn text(id: TextId) -> &'static str {
         StatTime => "ВРЕМЯ",
         StatBonus => "БОНУС",
         StatBestChain => "МАКС. СЕРИЯ",
-        ExtraLife => "Глава пройдена · дополнительная жизнь",
+        ExtraLife => "Глава пройдена · +1 жизнь",
         NextSector => "Следующий сектор",
         BackToSectors => "К секторам",
         SaveFailed => "Не удалось сохранить прогресс",

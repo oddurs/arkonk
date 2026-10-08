@@ -57,9 +57,9 @@ pub fn play_rect() -> Rect {
 }
 pub fn sector_rect(index: usize) -> Rect {
     Rect::new(
-        105.0 + (index / 4) as f32 * 255.0,
+        96.0 + (index / 4) as f32 * 260.0,
         196.0 + (index % 4) as f32 * 112.0,
-        240.0,
+        248.0,
         104.0,
     )
 }

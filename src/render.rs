@@ -60,6 +60,9 @@ const LINE: f32 = 26.0;
 const GAP: f32 = 28.0;
 /// The footer's last baseline; rows stack upward from it.
 const FOOTER: f32 = 872.0;
+/// Baseline-to-baseline distance between footer rows: captions are smaller
+/// than body text, so the rows need more air to read as separate lines.
+const FOOTER_LINE: f32 = 30.0;
 /// Text width inside the pause and results panels.
 const PANEL: f32 = 432.0;
 
@@ -576,9 +579,9 @@ impl Scene<'_> {
         }
     }
     /// A key or button cap, centred on the capitals of body text at `baseline`.
-    fn cap_glyph(&self, cap: Cap, x: f32, baseline: f32) {
+    fn cap_glyph(&self, cap: Cap, x: f32, baseline: f32, beside: Role) {
         let w = self.cap_width(cap);
-        let cy = baseline - self.cap(Role::Body) / 2.0;
+        let cy = baseline - self.cap(beside) / 2.0;
         match cap {
             Cap::Key(label) => {
                 self.rounded(x, cy - 12.0, w, 24.0, 6.0, BORDER);
@@ -604,20 +607,20 @@ impl Scene<'_> {
             }
         }
     }
-    fn item_width(&self, item: &Item) -> f32 {
+    fn item_width(&self, item: &Item, role: Role) -> f32 {
         let cap = item.cap.map_or(0.0, |c| self.cap_width(c) + 8.0);
-        cap + self.width_of(item.id, item.arg.as_slice(), Role::Body)
+        cap + self.width_of(item.id, item.arg.as_slice(), role)
     }
     /// Lays `items` into centred lines of at most `FULL` width; calls
     /// `line` with each line's items and width. Returns the line count.
-    fn pack(&self, items: &[Item], mut line: impl FnMut(&[Item], f32)) -> usize {
+    fn pack(&self, items: &[Item], role: Role, mut line: impl FnMut(&[Item], f32)) -> usize {
         let mut start = 0;
         let mut lines = 0;
         while start < items.len() {
-            let mut width = self.item_width(&items[start]);
+            let mut width = self.item_width(&items[start], role);
             let mut end = start + 1;
             while end < items.len() {
-                let next = width + GAP + self.item_width(&items[end]);
+                let next = width + GAP + self.item_width(&items[end], role);
                 if next > FULL {
                     break;
                 }
@@ -631,18 +634,18 @@ impl Scene<'_> {
         lines
     }
     /// Draws one packed line of hint items, centred, on `baseline`.
-    fn hint_line(&self, items: &[Item], width: f32, baseline: f32, color: Color) {
+    fn hint_line(&self, items: &[Item], width: f32, baseline: f32, color: Color, role: Role) {
         let mut x = WIDTH / 2.0 - width.min(FULL) / 2.0;
         for item in items {
             if let Some(cap) = item.cap {
-                self.cap_glyph(cap, x, baseline);
+                self.cap_glyph(cap, x, baseline, role);
                 x += self.cap_width(cap) + 8.0;
             }
-            let w = self.width_of(item.id, item.arg.as_slice(), Role::Body);
+            let w = self.width_of(item.id, item.arg.as_slice(), role);
             self.say(
                 item.id,
                 item.arg.as_slice(),
-                Role::Body,
+                role,
                 Slot::left(x, w.min(FULL), baseline),
                 color,
             );
@@ -654,7 +657,7 @@ impl Scene<'_> {
     fn footer(&self, rows: &[(&[Item], Color)], save_error: bool) {
         let count: usize = rows
             .iter()
-            .map(|(items, _)| self.pack(items, |_, _| {}))
+            .map(|(items, _)| self.pack(items, Role::Caption, |_, _| {}))
             .sum::<usize>()
             + usize::from(save_error);
         if count > 4
@@ -667,15 +670,15 @@ impl Scene<'_> {
                 missing: None,
             });
         }
-        let mut y = FOOTER - (count.saturating_sub(1)) as f32 * LINE;
+        let mut y = FOOTER - (count.saturating_sub(1)) as f32 * FOOTER_LINE;
         if save_error {
-            self.say(TextId::SaveFailed, &[], Role::Body, Slot::line(y), AMBER);
-            y += LINE;
+            self.say(TextId::SaveFailed, &[], Role::Caption, Slot::line(y), AMBER);
+            y += FOOTER_LINE;
         }
         for &(items, color) in rows {
-            self.pack(items, |line, width| {
-                self.hint_line(line, width, y, color);
-                y += LINE;
+            self.pack(items, Role::Caption, |line, width| {
+                self.hint_line(line, width, y, color, Role::Caption);
+                y += FOOTER_LINE;
             });
         }
     }
@@ -1141,7 +1144,9 @@ fn scene(
                 ),
                 Device::Gamepad => {
                     let items = [pad(Glyph::A, TextId::ActionRelease)];
-                    v.pack(&items, |line, w| v.hint_line(line, w, 720.0, CYAN));
+                    v.pack(&items, Role::Body, |line, w| {
+                        v.hint_line(line, w, 720.0, CYAN, Role::Body)
+                    });
                 }
             }
         }
@@ -1588,7 +1593,9 @@ fn ready(v: &Scene, game: &Game) {
         Device::KeyboardMouse => v.say(TextId::KeysServe, &[], Role::Body, Slot::line(y), CYAN),
         Device::Gamepad => {
             let items = [pad(Glyph::A, TextId::ActionServe)];
-            v.pack(&items, |line, w| v.hint_line(line, w, y, CYAN));
+            v.pack(&items, Role::Body, |line, w| {
+                v.hint_line(line, w, y, CYAN, Role::Body)
+            });
         }
     }
     let start = game.balls()[0].pos;
@@ -1676,15 +1683,16 @@ fn attract(v: &Scene, ui: &Ui, profile: &Profile) {
         .into_iter()
         .enumerate()
     {
-        let x = WIDTH / 2.0 + (i as f32 - 1.0) * 150.0;
+        // Wide enough for the largest possible best score at body size.
+        let x = WIDTH / 2.0 + (i as f32 - 1.0) * 180.0;
         v.say(
             label,
             &[],
             Role::Label,
-            Slot::centered(x, 140.0, 668.0),
+            Slot::centered(x, 170.0, 668.0),
             DIM,
         );
-        let value = Slot::centered(x, 140.0, 698.0);
+        let value = Slot::centered(x, 170.0, 698.0);
         match i {
             0 => {
                 let args = [
@@ -1748,7 +1756,7 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
             v.say(TextId::ActionBack, &[], Role::Body, slot, DIM);
         }
         Device::Gamepad => {
-            v.cap_glyph(Cap::Pad(Glyph::B), back.x + 10.0, baseline);
+            v.cap_glyph(Cap::Pad(Glyph::B), back.x + 10.0, baseline, Role::Body);
             let slot = Slot::left(back.x + 40.0, back.w - 50.0, baseline);
             v.say(TextId::ActionBack, &[], Role::Body, slot, DIM);
         }
@@ -1801,10 +1809,9 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
             8.0,
             if selected { RAISED } else { SURFACE },
         );
-        let number = Slot::left(r.x + 14.0, 24.0, r.y + 27.0);
-        let n = Figures::of(|f| write!(f, "{:02}", i + 1));
-        v.put(n.as_str(), Role::Label, number, DIM);
-        let name = Slot::left(r.x + 38.0, r.w - 48.0, r.y + 27.0);
+        // The card's place in its chapter column and the "Play sector 03"
+        // button already carry the number; the name gets the full width.
+        let name = Slot::left(r.x + 14.0, r.w - 28.0, r.y + 27.0);
         v.say(
             TextId::SectorName(id),
             &[],
@@ -1882,8 +1889,8 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
         (TextId::MedalSwift, TextId::MedalSwiftHow),
     ];
     let mut y = 676.0;
-    let lines = v.pack(detail, |line, w| {
-        v.hint_line(line, w, y, INK);
+    let lines = v.pack(detail, Role::Body, |line, w| {
+        v.hint_line(line, w, y, INK, Role::Body);
         y += LINE;
     });
     let mut legend_lines = 0;
@@ -1958,6 +1965,10 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
     };
     v.footer(&[(&hints, MUTED)], ui.save_error);
 }
+/// Distance between the sector-clear columns, and the widest a medal chip
+/// grows: three chips at most 136 wide leave at least 14 between them.
+const CLEAR_COLUMN: f32 = 150.0;
+const CHIP_MAX: f32 = 136.0;
 fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
     v.scrim();
     v.panel(240.0, 290.0, 480.0, 350.0);
@@ -1968,19 +1979,22 @@ fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
         Slot::centered(WIDTH / 2.0, PANEL, 342.0),
         INK,
     );
+    // Without the extra-life line the stats and medals drop into its space,
+    // so the button never sits under an empty gap.
+    let shift = if summary.life_earned { 0.0 } else { 14.0 };
     for (i, label) in [TextId::StatTime, TextId::StatBonus, TextId::StatBestChain]
         .into_iter()
         .enumerate()
     {
-        let x = WIDTH / 2.0 + (i as f32 - 1.0) * 140.0;
+        let x = WIDTH / 2.0 + (i as f32 - 1.0) * CLEAR_COLUMN;
         v.say(
             label,
             &[],
             Role::Label,
-            Slot::centered(x, 136.0, 386.0),
+            Slot::centered(x, CHIP_MAX, 386.0 + shift),
             DIM,
         );
-        let value = Slot::centered(x, 136.0, 414.0);
+        let value = Slot::centered(x, CHIP_MAX, 414.0 + shift);
         match i {
             0 => {
                 let t = Figures::of(|f| write!(f, "{}", Clock(summary.ticks)));
@@ -2003,22 +2017,23 @@ fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
         .into_iter()
         .enumerate()
     {
-        let x = WIDTH / 2.0 + (i as f32 - 1.0) * 140.0;
+        let x = WIDTH / 2.0 + (i as f32 - 1.0) * CLEAR_COLUMN;
         let earned = summary.medals.contains(MEDAL_ORDER[i]);
+        let w = (v.width_of(label, &[], Role::Label) + 32.0).min(CHIP_MAX);
         v.rounded(
-            x - 66.0,
-            436.0,
-            132.0,
+            x - w / 2.0,
+            436.0 + shift,
+            w,
             28.0,
             14.0,
             opacity(if earned { AMBER } else { MUTED }, 0.16),
         );
-        let y = 450.0 + v.cap(Role::Label) / 2.0;
+        let y = 450.0 + shift + v.cap(Role::Label) / 2.0;
         v.say(
             label,
             &[],
             Role::Label,
-            Slot::centered(x, 124.0, y),
+            Slot::centered(x, CHIP_MAX - 12.0, y),
             if earned { AMBER } else { MUTED },
         );
     }
@@ -2041,13 +2056,15 @@ fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
         Device::KeyboardMouse => v.say(
             TextId::KeysContinue,
             &[],
-            Role::Body,
+            Role::Caption,
             Slot::centered(WIDTH / 2.0, PANEL, 602.0),
             MUTED,
         ),
         Device::Gamepad => {
             let items = [pad(Glyph::A, TextId::ActionContinue)];
-            v.pack(&items, |line, w| v.hint_line(line, w, 602.0, MUTED));
+            v.pack(&items, Role::Caption, |line, w| {
+                v.hint_line(line, w, 602.0, MUTED, Role::Caption)
+            });
         }
     }
 }

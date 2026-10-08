@@ -130,8 +130,13 @@ for text when a window is too small for Noto to stay legible.
 | Role | Size (scene units) | Weight | Use |
 | --- | ---: | --- | --- |
 | Label | 15 | Regular, tracked +0.06 em | Small capitals: `SCORE`, `LIVES`, medals, chapters |
-| Body | 18 | Regular | Buttons, hints, tips, sector names, values |
+| Caption | 16 | Regular | Control hints, settings keys, the save warning |
+| Body | 20 | Regular | Buttons, tips, sector names, values, gameplay prompts |
 | Display | 32 | Medium | Headings, the score, the sector being served |
+
+Hints are captions so the screen's actions and content lead and the
+control reminders recede; gameplay prompts ("Click or space to serve")
+stay body text because they are the one thing to do next.
 
 Figures are tabular (`tnum`) everywhere, so scores and timers never shift as
 they change. Kerning is the fonts' GPOS pair kerning, extracted with a real
@@ -144,14 +149,15 @@ The scene is 960 × 900 units scaled to the window. A style's physical size is
 snapped to a **ladder** of pixel sizes (10–64 px) and glyphs are drawn 1:1,
 never scaled. Only the sizes the checked displays need are baked:
 
-| Display | Density | Label | Body | Display |
-| --- | ---: | ---: | ---: | ---: |
-| Steam Deck 1280 × 800 | 0.89 | 13 | 16 | 28 |
-| 960 × 900 window at 100 % | 1.0 | 15 | 18 | 32 |
-| 1080p | 1.2 | 18 | 22 | 40 |
-| 1440p | 1.6 | 24 | 28 | 48 |
-| Retina window at 200 % | 2.0 | 30 | 36 | 64 |
-| 4K | 2.4 | 36 | 44 | 64 |
+| Display | Density | Label | Caption | Body | Display |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 720p (1280 × 720) | 0.80 | 12 | 13 | 16 | 26 |
+| Steam Deck 1280 × 800 | 0.89 | 13 | 14 | 18 | 28 |
+| 960 × 900 window at 100 % | 1.00 | 15 | 16 | 20 | 32 |
+| 1080p | 1.20 | 18 | 20 | 24 | 40 |
+| 1440p | 1.60 | 24 | 26 | 32 | 48 |
+| Retina window at 200 % | 2.00 | 30 | 32 | 40 | 64 |
+| 4K | 2.40 | 36 | 40 | 48 | 64 |
 
 Between those densities a style takes the nearest ladder size, or the largest
 baked size below it. Above 2.4 text stays at the 4K sizes. Below about 0.76,
@@ -160,9 +166,9 @@ Latin text switches to the pixel font; scripts it cannot spell keep the
 smallest strike. The Small and Compact layouts will handle tiny displays.
 
 **Steam Deck legibility.** Valve asks for text at least 9 px tall at 1280 × 800.
-The smallest text is a label at 13 px, whose capitals are 9.3 px tall; body
-text is 16 px (capitals 11.4 px, lowercase 8.6 px). A test pins the cap-height
-check.
+The smallest text is a label at 13 px, whose capitals are 9.3 px tall;
+captions are 14 px and body text 18 px (lowercase just over 9 px). A test
+pins the cap-height check and the Deck strike for each role.
 
 ### Layout check
 
@@ -203,15 +209,15 @@ macOS arm64 release binary, symbols kept:
 | Build | Bytes | Change |
 | --- | ---: | ---: |
 | Before (`main`, 5×7 font only) | 2,013,088 | |
-| Without CJK (`--no-default-features`) | 2,285,680 | +272,592 |
-| With CJK (default) | 2,930,016 | +916,928 |
+| Without CJK (`--no-default-features`) | 2,335,216 | +322,128 |
+| With CJK (default) | 3,144,672 | +1,131,584 |
 
 | Atlas file | Holds | Bytes |
 | --- | --- | ---: |
-| `latin.bin` | Latin, Cyrillic, figures; 204 Regular + 126 Medium glyphs, 15 strikes | 138,251 |
-| `zh.bin` | 219 + 36 Simplified Chinese glyphs | 258,672 |
-| `ja.bin` | 205 + 52 Japanese glyphs | 229,725 |
-| `ko.bin` | 204 + 45 Korean glyphs | 150,987 |
+| `latin.bin` | Latin, Cyrillic, figures; 203 Regular + 126 Medium glyphs | 175,509 |
+| `zh.bin` | 219 + 36 Simplified Chinese glyphs | 324,282 |
+| `ja.bin` | 205 + 52 Japanese glyphs | 286,940 |
+| `ko.bin` | 204 + 45 Korean glyphs | 192,553 |
 
 The rest of the change, about 134 KB, is code and string tables: the new
 renderer text path, the twelve tables (with their CJK and Cyrillic UTF-8),
@@ -223,29 +229,36 @@ roles drawn at it; Label and Display sizes hold far fewer glyphs than Body):
 
 | Size | Weight | Roles | Latin | zh | ja | ko |
 | ---: | --- | --- | ---: | ---: | ---: | ---: |
+| 26 | Medium | Display | 6,026 | 5,333 | 6,303 | 4,286 |
 | 28 | Medium | Display | 6,908 | 5,776 | 6,856 | 4,619 |
 | 32 | Medium | Display | 7,848 | 6,463 | 7,657 | 5,111 |
 | 40 | Medium | Display | 10,032 | 8,004 | 9,574 | 6,224 |
 | 48 | Medium | Display | 12,425 | 9,568 | 11,442 | 7,369 |
 | 64 | Medium | Display | 18,955 | 12,519 | 15,327 | 9,669 |
-| 13 | Regular | Label | 1,916 | 2,071 | 1,785 | 1,512 |
+| 12 | Regular | Label | 1,852 | 1,861 | 1,598 | 1,361 |
+| 13 | Regular | Label+Caption | 3,421 | 5,030 | 4,229 | 3,715 |
+| 14 | Regular | Caption | 3,356 | 3,433 | 3,347 | 2,973 |
 | 15 | Regular | Label | 2,300 | 2,454 | 2,103 | 1,720 |
-| 16 | Regular | Body | 6,041 | 18,638 | 15,167 | 10,254 |
+| 16 | Regular | Body+Caption | 6,041 | 18,638 | 15,167 | 10,254 |
 | 18 | Regular | Label+Body | 6,840 | 21,666 | 17,602 | 12,003 |
-| 22 | Regular | Body | 8,322 | 27,139 | 22,038 | 14,784 |
-| 24 | Regular | Label | 3,935 | 4,260 | 3,584 | 2,906 |
-| 28 | Regular | Body | 10,547 | 33,997 | 28,219 | 18,027 |
+| 20 | Regular | Body+Caption | 7,646 | 24,511 | 19,828 | 13,321 |
+| 24 | Regular | Label+Body | 9,064 | 29,677 | 24,156 | 15,871 |
+| 26 | Regular | Caption | 6,228 | 7,258 | 6,811 | 5,867 |
 | 30 | Regular | Label | 5,200 | 5,169 | 4,569 | 3,467 |
-| 36 | Regular | Label+Body | 14,891 | 44,797 | 36,745 | 23,623 |
-| 44 | Regular | Body | 18,888 | 54,448 | 45,156 | 28,032 |
+| 32 | Regular | Body+Caption | 13,211 | 39,373 | 32,276 | 20,999 |
+| 36 | Regular | Label | 6,260 | 6,281 | 5,525 | 4,156 |
+| 40 | Regular | Body+Caption | 16,717 | 49,655 | 40,914 | 26,659 |
+| 48 | Regular | Body | 21,931 | 59,865 | 49,710 | 31,197 |
 
-The 4K body size (44 px) is the largest single cost in each CJK file;
-dropping the 2.4× strikes for CJK would save about 128 KB and draw CJK text
-at the 2× sizes on 4K.
+The 4K body size (48 px) is the largest single cost in each CJK file.
 
 CJK is a cargo feature, `cjk`, on by default, so every package ships all
-twelve languages. Building without it saves 639,384 bytes of atlas; the CJK locales
-then fall back to the next preference. 
+twelve languages; building without it saves 803,775 bytes of atlas and the
+CJK locales fall back to the next preference. The desktop size budget is
+measured without `cjk` (as Steam is measured separately): Chinese, Japanese
+and Korean are part of the Steam and desktop packages, while the portable
+and minimal builds hold the size line.
+
 ## Known gaps
 
 - Steam rich presence (`docs/steam/rich_presence.vdf`) is English only, and
