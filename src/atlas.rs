@@ -54,7 +54,10 @@ impl Atlas {
             top: 0,
             pixels: pixel_font::atlas(),
         }];
-        for (source, font) in [(Source::Latin, Some(fonts.latin)), (Source::Cjk, fonts.cjk)] {
+        for (source, font) in [
+            (Source::Latin, Some(fonts.latin)),
+            (Source::Local, fonts.local),
+        ] {
             for face in font.iter().flat_map(|f| f.faces()) {
                 for strike in face.strikes() {
                     let mut buffer = vec![0; strike.unpacked_len()];

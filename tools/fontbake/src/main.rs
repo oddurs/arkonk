@@ -1,7 +1,9 @@
 //! Bakes the glyph atlases in `crates/ark-glyphs/data/` from pinned Noto
 //! releases: only the characters the string tables use, only at the sizes
-//! `spec.rs` asks for, hinted, as 4-bit run-length coded alpha with advances
-//! and GPOS pair kerning. The game links the output, never this tool.
+//! `spec.rs` asks for, hinted, as deflated 16-level alpha with advances and
+//! GPOS pair kerning. Thai clusters and Arabic letter forms are shaped
+//! by the fonts themselves (`script.rs` says which). The game links the
+//! output, never this tool.
 //!
 //! ```text
 //! cargo run -p fontbake --release            # rewrite the data files
@@ -10,6 +12,9 @@
 //!
 //! Fonts are fetched with `curl` into `target/fontbake/` and verified
 //! against the SHA-256 pinned in `sources.rs` before use.
+#[path = "../../../crates/ark-glyphs/src/script.rs"]
+#[allow(dead_code)]
+mod script;
 #[path = "../../../crates/ark-glyphs/src/spec.rs"]
 #[allow(dead_code)]
 mod spec;

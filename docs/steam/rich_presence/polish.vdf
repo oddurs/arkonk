@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"polish"
+	"Tokens"
+	{
+		"#Menus"	"W menu"
+		"#Journey"	"Sektor %sector% · {#Sector_%name%}"
+		"#Practice"	"Trening: sektor %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Pierwsze światło"
+		"#Sector_satellites"	"Satelity"
+		"#Sector_slipstream"	"Strumień"
+		"#Sector_resonance"	"Rezonans"
+		"#Sector_prism"	"Pryzmat"
+		"#Sector_crossfade"	"Przenikanie"
+		"#Sector_undertow"	"Prąd wsteczny"
+		"#Sector_moonrise"	"Wschód księżyca"
+		"#Sector_afterglow"	"Poświata"
+		"#Sector_parallax"	"Paralaksa"
+		"#Sector_supernova"	"Supernowa"
+		"#Sector_homecoming"	"Powrót"
+	}
+}

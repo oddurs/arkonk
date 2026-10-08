@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"thai"
+	"Tokens"
+	{
+		"#Menus"	"อยู่ในเมนู"
+		"#Journey"	"เซกเตอร์ %sector% · {#Sector_%name%}"
+		"#Practice"	"กำลังฝึกซ้อมเซกเตอร์ %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"แสงแรก"
+		"#Sector_satellites"	"ดาวเทียม"
+		"#Sector_slipstream"	"กระแสลม"
+		"#Sector_resonance"	"การสั่นพ้อง"
+		"#Sector_prism"	"ปริซึม"
+		"#Sector_crossfade"	"ครอสเฟด"
+		"#Sector_undertow"	"คลื่นใต้น้ำ"
+		"#Sector_moonrise"	"จันทร์ขึ้น"
+		"#Sector_afterglow"	"แสงสนธยา"
+		"#Sector_parallax"	"พารัลแลกซ์"
+		"#Sector_supernova"	"ซูเปอร์โนวา"
+		"#Sector_homecoming"	"กลับบ้าน"
+	}
+}

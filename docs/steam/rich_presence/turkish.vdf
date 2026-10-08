@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"turkish"
+	"Tokens"
+	{
+		"#Menus"	"Menülerde"
+		"#Journey"	"Sektör %sector% · {#Sector_%name%}"
+		"#Practice"	"Antrenman: %sector%. sektör · {#Sector_%name%}"
+		"#Sector_first_light"	"İlk Işık"
+		"#Sector_satellites"	"Uydular"
+		"#Sector_slipstream"	"Hava Akımı"
+		"#Sector_resonance"	"Rezonans"
+		"#Sector_prism"	"Prizma"
+		"#Sector_crossfade"	"Geçiş"
+		"#Sector_undertow"	"Dip Akıntısı"
+		"#Sector_moonrise"	"Ay Doğuşu"
+		"#Sector_afterglow"	"Son Işıltı"
+		"#Sector_parallax"	"Paralaks"
+		"#Sector_supernova"	"Süpernova"
+		"#Sector_homecoming"	"Eve Dönüş"
+	}
+}

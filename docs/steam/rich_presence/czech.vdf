@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"czech"
+	"Tokens"
+	{
+		"#Menus"	"V nabídkách"
+		"#Journey"	"Sektor %sector% · {#Sector_%name%}"
+		"#Practice"	"Trénuje sektor %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"První světlo"
+		"#Sector_satellites"	"Satelity"
+		"#Sector_slipstream"	"Úplav"
+		"#Sector_resonance"	"Rezonance"
+		"#Sector_prism"	"Hranol"
+		"#Sector_crossfade"	"Prolínání"
+		"#Sector_undertow"	"Spodní proud"
+		"#Sector_moonrise"	"Východ měsíce"
+		"#Sector_afterglow"	"Dosvit"
+		"#Sector_parallax"	"Paralaxa"
+		"#Sector_supernova"	"Supernova"
+		"#Sector_homecoming"	"Návrat domů"
+	}
+}

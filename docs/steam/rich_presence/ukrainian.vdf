@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"ukrainian"
+	"Tokens"
+	{
+		"#Menus"	"У меню"
+		"#Journey"	"Сектор %sector% · {#Sector_%name%}"
+		"#Practice"	"Тренування: сектор %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Перше світло"
+		"#Sector_satellites"	"Супутники"
+		"#Sector_slipstream"	"Попутний потік"
+		"#Sector_resonance"	"Резонанс"
+		"#Sector_prism"	"Призма"
+		"#Sector_crossfade"	"Перехід"
+		"#Sector_undertow"	"Підводна течія"
+		"#Sector_moonrise"	"Схід місяця"
+		"#Sector_afterglow"	"Післясвітіння"
+		"#Sector_parallax"	"Паралакс"
+		"#Sector_supernova"	"Наднова"
+		"#Sector_homecoming"	"Повернення"
+	}
+}

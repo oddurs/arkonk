@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"german"
+	"Tokens"
+	{
+		"#Menus"	"Im Menü"
+		"#Journey"	"Sektor %sector% · {#Sector_%name%}"
+		"#Practice"	"Übt Sektor %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Erstes Licht"
+		"#Sector_satellites"	"Satelliten"
+		"#Sector_slipstream"	"Windschatten"
+		"#Sector_resonance"	"Resonanz"
+		"#Sector_prism"	"Prisma"
+		"#Sector_crossfade"	"Überblendung"
+		"#Sector_undertow"	"Sog"
+		"#Sector_moonrise"	"Mondaufgang"
+		"#Sector_afterglow"	"Nachglühen"
+		"#Sector_parallax"	"Parallaxe"
+		"#Sector_supernova"	"Supernova"
+		"#Sector_homecoming"	"Heimkehr"
+	}
+}

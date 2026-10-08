@@ -11,7 +11,10 @@ fn locales() -> impl Iterator<Item = Locale> {
 /// Glyph indices baked per (source, weight, ppem).
 fn baked(fonts: &Fonts) -> BTreeMap<(Source, spec::Weight, u8), BTreeSet<u16>> {
     let mut out = BTreeMap::new();
-    for (source, font) in [(Source::Latin, Some(fonts.latin)), (Source::Cjk, fonts.cjk)] {
+    for (source, font) in [
+        (Source::Latin, Some(fonts.latin)),
+        (Source::Local, fonts.local),
+    ] {
         for face in font.iter().flat_map(|f| f.faces()) {
             for strike in face.strikes() {
                 let mut buffer = vec![0; strike.unpacked_len()];
@@ -221,4 +224,62 @@ fn baked_sizes_are_the_nearest_rung_at_each_density() {
         }
         assert_eq!(spec::rungs(role).collect::<Vec<_>>(), want, "{role:?}");
     }
+}
+
+#[cfg(feature = "scripts")]
+#[test]
+fn arabic_is_shaped_and_laid_out_right_to_left() {
+    let ar = fonts(Locale::Ar).unwrap();
+    let mut placed = Vec::new();
+    ar.layout("بيت", spec::Weight::Regular, 18, 0.0, |p| placed.push(p));
+    // Teh final sits leftmost, beh initial rightmost; every form is baked.
+    let forms: Vec<u32> = placed.iter().map(|p| p.c as u32).collect();
+    assert_eq!(forms, [0xFE96, 0xFEF4, 0xFE91]);
+    assert!(
+        placed
+            .iter()
+            .all(|p| p.glyph.is_some() && p.source == Source::Local)
+    );
+    assert!(placed.windows(2).all(|w| w[0].x < w[1].x));
+    // Latin inside Arabic keeps its own order, from Noto Sans.
+    let mut chars = String::new();
+    ar.layout("Esc للرجوع", spec::Weight::Regular, 18, 0.0, |p| {
+        chars.push(p.c)
+    });
+    assert!(chars.ends_with(" Esc"), "{chars}");
+    // Arabic is never tracked: spacing would break the joins.
+    assert_eq!(ar.tracking(0.06, 18), 0.0);
+    // Figures alone keep their order: a count out of a total, a bonus, a
+    // chain. These once came out as `36 /`, `2,000+` and `0×`.
+    for figure in [" / 36", "+2,000", "×0", "01:40"] {
+        let mut drawn = String::new();
+        ar.layout(figure, spec::Weight::Medium, 18, 0.0, |p| drawn.push(p.c));
+        assert_eq!(drawn, figure);
+    }
+}
+
+#[cfg(feature = "scripts")]
+#[test]
+fn a_thai_consonant_and_its_marks_are_one_glyph() {
+    let th = fonts(Locale::Th).unwrap();
+    let mut placed = Vec::new();
+    th.layout("ที่", spec::Weight::Regular, 18, 0.0, |p| {
+        placed.push(p)
+    });
+    assert_eq!(placed.len(), 1);
+    assert!(placed[0].glyph.is_some());
+    // A zero width space is a break opportunity that takes no room.
+    let with = th.measure("เล่น\u{200B}ต่อ", spec::Weight::Regular, 18, 0.0);
+    let without = th.measure("เล่นต่อ", spec::Weight::Regular, 18, 0.0);
+    assert_eq!(with, without);
+    let mut lines = Vec::new();
+    th.wrap(
+        "เล่น\u{200B}ต่อ",
+        spec::Weight::Regular,
+        18,
+        0.0,
+        with * 0.7,
+        |l| lines.push(l),
+    );
+    assert_eq!(lines.len(), 2, "{lines:?}");
 }

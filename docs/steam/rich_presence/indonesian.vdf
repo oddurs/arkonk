@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"indonesian"
+	"Tokens"
+	{
+		"#Menus"	"Di menu"
+		"#Journey"	"Sektor %sector% · {#Sector_%name%}"
+		"#Practice"	"Berlatih sektor %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Cahaya Pertama"
+		"#Sector_satellites"	"Satelit"
+		"#Sector_slipstream"	"Arus Seret"
+		"#Sector_resonance"	"Resonansi"
+		"#Sector_prism"	"Prisma"
+		"#Sector_crossfade"	"Silang Pudar"
+		"#Sector_undertow"	"Arus Bawah"
+		"#Sector_moonrise"	"Bulan Terbit"
+		"#Sector_afterglow"	"Pendar Senja"
+		"#Sector_parallax"	"Paralaks"
+		"#Sector_supernova"	"Supernova"
+		"#Sector_homecoming"	"Pulang"
+	}
+}

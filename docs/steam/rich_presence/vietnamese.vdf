@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"vietnamese"
+	"Tokens"
+	{
+		"#Menus"	"Đang ở menu"
+		"#Journey"	"Khu vực %sector% · {#Sector_%name%}"
+		"#Practice"	"Đang luyện tập khu vực %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Tia sáng đầu"
+		"#Sector_satellites"	"Vệ tinh"
+		"#Sector_slipstream"	"Luồng gió"
+		"#Sector_resonance"	"Cộng hưởng"
+		"#Sector_prism"	"Lăng kính"
+		"#Sector_crossfade"	"Chuyển cảnh"
+		"#Sector_undertow"	"Dòng ngầm"
+		"#Sector_moonrise"	"Trăng lên"
+		"#Sector_afterglow"	"Ánh tà"
+		"#Sector_parallax"	"Thị sai"
+		"#Sector_supernova"	"Siêu tân tinh"
+		"#Sector_homecoming"	"Trở về"
+	}
+}

@@ -24,4 +24,5 @@ description: Use after adding or changing strings, characters, type roles, sizes
   `tools/fontbake/src/sources.rs` with its SHA-256, and add its licence under
   `packaging/licenses/fonts/`.
 - Glyph coverage per script is set in `tools/fontbake/src/charsets.rs`. Atlases are
-  split by script, and the CJK ones sit behind the default feature.
+  split by script, and the CJK, Thai and Arabic ones sit behind the default
+  `scripts` feature.

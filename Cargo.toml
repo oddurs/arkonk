@@ -24,10 +24,11 @@ license.workspace = true
 repository.workspace = true
 
 [features]
-default = ["cjk"]
-# Chinese, Japanese and Korean glyph atlases, about 640 KB; without them
-# those languages fall back to English. See docs/localization.md.
-cjk = ["ark-glyphs/cjk"]
+default = ["scripts"]
+# Glyph atlases for Chinese, Japanese, Korean, Thai and Arabic, about
+# 2.3 MB; without them those languages fall back to the next preference.
+# See docs/localization.md.
+scripts = ["ark-glyphs/scripts"]
 # Opt-in so development, CI tests and the benchmark never need a Steam client;
 # see docs/steam/README.md.
 steam = ["dep:steamworks"]

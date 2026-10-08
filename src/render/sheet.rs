@@ -181,6 +181,7 @@ pub(super) fn draw(
             inner - ROW_TEXT,
             v.baseline(Role::Caption, top),
         );
+        let slot = v.lead((x, inner), slot);
         v.paragraph((id, &[]), Role::Caption, slot, help_lines, DIM);
     }
     v.set_motion(1.0, 0.0);
@@ -213,27 +214,23 @@ fn open(v: &Scene, ui: &Ui, (w, h): (f32, f32), (title, room): (TextId, f32), ba
     let top = r.y + PAD;
     let title_top = top + (head - v.line_h(Role::Title)) / 2.0;
     let baseline = v.baseline(Role::Title, title_top);
+    let span = (r.x, r.w);
     v.say(
         title,
         &[],
         Role::Title,
-        Slot::left(r.x + PAD, room, baseline),
+        v.lead(span, Slot::left(r.x + PAD, room, baseline)),
         INK,
     );
     if back {
         let size = chips::size(v, true);
         let mid = top + head / 2.0;
         let cw = chips::width(v, Prompt::Back, size);
-        chips::chip(
-            v,
-            Prompt::Back,
-            (r.x + w - PAD - cw, mid),
-            size,
-            Lit::Neutral,
-        );
+        // At the title's far end: the right, or the left in Arabic.
+        let x = v.mirror(span, r.x + w - PAD - cw, cw);
+        chips::chip(v, Prompt::Back, (x, mid), size, Lit::Neutral);
         let reach = v.at_least(size, 32.0);
-        v.hits.borrow_mut().back =
-            Some(Rect::new(r.x + w - PAD - cw, mid - reach / 2.0, cw, reach));
+        v.hits.borrow_mut().back = Some(Rect::new(x, mid - reach / 2.0, cw, reach));
     }
     r
 }
@@ -317,6 +314,7 @@ pub(super) fn row(
     };
     let chip = chips::size(v, true);
     let room = r.w - ROW_TEXT - GLYPH_INSET - chip - S8;
+    let span = (r.x, r.w);
     match detail {
         None => {
             let baseline = v.snap(r.y + r.h / 2.0 + v.cap(style) / 2.0);
@@ -324,7 +322,7 @@ pub(super) fn row(
                 id,
                 args,
                 style,
-                Slot::left(r.x + ROW_TEXT, room, baseline),
+                v.lead(span, Slot::left(r.x + ROW_TEXT, room, baseline)),
                 color,
             );
         }
@@ -338,18 +336,22 @@ pub(super) fn row(
                 id,
                 args,
                 style,
-                Slot::left(r.x + ROW_TEXT, room, name),
+                v.lead(span, Slot::left(r.x + ROW_TEXT, room, name)),
                 color,
             );
             let below = v.snap(top + name_h + 4.0 + caption_h * 0.888);
-            let slot = Slot::left(r.x + ROW_TEXT, room, below);
+            let slot = v.lead(span, Slot::left(r.x + ROW_TEXT, room, below));
             v.say(detail, detail_args, caption, slot, hex(0x9fd9e6));
         }
     }
     if focused {
         let lit = if primary { Lit::Primary } else { Lit::Neutral };
         let w = chips::width(v, Prompt::Confirm, chip);
-        let at = (r.x + r.w - GLYPH_INSET - w, r.y + r.h / 2.0);
+        // At the row's end: the right, or the left in Arabic.
+        let at = (
+            v.mirror(span, r.x + r.w - GLYPH_INSET - w, w),
+            r.y + r.h / 2.0,
+        );
         chips::chip(v, Prompt::Confirm, at, chip, lit);
     }
 }
@@ -390,9 +392,10 @@ fn figure_block(v: &Scene) -> f32 {
 }
 fn figure(v: &Scene, x: f32, top: f32, w: f32, (label, value): (TextId, &str)) {
     let name = v.baseline(Role::Label, top);
-    v.say(label, &[], Role::Label, Slot::left(x, w, name), DIM);
+    let slot = |y| v.lead((x, w), Slot::left(x, w, y));
+    v.say(label, &[], Role::Label, slot(name), DIM);
     let at = v.baseline(Role::Figure, top + v.line_h(Role::Label) + 10.0);
-    v.put(value, Role::Figure, Slot::left(x, w, at), INK);
+    v.put(value, Role::Figure, slot(at), INK);
 }
 
 /// After the last life or the last sector: the outcome, the points, and
@@ -485,24 +488,34 @@ pub(super) fn cleared(v: &Scene, ui: &Ui, game: &Game, summary: SectorSummary) {
         |a| label(a, practice),
         |r| {
             let w = (r.w - 2.0 * S8) / 3.0;
+            let span = (r.x, r.w);
+            // Columns read in the language's direction.
+            let column = |i: usize| v.mirror(span, r.x + i as f32 * (w + S8), w);
             for (i, &stat) in stats.iter().enumerate() {
-                figure(v, r.x + i as f32 * (w + S8), r.y, w, stat);
+                figure(v, column(i), r.y, w, stat);
             }
             let top = r.y + figure_block(v) + S24;
             for (i, medal) in medals.into_iter().enumerate() {
-                let x = r.x + i as f32 * (w + S8);
+                let x = column(i);
                 let earned = summary.medals.contains(MEDAL_ORDER[i]);
-                medal_pip(v, Rect::new(x, top, 28.0, 5.0), earned);
+                medal_pip(
+                    v,
+                    Rect::new(v.mirror((x, w), x, 28.0), top, 28.0, 5.0),
+                    earned,
+                );
                 let name = v.baseline(Role::Label, top + 15.0);
                 let ink = if earned { INK } else { MUTED };
-                v.say(medal, &[], Role::Label, Slot::left(x, w, name), ink);
+                let slot = v.lead((x, w), Slot::left(x, w, name));
+                v.say(medal, &[], Role::Label, slot, ink);
             }
             if summary.life_earned {
                 let top = top + medal_block(v) + S24;
                 let mid = top + life_line / 2.0;
-                v.pearl(V2::new(v.snap(r.x + 6.0), v.snap(mid)), 6.0, 1.0);
+                let pearl = v.mirror(span, r.x, 12.0) + 6.0;
+                v.pearl(V2::new(v.snap(pearl), v.snap(mid)), 6.0, 1.0);
                 let line = v.baseline(Role::Caption, top);
                 let slot = Slot::left(r.x + 12.0 + S12, r.w - 24.0, line);
+                let slot = v.lead(span, slot);
                 v.say(TextId::ExtraLife, &[], Role::Caption, slot, AMBER);
             }
         },
@@ -577,29 +590,34 @@ pub(super) fn settings(v: &Scene, ui: &Ui, profile: &Profile, focus: usize) {
         let baseline = v.snap(rr.y + rr.h / 2.0 + v.cap(Role::Body) / 2.0);
         let left = rr.x + SETTING_PAD;
         let right = rr.x + rr.w - SETTING_PAD;
+        // The name leads and the value ends the row, mirrored in Arabic.
+        let span = (rr.x, rr.w);
         v.say(
             row.name(),
             &[],
             Role::Body,
-            Slot::left(left, right - left, baseline),
+            v.lead(span, Slot::left(left, right - left, baseline)),
             INK,
         );
         let mid = rr.y + rr.h / 2.0;
         let caption = v.snap(mid + v.cap(Role::Caption) / 2.0);
         match row.value(&profile.settings) {
-            Value::Toggle(on) => toggle(v, Rect::new(right - 40.0, mid - 11.0, 40.0, 22.0), on),
+            Value::Toggle(on) => {
+                let x = v.mirror(span, right - 40.0, 40.0);
+                toggle(v, Rect::new(x, mid - 11.0, 40.0, 22.0), on);
+            }
             Value::Level(level, max) => {
                 let figure = Figures::count(v.locale, u32::from(level));
                 v.put(
                     figure.as_str(),
                     Role::Caption,
-                    Slot::right(right, 18.0, caption),
+                    v.lead(span, Slot::right(right, 18.0, caption)),
                     INK,
                 );
                 let first = right - 18.0 - 10.0 - (f32::from(max) * 12.0 - 3.0);
                 for i in 0..max {
-                    let pip =
-                        v.snap_rect(Rect::new(first + f32::from(i) * 12.0, mid - 2.5, 9.0, 5.0));
+                    let x = v.mirror(span, first + f32::from(i) * 12.0, 9.0);
+                    let pip = v.snap_rect(Rect::new(x, mid - 2.5, 9.0, 5.0));
                     let fill = if i < level {
                         Fill::ramp(hex(0xb8f3fc), CYAN)
                     } else {
@@ -613,7 +631,7 @@ pub(super) fn settings(v: &Scene, ui: &Ui, profile: &Profile, focus: usize) {
                     id,
                     &[],
                     Role::Caption,
-                    Slot::right(right, right - left, caption),
+                    v.lead(span, Slot::right(right, right - left, caption)),
                     DIM,
                 );
             }
@@ -621,7 +639,7 @@ pub(super) fn settings(v: &Scene, ui: &Ui, profile: &Profile, focus: usize) {
                 v.put(
                     name,
                     Role::Caption,
-                    Slot::right(right, right - left, caption),
+                    v.lead(span, Slot::right(right, right - left, caption)),
                     DIM,
                 );
             }
@@ -632,26 +650,29 @@ pub(super) fn settings(v: &Scene, ui: &Ui, profile: &Profile, focus: usize) {
     // The help line shows how to change the focused row.
     let top = y - gap + S16;
     let mid = top + help_line / 2.0;
-    let x = r.x + PAD;
-    let mut text = x;
+    let span = (r.x + PAD, w - 2.0 * PAD);
+    // The pair of glyphs keeps its order, left then right, and leads the
+    // line from the language's side.
+    let pair = chips::width(v, Prompt::Left, small) + S8 + chips::width(v, Prompt::Right, small);
+    let mut at = v.mirror(span, span.0, pair);
     for prompt in [Prompt::Left, Prompt::Right] {
-        text += chips::chip(v, prompt, (text, mid), small, Lit::Neutral) + S8;
+        at += chips::chip(v, prompt, (at, mid), small, Lit::Neutral) + S8;
     }
     let verb = settings::ROWS[focus.min(rows.len() - 1)].verb();
-    let text = text - S8 + S12;
+    let text = span.0 + pair + S12;
     let baseline = v.snap(mid + v.cap(Role::Caption) / 2.0);
     v.say(
         verb,
         &[],
         Role::Caption,
-        Slot::left(text, r.x + w - PAD - text, baseline),
+        v.lead(span, Slot::left(text, span.0 + span.1 - text, baseline)),
         DIM,
     );
     v.set_motion(1.0, 0.0);
 }
 
 /// A switch: cyan glass with the pearl knob at the right when on, dark
-/// with the knob at the left when off.
+/// with the knob at the left when off; mirrored in Arabic.
 fn toggle(v: &Scene, r: Rect, on: bool) {
     let r = v.snap_rect(r);
     let rim = v.thick(1.5);
@@ -674,6 +695,8 @@ fn toggle(v: &Scene, r: Rect, on: bool) {
     } else {
         r.x + 2.0 + knob
     };
+    // On is the end a line reads towards: the left in Arabic.
+    let cx = v.mirror((r.x, r.w), cx - knob, 2.0 * knob) + knob;
     v.pearl(
         V2::new(cx, r.y + r.h / 2.0),
         knob,

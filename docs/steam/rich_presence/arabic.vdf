@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"arabic"
+	"Tokens"
+	{
+		"#Menus"	"في القوائم"
+		"#Journey"	"القطاع %sector% · {#Sector_%name%}"
+		"#Practice"	"يتدرب في القطاع %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"الضوء الأول"
+		"#Sector_satellites"	"أقمار صناعية"
+		"#Sector_slipstream"	"انسياب"
+		"#Sector_resonance"	"رنين"
+		"#Sector_prism"	"منشور"
+		"#Sector_crossfade"	"تداخل"
+		"#Sector_undertow"	"التيار الساحب"
+		"#Sector_moonrise"	"طلوع القمر"
+		"#Sector_afterglow"	"وهج الغروب"
+		"#Sector_parallax"	"اختلاف المنظر"
+		"#Sector_supernova"	"مستعر أعظم"
+		"#Sector_homecoming"	"العودة"
+	}
+}

@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"hungarian"
+	"Tokens"
+	{
+		"#Menus"	"A menükben"
+		"#Journey"	"%sector%. szektor · {#Sector_%name%}"
+		"#Practice"	"Gyakorol: %sector%. szektor · {#Sector_%name%}"
+		"#Sector_first_light"	"Első fény"
+		"#Sector_satellites"	"Műholdak"
+		"#Sector_slipstream"	"Szélárnyék"
+		"#Sector_resonance"	"Rezonancia"
+		"#Sector_prism"	"Prizma"
+		"#Sector_crossfade"	"Áttűnés"
+		"#Sector_undertow"	"Örvény"
+		"#Sector_moonrise"	"Holdkelte"
+		"#Sector_afterglow"	"Utófény"
+		"#Sector_parallax"	"Parallaxis"
+		"#Sector_supernova"	"Szupernóva"
+		"#Sector_homecoming"	"Hazatérés"
+	}
+}

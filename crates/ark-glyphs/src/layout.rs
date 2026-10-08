@@ -1,18 +1,24 @@
 //! Places glyphs along a line. The pen moves in fractional pixels: advances,
 //! kerning and tracking accumulate unrounded, and only each glyph's final
 //! position is rounded, so measuring and drawing agree to the pixel.
+//!
+//! Thai consonants and their marks are placed as one baked cluster. Arabic
+//! is shaped into contextual letter forms and laid out right to left
+//! ([`crate::script`]); `x` always grows left to right on screen.
 use crate::{
     data::{Face, Font},
+    script,
     spec::{self, Weight},
 };
 use ark_text::Script;
 
 /// The faces a locale draws with: Noto Sans for everything, and the
-/// locale's Noto Sans CJK subset for its CJK characters.
+/// locale's own script font (Noto Sans CJK, Thai or Arabic UI) for the
+/// characters of that script.
 #[derive(Clone, Copy, Debug)]
 pub struct Fonts {
     pub latin: Font,
-    pub cjk: Option<Font>,
+    pub local: Option<Font>,
     pub script: Script,
 }
 
@@ -20,8 +26,17 @@ pub struct Fonts {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Source {
     Latin,
-    Cjk,
+    /// The locale's own script font.
+    Local,
 }
+
+/// The longest line, in characters, that Arabic layout reorders; longer
+/// text lays out its first part and marks the rest missing, so the layout
+/// tests fail on it instead of it vanishing.
+const RTL_LINE: usize = 192;
+
+/// U+200B ZERO WIDTH SPACE: where a Thai line may break. It takes no room.
+const BREAK: char = '\u{200B}';
 
 /// How wide a capsule icon is, in em: the in-game capsule's 3:2 pill at
 /// the text's size. Its advance is exactly this; the spaces around it in
@@ -41,20 +56,55 @@ pub struct Placed {
 }
 
 impl Fonts {
-    /// The face for `c`: CJK characters from the CJK font when there is one.
+    /// The face for `c`: the locale's own script from its font when there
+    /// is one, everything else from Noto Sans.
     pub fn face(&self, c: char, weight: Weight) -> (Source, Option<&Face>) {
-        match &self.cjk {
-            Some(cjk) if spec::is_cjk(c) => (Source::Cjk, cjk.face(weight)),
+        match &self.local {
+            Some(local) if spec::is_local(c) => (Source::Local, local.face(weight)),
             _ => (Source::Latin, self.latin.face(weight)),
         }
     }
 
-    /// Letter spacing in pixels at `ppem`. Ideographic text is never tracked.
+    /// Letter spacing in pixels at `ppem`. Only alphabetic and Hangul text
+    /// is tracked: spacing would break Arabic joins, Thai clusters, and the
+    /// even grid of Chinese and Japanese.
     pub fn tracking(&self, em: f32, ppem: u8) -> f32 {
-        if self.script == Script::Ideographic {
-            0.0
-        } else {
-            em * f32::from(ppem)
+        match self.script {
+            Script::Alphabetic | Script::Hangul => em * f32::from(ppem),
+            Script::Ideographic | Script::Thai | Script::Arabic => 0.0,
+        }
+    }
+
+    /// Calls `unit` with each cluster of `text` in visual order: Arabic
+    /// shaped and reordered, Thai marks kept with their consonant.
+    fn units(&self, text: &str, mut unit: impl FnMut(&[char])) {
+        // A line with no Arabic letter (a score, a time, `+2,000`) has
+        // nothing to run right to left, so it keeps its own order.
+        if self.script != Script::Arabic || !text.chars().any(script::is_rtl) {
+            script::thai_clusters(text, |c| {
+                if c != [BREAK] {
+                    unit(c);
+                }
+            });
+            return;
+        }
+        let mut logical = ['\0'; RTL_LINE];
+        let mut n = 0;
+        let mut overflow = false;
+        script::arabic_forms(text, |c| match logical.get_mut(n) {
+            Some(slot) => {
+                *slot = c;
+                n += 1;
+            }
+            None => overflow = true,
+        });
+        let mut visual = ['\0'; RTL_LINE];
+        script::visual(&logical[..n], &mut visual[..n]);
+        for c in &visual[..n] {
+            unit(core::slice::from_ref(c));
+        }
+        if overflow {
+            unit(&['\u{FFFD}']);
         }
     }
 
@@ -71,7 +121,8 @@ impl Fonts {
         let mut pen = 0.0;
         let mut previous: Option<(Source, u16)> = None;
         let mut first = true;
-        for c in text.chars() {
+        self.units(text, |unit| {
+            let c = unit[0];
             if ark_text::icon_power(c).is_some() {
                 if !first {
                     pen += tracking;
@@ -85,10 +136,10 @@ impl Fonts {
                 });
                 pen += ICON_EM * f32::from(ppem);
                 previous = None;
-                continue;
+                return;
             }
             let (source, face) = self.face(c, weight);
-            let Some((face, glyph)) = face.and_then(|f| Some((f, f.glyph(c)?))) else {
+            let Some((face, glyph)) = face.and_then(|f| Some((f, f.cluster(unit)?))) else {
                 place(Placed {
                     source,
                     glyph: None,
@@ -96,7 +147,7 @@ impl Fonts {
                     x: pen,
                 });
                 previous = None;
-                continue;
+                return;
             };
             let scale = f32::from(ppem) / f32::from(face.units_per_em);
             if let Some((prior, left)) = previous
@@ -116,7 +167,7 @@ impl Fonts {
             });
             pen += f32::from(face.advance(glyph)) * scale;
             previous = Some((source, glyph));
-        }
+        });
         pen
     }
 
@@ -126,9 +177,10 @@ impl Fonts {
     }
 
     /// Splits `text` into lines no wider than `max` pixels, calling `line`
-    /// for each. Breaks at spaces, and between CJK characters except before
-    /// closing punctuation or after opening punctuation. A word wider than
-    /// `max` gets a line of its own. Returns the number of lines.
+    /// for each. Breaks at spaces and at Thai break marks, and between
+    /// Chinese or Japanese characters except before closing punctuation or
+    /// after opening punctuation. A word wider than `max` gets a line of its
+    /// own. Returns the number of lines.
     pub fn wrap<'t>(
         &self,
         text: &'t str,
@@ -178,5 +230,7 @@ fn breaks_between(a: char, b: char, ideographic: bool) -> bool {
     if NO_START.contains(b) || NO_END.contains(a) {
         return false;
     }
-    a == ' ' || (ideographic && ((spec::is_cjk(a) && b != ' ') || (spec::is_cjk(b) && a != ' ')))
+    a == ' '
+        || a == BREAK
+        || (ideographic && ((spec::is_cjk(a) && b != ' ') || (spec::is_cjk(b) && a != ' ')))
 }

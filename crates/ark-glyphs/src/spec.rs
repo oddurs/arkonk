@@ -4,8 +4,8 @@
 use ark_text::Role;
 
 /// The cuts in use: Noto Sans Regular and Medium, and Noto Sans Display
-/// Medium for headings. CJK has no Display cut, so its Display face is
-/// baked from Noto Sans CJK Medium.
+/// Medium for headings. Only Latin, Greek and Cyrillic have a Display cut;
+/// the CJK, Thai and Arabic Display faces are baked from their own Medium.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Weight {
     Regular,
@@ -195,6 +195,12 @@ pub fn ppem_px(role: Role, px: f32) -> u8 {
 pub fn step_down(role: Role, ppem: u8) -> Option<u8> {
     let floor = nearest(floor(role));
     rungs(role).filter(|&r| r < ppem && r >= floor).max()
+}
+
+/// Characters drawn from a locale's own script font (CJK, Thai or
+/// Arabic) rather than Noto Sans.
+pub const fn is_local(c: char) -> bool {
+    is_cjk(c) || matches!(c as u32, 0x0E00..=0x0E7F) || crate::script::is_rtl(c)
 }
 
 /// Characters drawn from the CJK faces; everything else comes from Noto Sans.

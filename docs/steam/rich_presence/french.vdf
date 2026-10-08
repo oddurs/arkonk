@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"french"
+	"Tokens"
+	{
+		"#Menus"	"Dans les menus"
+		"#Journey"	"Secteur %sector% · {#Sector_%name%}"
+		"#Practice"	"Entraînement, secteur %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Première lueur"
+		"#Sector_satellites"	"Satellites"
+		"#Sector_slipstream"	"Sillage"
+		"#Sector_resonance"	"Résonance"
+		"#Sector_prism"	"Prisme"
+		"#Sector_crossfade"	"Fondu enchaîné"
+		"#Sector_undertow"	"Contre-courant"
+		"#Sector_moonrise"	"Lever de lune"
+		"#Sector_afterglow"	"Rémanence"
+		"#Sector_parallax"	"Parallaxe"
+		"#Sector_supernova"	"Supernova"
+		"#Sector_homecoming"	"Retour"
+	}
+}

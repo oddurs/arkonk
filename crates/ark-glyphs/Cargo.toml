@@ -9,8 +9,8 @@ repository.workspace = true
 publish = false
 
 [features]
-# Chinese, Japanese and Korean atlases: about 640 KB of the binary.
-cjk = []
+# The Chinese, Japanese, Korean, Thai and Arabic atlases.
+scripts = []
 
 [dependencies]
 ark-text = { path = "../ark-text" }

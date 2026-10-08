@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"swedish"
+	"Tokens"
+	{
+		"#Menus"	"I menyerna"
+		"#Journey"	"Sektor %sector% · {#Sector_%name%}"
+		"#Practice"	"Tränar sektor %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Första ljuset"
+		"#Sector_satellites"	"Satelliter"
+		"#Sector_slipstream"	"Slipström"
+		"#Sector_resonance"	"Resonans"
+		"#Sector_prism"	"Prisma"
+		"#Sector_crossfade"	"Övertoning"
+		"#Sector_undertow"	"Underström"
+		"#Sector_moonrise"	"Månuppgång"
+		"#Sector_afterglow"	"Efterglöd"
+		"#Sector_parallax"	"Parallax"
+		"#Sector_supernova"	"Supernova"
+		"#Sector_homecoming"	"Hemkomst"
+	}
+}

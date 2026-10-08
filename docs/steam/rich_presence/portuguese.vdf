@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"portuguese"
+	"Tokens"
+	{
+		"#Menus"	"Nos menus"
+		"#Journey"	"Setor %sector% · {#Sector_%name%}"
+		"#Practice"	"A treinar o setor %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Primeira luz"
+		"#Sector_satellites"	"Satélites"
+		"#Sector_slipstream"	"Esteira"
+		"#Sector_resonance"	"Ressonância"
+		"#Sector_prism"	"Prisma"
+		"#Sector_crossfade"	"Transição"
+		"#Sector_undertow"	"Ressaca"
+		"#Sector_moonrise"	"Nascer da lua"
+		"#Sector_afterglow"	"Arrebol"
+		"#Sector_parallax"	"Paralaxe"
+		"#Sector_supernova"	"Supernova"
+		"#Sector_homecoming"	"Regresso"
+	}
+}

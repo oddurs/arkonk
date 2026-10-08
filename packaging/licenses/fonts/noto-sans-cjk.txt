@@ -1,4 +1,4 @@
-Noto Sans CJK 2.004 (Simplified Chinese, Japanese and Korean subsets)
+Noto Sans CJK 2.004 (Simplified Chinese, Traditional Chinese, Japanese and Korean subsets)
 https://github.com/notofonts/noto-cjk
 © 2014-2021 Adobe (http://www.adobe.com/).
 

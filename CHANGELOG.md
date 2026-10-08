@@ -25,9 +25,10 @@ GitHub Release notes, so each `## [x.y.z]` heading must exist before tagging.
   executable with an icon and version resource and no console window, and a
   Linux build against the Steam Runtime.
 - `arkonk --version`.
-- Twelve languages: English plus draft French, German, Spanish (Spain and
-  Latin America), Brazilian Portuguese, Italian, Polish, Russian, Simplified
-  Chinese, Japanese and Korean, chosen from Steam, the system, a saved
-  setting or `--locale`, and a `pseudo` test locale.
-- Noto Sans and Noto Sans CJK UI type, pre-rendered with hinting and kerning
-  at the sizes each display needs, with tabular figures.
+- Every language Steam offers: English plus drafts of the other 29,
+  including Arabic (right to left), Thai, and Simplified and Traditional
+  Chinese, chosen from Steam, the system, a saved setting or `--locale`, and
+  a `pseudo` test locale. Steam rich presence is localized too.
+- Noto Sans, Noto Sans CJK, Noto Sans Thai and Noto Sans Arabic UI type,
+  pre-rendered with hinting and kerning at the sizes each display needs, with
+  tabular figures.

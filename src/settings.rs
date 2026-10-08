@@ -232,21 +232,23 @@ mod tests {
     fn languages_cycle_from_system_through_what_can_be_drawn() {
         let mut s = Settings::default();
         assert_eq!(Row::Language.value(&s), Value::Text(TextId::LanguageSystem));
-        let latin = |l: Locale| !matches!(l, Locale::ZhHans | Locale::Ja | Locale::Ko);
+        // A build without the `scripts` atlases: Latin, Greek and Cyrillic.
+        let latin = |l: Locale| l.script() == ark_text::Script::Alphabetic;
         let mut seen = Vec::new();
-        for _ in 0..12 {
+        for _ in 0..28 {
             Row::Language.step(&mut s, true, latin);
             seen.push(s.locale);
         }
-        // Nine drawable languages, then back to System.
+        // Twenty-four drawable languages, then back to System.
         assert_eq!(seen[0], Some(Locale::En));
-        assert_eq!(seen[9], None);
+        assert_eq!(seen[24], None);
         assert!(!seen.contains(&Some(Locale::Pseudo)));
         assert!(!seen.contains(&Some(Locale::Ja)));
+        assert!(!seen.contains(&Some(Locale::Ar)));
         // Back from System wraps to the last language.
         s.locale = None;
         Row::Language.step(&mut s, false, latin);
-        assert_eq!(s.locale, Some(Locale::Ru));
+        assert_eq!(s.locale, Some(Locale::Vi));
     }
 
     #[test]

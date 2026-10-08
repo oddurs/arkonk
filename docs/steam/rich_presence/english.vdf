@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"english"
+	"Tokens"
+	{
+		"#Menus"	"In menus"
+		"#Journey"	"Sector %sector% · {#Sector_%name%}"
+		"#Practice"	"Practicing sector %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"First Light"
+		"#Sector_satellites"	"Satellites"
+		"#Sector_slipstream"	"Slipstream"
+		"#Sector_resonance"	"Resonance"
+		"#Sector_prism"	"Prism"
+		"#Sector_crossfade"	"Crossfade"
+		"#Sector_undertow"	"Undertow"
+		"#Sector_moonrise"	"Moonrise"
+		"#Sector_afterglow"	"Afterglow"
+		"#Sector_parallax"	"Parallax"
+		"#Sector_supernova"	"Supernova"
+		"#Sector_homecoming"	"Homecoming"
+	}
+}

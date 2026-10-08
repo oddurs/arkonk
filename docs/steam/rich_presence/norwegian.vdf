@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"norwegian"
+	"Tokens"
+	{
+		"#Menus"	"I menyene"
+		"#Journey"	"Sektor %sector% · {#Sector_%name%}"
+		"#Practice"	"Trener sektor %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Første lys"
+		"#Sector_satellites"	"Satellitter"
+		"#Sector_slipstream"	"Slipstrøm"
+		"#Sector_resonance"	"Resonans"
+		"#Sector_prism"	"Prisme"
+		"#Sector_crossfade"	"Overtoning"
+		"#Sector_undertow"	"Understrøm"
+		"#Sector_moonrise"	"Måneoppgang"
+		"#Sector_afterglow"	"Etterglød"
+		"#Sector_parallax"	"Parallakse"
+		"#Sector_supernova"	"Supernova"
+		"#Sector_homecoming"	"Hjemkomst"
+	}
+}

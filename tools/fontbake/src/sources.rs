@@ -2,12 +2,15 @@
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fs, path::Path, process::Command};
 
-/// Noto Sans 2.015, hinted TrueType, from the notofonts build repository.
-macro_rules! noto_sans {
-    ($file:literal) => {
+/// A hinted TrueType from the notofonts build repository, pinned to one
+/// commit: Noto Sans 2.015, Noto Sans Thai and Noto Sans Arabic UI.
+macro_rules! noto_hinted {
+    ($family:literal, $file:literal) => {
         concat!(
             "https://raw.githubusercontent.com/notofonts/notofonts.github.io/",
-            "b966e2e80feb783346a7d3b7c14c8d6e7e1a757b/fonts/NotoSans/hinted/ttf/",
+            "b966e2e80feb783346a7d3b7c14c8d6e7e1a757b/fonts/",
+            $family,
+            "/hinted/ttf/",
             $file
         )
     };
@@ -36,18 +39,42 @@ macro_rules! noto_cjk {
 }
 
 /// Download URL and SHA-256 of every font the atlases come from.
-pub const FONTS: [(&str, &str); 9] = [
+pub const FONTS: [(&str, &str); 15] = [
     (
-        noto_sans!("NotoSans-Regular.ttf"),
+        noto_hinted!("NotoSans", "NotoSans-Regular.ttf"),
         "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823",
     ),
     (
-        noto_sans!("NotoSans-Medium.ttf"),
+        noto_hinted!("NotoSans", "NotoSans-Medium.ttf"),
         "635d93d1131d791f2576de90b3bb0f7cdf61929906e8420a61b5f7f8e76420bb",
     ),
     (
         noto_display!("NotoSansDisplay-Medium.ttf"),
         "96775693878d9436e30b6a9b355bb38b49cdd42b964c98f297706043e4b9f4f5",
+    ),
+    (
+        noto_hinted!("NotoSansThai", "NotoSansThai-Regular.ttf"),
+        "61cf814eec46b294d6ea4401ac295d0cecd5207bd2331dcc5a15e7301d30ee44",
+    ),
+    (
+        noto_hinted!("NotoSansThai", "NotoSansThai-Medium.ttf"),
+        "11bc8f6cf3523241995f07225fcc7d8e25eb55064fbfa39281a5e44dcd59f5f5",
+    ),
+    (
+        noto_hinted!("NotoSansArabicUI", "NotoSansArabicUI-Regular.ttf"),
+        "c56275c744ded6ff6df13de04963e6174632f0405a54a83f44d0fe5395f45ae6",
+    ),
+    (
+        noto_hinted!("NotoSansArabicUI", "NotoSansArabicUI-Medium.ttf"),
+        "d8f4ed3443a3822687edd7e7fb73dcc31f594720c69805217ec8f3ceb0ba1e1a",
+    ),
+    (
+        noto_cjk!("TC/NotoSansTC-Regular.otf"),
+        "5bab0cb3c1cf89dde07c4a95a4054b195afbcfe784d69d75c340780712237537",
+    ),
+    (
+        noto_cjk!("TC/NotoSansTC-Medium.otf"),
+        "bf206dca0975779bac71cb49a037a364156ca98a0c431b1b7d6b29fb8952ac7e",
     ),
     (
         noto_cjk!("SC/NotoSansSC-Regular.otf"),

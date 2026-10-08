@@ -5,16 +5,18 @@ ARKONK's text lives in two `no_std` crates that every port can share:
 - **`crates/ark-text`**: the shipped `Locale`s, a typed `TextId` for every visible
   string, one table per language, and formatting (argument order, digit
   grouping, capsule icons, the pseudo locale). It holds no font data.
-- **`crates/ark-glyphs`**: Noto Sans and Noto Sans CJK, pre-rasterized into
-  hinted strikes at fixed pixel sizes, with advances and GPOS pair kerning,
-  plus the line layout (measure, place, wrap) that the game draws with.
+- **`crates/ark-glyphs`**: Noto Sans, Noto Sans CJK, Noto Sans Thai and Noto
+  Sans Arabic UI, pre-rasterized into hinted strikes at fixed pixel sizes,
+  with advances and GPOS pair kerning, plus the line layout (measure, place,
+  wrap, right-to-left order) that the game draws with.
 
 `ark` itself knows sectors, chapters and powers only by id and slug.
 
 ## Languages
 
-English is the source. Every other table is a **draft that needs native
-review**; none has been checked by a native speaker yet.
+ARKONK ships every language Steam offers. English is the source. Every other
+table is a **draft that needs native review**; none has been checked by a
+native speaker yet.
 
 | Locale | Tag | Steam language | Status |
 | --- | --- | --- | --- |
@@ -23,17 +25,32 @@ review**; none has been checked by a native speaker yet.
 | German | `de` | german | Draft, needs native review |
 | Spanish (Spain) | `es-ES` | spanish | Draft, needs native review |
 | Spanish (Latin America) | `es-419` | latam | Draft, needs native review. Inherits `es-ES` except a few words (Mouse, Enter, pad direccional). |
-| Portuguese (Brazil) | `pt-BR` | brazilian | Draft, needs native review. Also chosen for other Portuguese. |
+| Portuguese (Brazil) | `pt-BR` | brazilian | Draft, needs native review. Chosen for plain `pt`. |
+| Portuguese (Portugal) | `pt-PT` | portuguese | Draft, needs native review. Also chosen for Portuguese-speaking Africa, Macau and Timor-Leste. |
 | Italian | `it` | italian | Draft, needs native review |
 | Polish | `pl` | polish | Draft, needs native review |
 | Russian | `ru` | russian | Draft, needs native review |
+| Ukrainian | `uk` | ukrainian | Draft, needs native review |
+| Bulgarian | `bg` | bulgarian | Draft, needs native review |
+| Czech | `cs` | czech | Draft, needs native review |
+| Hungarian | `hu` | hungarian | Draft, needs native review |
+| Romanian | `ro` | romanian | Draft, needs native review |
+| Greek | `el` | greek | Draft, needs native review |
+| Turkish | `tr` | turkish | Draft, needs native review |
+| Dutch | `nl` | dutch | Draft, needs native review |
+| Danish | `da` | danish | Draft, needs native review |
+| Swedish | `sv` | swedish | Draft, needs native review |
+| Norwegian (Bokmål) | `nb` | norwegian | Draft, needs native review. Also chosen for `no` and `nn`. |
+| Finnish | `fi` | finnish | Draft, needs native review |
+| Indonesian | `id` | indonesian | Draft, needs native review |
+| Vietnamese | `vi` | vietnamese | Draft, needs native review |
+| Thai | `th` | thai | Draft, needs native review. Line breaks marked in the table (see below). |
+| Arabic | `ar` | arabic | Draft, needs native review. Right to left; see below. |
 | Chinese (Simplified) | `zh-Hans` | schinese | Draft, needs native review |
+| Chinese (Traditional) | `zh-Hant` | tchinese | Draft, needs native review. Taiwan's vocabulary; chosen for `zh-TW`, `zh-HK`, `zh-MO` and `zh-Hant`. |
 | Japanese | `ja` | japanese | Draft, needs native review |
 | Korean | `ko` | koreana | Draft, needs native review |
 | Pseudo | `en-XA` | – | Test only: accented, bracketed, about 40 % longer |
-
-Traditional Chinese is not shipped; `zh-TW`, `zh-HK` and `zh-Hant` fall back
-to the next preference, then English.
 
 ### Which language plays
 
@@ -45,7 +62,8 @@ to the next preference, then English.
 4. The operating system's preferred languages, in order (`sys-locale`).
 5. English.
 
-A language this build cannot draw (CJK without the `cjk` feature) is skipped.
+A language this build cannot draw (Chinese, Japanese, Korean, Thai or Arabic
+without the `scripts` feature) is skipped.
 `logs/arkonk.log` records the choice and where it came from.
 
 For a language picker: `Locale::ALL` minus `Locale::Pseudo`,
@@ -80,10 +98,13 @@ fixed-length arrays for the same reason. `es-419` deliberately falls back to
   already upper case (it would catch an ß, which upper-cases to SS).
 - **No plurals.** Counts appear as label–value pairs (`MEDALS 7`), never
   inside a sentence, so no language needs plural forms.
-- **Numbers.** `Arg::Count` groups digits the locale's way: `12,500`,
-  `12.500`, `12 500` (French narrow no-break space), `12 500` (Russian, Polish
-  no-break space); Spanish and Polish leave four-digit numbers ungrouped (CLDR
-  minimum grouping digits of 2). Times are `mm:ss` everywhere.
+- **Numbers.** `Arg::Count` groups digits the locale's way, from CLDR:
+  `12,500`, `12.500`, `12 500` (French narrow no-break space), `12 500`
+  (no-break space in the Slavic and Nordic languages, Hungarian and
+  Portuguese). Where CLDR's minimum grouping digits is 2 (Spanish, Italian,
+  Polish, Bulgarian, Hungarian, European Portuguese) four-digit numbers stay
+  ungrouped. Arabic uses Latin digits, CLDR's default for `ar`. Times are
+  `mm:ss` everywhere.
 - **Short forms.** `short` in a table gives a narrower wording, used only
   when the full one does not fit (for example `Continue journey` → `Continue`).
   Every action, everything the band shows, the help lines, the settings and
@@ -94,11 +115,39 @@ fixed-length arrays for the same reason. `es-419` deliberately falls back to
   sector number and keeps the name); it never adds one.
 - **Quoted strings.** A slot filled with another string (`Arg::Text`) sets
   that string in the quoting string's role. Sector names are quoted in a
-  caption, so `TextId::quoted_as` tells the baker to bake them at caption
-  sizes too; a new quotation in a new role needs an entry there.
-- **Precomposed text only.** Strings must be NFC with no combining marks: the
-  atlases hold whole glyphs and do no mark positioning. The baker refuses
-  anything else.
+  caption, so `TextId::also` tells the baker to bake them at caption sizes
+  too; a new quotation in a new role needs an entry there.
+- **Precomposed text only.** Strings must be NFC with no combining marks:
+  the atlases hold whole glyphs and do no mark positioning. Vietnamese has a
+  precomposed form for every letter it uses. The baker refuses anything else,
+  except Thai vowel and tone marks (next).
+- **Thai.** A consonant and its vowel and tone marks are baked together as one
+  glyph, positioned by the font's own shaping, so marks stack correctly
+  (ที่). Thai writes no spaces between words, so each table marks where a
+  line may break with U+200B ZERO WIDTH SPACE; it takes no room. A test
+  requires one in any Thai string long enough to wrap, and rejects it in
+  every other language.
+- **Arabic.** Letters join, so each one is baked in the contextual form it
+  takes (isolated, initial, medial, final, and the lam-alef ligature),
+  shaped by the font in context; `ark_glyphs::script` picks the form at run
+  time. Lines run right to left with Latin words and numbers kept left to
+  right inside them. No short vowels or shadda: they are combining marks
+  the atlas cannot place.
+- **Mirroring.** In Arabic, sheets, action rows, sector cards and help
+  lines mirror: titles, labels and help end at the right, the confirm
+  glyph sits at a button's left, the back glyph at the left of a sheet's
+  title, settings values at a row's left (a switch is on with its knob at
+  the left, a volume level fills from the right), results columns and
+  medals read from the right, and a prompt's glyph leads from the right.
+  Two things keep their places, on purpose. The band stays score · sector ·
+  lives in every language: it is an instrument, read at a glance during
+  play, and one layout means a player switching languages, or watching a
+  stream in another one, finds the score where it always is. The sector
+  grid keeps its chapters left to right, because the arrows move across it
+  in that direction; a bricks miniature is a map of the field and never
+  flips.
+- **No tracking** for Chinese, Japanese, Thai or Arabic: spacing would break
+  the joins, the clusters or the even character grid.
 
 ### Native review checklist
 
@@ -125,9 +174,10 @@ For each language, a native speaker who plays games should check:
    native name, script, Steam API name, and digit grouping from CLDR.
 2. Copy `tables/en.rs` to `tables/<lang>.rs`, translate it, and route it in
    `tables/mod.rs`.
-3. If it needs a script the atlases lack (Arabic, Thai, Devanagari …), add
-   a font and a group in `tools/fontbake`; right-to-left text and complex
-   shaping also need layout work in `ark-glyphs` first.
+3. If it needs a script the atlases lack (Devanagari, Hebrew …), add a font
+   and a group in `tools/fontbake`. Scripts whose letters change shape or
+   reorder beyond what Thai clusters and Arabic forms cover need layout work
+   in `ark-glyphs` first.
 4. Rebake the atlases (below) and run `scripts/task check`. The layout test
    fails, naming the string, if anything is wider than its place; shorten it
    or add a `short` form.
@@ -135,23 +185,26 @@ For each language, a native speaker who plays games should check:
 
 ## Type
 
-The UI is set in **Noto Sans** (Regular and Medium) and **Noto Sans CJK**
-(SC, JP and KR subsets, Regular and Medium), both SIL Open Font License 1.1.
-The 5×7 pixel font draws the ARKONK logo and the app icons, and sets the
-text of the Compact layout, for frames under 400 px wide.
+The UI is set in **Noto Sans** (Latin, Greek and Cyrillic), **Noto Sans
+CJK** (SC, TC, JP and KR subsets), **Noto Sans Thai** and **Noto Sans
+Arabic UI**, each in Regular and Medium, all SIL Open Font License 1.1. The
+Arabic UI cut keeps Arabic within the line height Latin text uses.
+Headings are set in **Noto Sans Display** Medium; scripts it lacks take
+their own font's Medium cut. The 5×7 pixel font draws the ARKONK logo and
+the app icons, and sets the text of the Compact layout, for frames under
+400 px wide.
 
-| Role | Size (scene units) | Weight | Use |
+| Role | Size (scene units) | Cut | Use |
 | --- | ---: | --- | --- |
-| Label | 15 | Regular, tracked +0.06 em | Small capitals that name a value: `SCORE`, `LIVES`, medals, chapters, eyebrows |
-| Caption | 16 | Regular | Control hints, settings keys, footnotes, the Continue button's second line, the save warning |
-| Body | 20 | Regular | Buttons, tips, sector names, values, gameplay prompts |
-| Display | 32 | Medium | Screen titles, the score, the sector being served |
+| Display | 40 | Display Medium | The one hero line on a screen: the sector being served |
+| Title | 26 | Display Medium | Sheet titles and screen headers |
+| Figure | 32 | Medium, tabular | Scores and results |
+| Body | 20 | Regular; Medium when primary or focused | Actions, names, tips |
+| Caption | 16 | Regular | Help lines, notes, settings values, the save warning |
+| Label | 15 | Medium, tracked +0.10 em | Small capitals that name a value: `MEDALS`, `BEST`, medals, chapters, eyebrows |
 
-Hints and footnotes are captions so the screen's actions and content lead
-and the reminders recede; gameplay prompts ("Click or space to serve")
-stay body text because they are the one thing to do next. A footnote sits
-under the action it qualifies: "Practice runs never change your journey"
-under Play, "Retry restarts from the checkpoint" under the pause menu.
+Sizes, cuts and tracking come from `crates/ark-glyphs/src/spec.rs`. Chinese,
+Japanese, Thai and Arabic are never tracked.
 
 Figures are tabular (`tnum`) everywhere, so scores and timers never shift as
 they change. Kerning is the fonts' GPOS pair kerning, extracted with a real
@@ -161,20 +214,23 @@ values. The pen moves in fractional pixels and each glyph is rounded once.
 ### Pixel sizes
 
 The scene is 960 × 900 units scaled to the window. A style's physical size is
-snapped to a **ladder** of pixel sizes (10–64 px) and glyphs are drawn 1:1,
+snapped to a **ladder** of pixel sizes (10–96 px) and glyphs are drawn 1:1,
 never scaled. Only the sizes the checked displays need are baked:
 
-| Display | Density | Label | Caption | Body | Display |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 720p (1280 × 720) | 0.80 | 12 | 13 | 16 | 26 |
-| Steam Deck 1280 × 800 | 0.89 | 13 | 14 | 18 | 28 |
-| 960 × 900 window at 100 % | 1.00 | 15 | 16 | 20 | 32 |
-| 1080p | 1.20 | 18 | 20 | 24 | 40 |
-| 1440p | 1.60 | 24 | 26 | 32 | 48 |
-| Retina window at 200 % | 2.00 | 30 | 32 | 40 | 64 |
-| 4K | 2.40 | 36 | 40 | 48 | 64 |
+| Display | Density | Label | Caption | Body | Figure | Title | Display |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Small, at its 400 px floor | 0.42 | 10 | 11 | 12 | 14 | 14 | 17 |
+| Smallest desktop window (480 × 450) | 0.50 | 10 | 11 | 12 | 16 | 14 | 20 |
+| Small | 0.60 | 10 | 11 | 12 | 20 | 16 | 24 |
+| Small | 0.75 | 11 | 12 | 15 | 24 | 20 | 30 |
+| 720p (1280 × 720) | 0.80 | 12 | 13 | 16 | 26 | 20 | 32 |
+| Steam Deck 1280 × 800 | 0.89 | 13 | 14 | 18 | 28 | 24 | 36 |
+| 960 × 900 window at 100 % | 1.00 | 15 | 16 | 20 | 32 | 26 | 40 |
+| 1080p | 1.20 | 18 | 20 | 24 | 40 | 32 | 48 |
+| 1440p | 1.60 | 24 | 26 | 32 | 48 | 40 | 64 |
+| Retina window at 200 % | 2.00 | 30 | 32 | 40 | 64 | 56 | 80 |
+| 4K | 2.40 | 36 | 40 | 48 | 80 | 64 | 96 |
 
-Small frames (400 to 719 px wide) add densities 0.42, 0.5, 0.6 and 0.75.
 Between the checked densities a style takes the nearest ladder size, or the
 largest baked size below it. Above 2.4 text stays at the 4K sizes.
 
@@ -185,7 +241,9 @@ The fit chain may step a role down one baked size, never below its floor.
 
 On a Compact frame (under 400 px) text the 5×7 font can spell is set in it
 at whole pixels, headings doubled; a string with letters it lacks (accents,
-Cyrillic, CJK) is set in Noto at its floor, whole paragraphs at once.
+Greek, Cyrillic, CJK, Thai, Arabic) is set in Noto at its floor, whole
+paragraphs at once, so every script draws in its own font and none falls
+back to missing glyphs. Compact pages mirror in Arabic as sheets do.
 
 **Steam Deck legibility.** Valve asks for text at least 9 px tall at 1280 × 800.
 The smallest text is a label at 13 px, whose capitals are 9.3 px tall;
@@ -230,67 +288,45 @@ update `packaging/licenses/fonts/`. Those license texts are appended to
 
 ### Size
 
-macOS arm64 release binary, symbols kept:
+macOS arm64 release binary, symbols kept, measured side by side:
 
-| Build | Bytes | Change |
-| --- | ---: | ---: |
-| Before (`main`, 5×7 font only) | 2,013,088 | |
-| Without CJK (`--no-default-features`) | 2,335,216 | +322,128 |
-| With CJK (default) | 3,144,672 | +1,131,584 |
+| Build | Bytes |
+| --- | ---: |
+| Twelve languages (`main` before this change, `cjk` on) | 3,977,840 |
+| All thirty languages (default, `scripts` on) | 5,333,376 |
+| All thirty languages without `scripts` (Latin, Greek, Cyrillic only) | 2,971,648 |
 
-| Atlas file | Holds | Bytes |
-| --- | --- | ---: |
-| `latin.bin` | Latin, Cyrillic, figures, in the Regular, Medium and Display cuts | 363,750 |
-| `zh.bin` | Simplified Chinese glyphs | 537,712 |
-| `ja.bin` | Japanese glyphs | 498,762 |
-| `ko.bin` | Korean glyphs | 335,605 |
+| Atlas file | Holds | Twelve languages | Thirty |
+| --- | --- | ---: | ---: |
+| `latin.bin` | Latin, Greek, Cyrillic, Vietnamese, figures, in the Regular, Medium and Display cuts | 363,750 | 622,864 |
+| `zh.bin` | Simplified Chinese | 537,712 | 538,238 |
+| `tw.bin` | Traditional Chinese | – | 578,329 |
+| `ja.bin` | Japanese | 498,762 | 498,765 |
+| `ko.bin` | Korean | 335,605 | 335,608 |
+| `th.bin` | Thai clusters | – | 174,535 |
+| `ar.bin` | Arabic letter forms | – | 204,298 |
 
-The Small layout's strikes (densities 0.42 to 0.75) and the short forms
-added 218,845 bytes (14 %) across the four files.
+Latin grew most: Greek, Vietnamese's precomposed letters and the extra
+Cyrillic and Latin letters are baked in three cuts at every size up to the
+96 px Display strike. `fontbake` prints the deflated bytes of every strike;
+the largest single costs are the CJK body sizes at 40 and 48 px (50 to
+65 KB each) and Latin Display at 96 px (49 KB).
 
-The rest of the change, about 134 KB, is code and string tables: the new
-renderer text path, the twelve tables (with their CJK and Cyrillic UTF-8),
-and the inflate routine (already linked through Macroquad's PNG decoder
-today, so it costs nothing until that goes).
-
-Deflated bytes per strike (each size carries only the characters of the
-roles drawn at it; Label and Display sizes hold far fewer glyphs than Body):
-
-| Size | Weight | Roles | Latin | zh | ja | ko |
-| ---: | --- | --- | ---: | ---: | ---: | ---: |
-| 26 | Medium | Display | 6,026 | 5,333 | 6,303 | 4,286 |
-| 28 | Medium | Display | 6,908 | 5,776 | 6,856 | 4,619 |
-| 32 | Medium | Display | 7,848 | 6,463 | 7,657 | 5,111 |
-| 40 | Medium | Display | 10,032 | 8,004 | 9,574 | 6,224 |
-| 48 | Medium | Display | 12,425 | 9,568 | 11,442 | 7,369 |
-| 64 | Medium | Display | 18,955 | 12,519 | 15,327 | 9,669 |
-| 12 | Regular | Label | 1,852 | 1,861 | 1,598 | 1,361 |
-| 13 | Regular | Label+Caption | 3,421 | 5,030 | 4,229 | 3,715 |
-| 14 | Regular | Caption | 3,356 | 3,433 | 3,347 | 2,973 |
-| 15 | Regular | Label | 2,300 | 2,454 | 2,103 | 1,720 |
-| 16 | Regular | Body+Caption | 6,041 | 18,638 | 15,167 | 10,254 |
-| 18 | Regular | Label+Body | 6,840 | 21,666 | 17,602 | 12,003 |
-| 20 | Regular | Body+Caption | 7,646 | 24,511 | 19,828 | 13,321 |
-| 24 | Regular | Label+Body | 9,064 | 29,677 | 24,156 | 15,871 |
-| 26 | Regular | Caption | 6,228 | 7,258 | 6,811 | 5,867 |
-| 30 | Regular | Label | 5,200 | 5,169 | 4,569 | 3,467 |
-| 32 | Regular | Body+Caption | 13,211 | 39,373 | 32,276 | 20,999 |
-| 36 | Regular | Label | 6,260 | 6,281 | 5,525 | 4,156 |
-| 40 | Regular | Body+Caption | 16,717 | 49,655 | 40,914 | 26,659 |
-| 48 | Regular | Body | 21,931 | 59,865 | 49,710 | 31,197 |
-
-The 4K body size (48 px) is the largest single cost in each CJK file.
-
-CJK is a cargo feature, `cjk`, on by default, so every package ships all
-twelve languages; building without it saves 803,775 bytes of atlas and the
-CJK locales fall back to the next preference. The desktop size budget is
-measured without `cjk` (as Steam is measured separately): Chinese, Japanese
-and Korean are part of the Steam and desktop packages, while the portable
-and minimal builds hold the size line.
+Every non-Latin script atlas sits behind the cargo feature `scripts`, on by
+default, so every package ships all thirty languages. Building without it
+saves 2,329,773 bytes of atlas; those locales then fall back to the next
+preference. The desktop size budget is measured without `scripts` (as Steam
+is measured separately): the Steam and desktop packages carry every
+language, while portable and minimal builds hold the size line.
 
 ## Known gaps
 
-- Steam rich presence (`docs/steam/rich_presence.vdf`) is English only, and
-  sends English sector names.
+- The band and the sector grid keep their left-to-right order in Arabic, by
+  design (see Mirroring above); a reader of Arabic should confirm that it
+  reads well.
+- The bidi pass is simplified: no nested embeddings, and Arabic-Indic
+  digits are not offered.
+- Thai line breaks are placed by hand in the tables rather than found with a
+  dictionary.
 - The F3 performance overlay is a developer tool and stays in English.
 - The pixel-font fallback below density 0.76 spells only ASCII.

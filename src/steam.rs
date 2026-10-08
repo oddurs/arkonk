@@ -119,7 +119,7 @@ mod imp {
             let mut accepted = true;
             if let Some((sector, name)) = presence.sector() {
                 accepted &= friends.set_rich_presence("sector", Some(&sector));
-                accepted &= friends.set_rich_presence("name", Some(&name));
+                accepted &= friends.set_rich_presence("name", Some(name));
             }
             accepted &= friends.set_rich_presence("steam_display", Some(presence.token()));
             if !accepted {
