@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"greek"
+	"Tokens"
+	{
+		"#Menus"	"Στα μενού"
+		"#Journey"	"Τομέας %sector% · {#Sector_%name%}"
+		"#Practice"	"Εξάσκηση στον τομέα %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Πρώτο φως"
+		"#Sector_satellites"	"Δορυφόροι"
+		"#Sector_slipstream"	"Ρεύμα έλξης"
+		"#Sector_resonance"	"Συντονισμός"
+		"#Sector_prism"	"Πρίσμα"
+		"#Sector_crossfade"	"Διασταύρωση"
+		"#Sector_undertow"	"Υπόρρευμα"
+		"#Sector_moonrise"	"Ανατολή σελήνης"
+		"#Sector_afterglow"	"Απόλαμψη"
+		"#Sector_parallax"	"Παράλλαξη"
+		"#Sector_supernova"	"Σουπερνόβα"
+		"#Sector_homecoming"	"Επιστροφή"
+	}
+}

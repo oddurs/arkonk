@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"russian"
+	"Tokens"
+	{
+		"#Menus"	"В меню"
+		"#Journey"	"Сектор %sector% · {#Sector_%name%}"
+		"#Practice"	"Тренировка: сектор %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Первый свет"
+		"#Sector_satellites"	"Спутники"
+		"#Sector_slipstream"	"Попутный поток"
+		"#Sector_resonance"	"Резонанс"
+		"#Sector_prism"	"Призма"
+		"#Sector_crossfade"	"Наплыв"
+		"#Sector_undertow"	"Течение"
+		"#Sector_moonrise"	"Восход луны"
+		"#Sector_afterglow"	"Послесвечение"
+		"#Sector_parallax"	"Параллакс"
+		"#Sector_supernova"	"Сверхновая"
+		"#Sector_homecoming"	"Возвращение"
+	}
+}

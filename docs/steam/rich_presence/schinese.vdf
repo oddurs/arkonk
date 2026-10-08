@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"schinese"
+	"Tokens"
+	{
+		"#Menus"	"在菜单中"
+		"#Journey"	"星区 %sector% · {#Sector_%name%}"
+		"#Practice"	"正在练习星区 %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"晨光"
+		"#Sector_satellites"	"卫星"
+		"#Sector_slipstream"	"滑流"
+		"#Sector_resonance"	"共振"
+		"#Sector_prism"	"棱镜"
+		"#Sector_crossfade"	"交错"
+		"#Sector_undertow"	"暗流"
+		"#Sector_moonrise"	"月出"
+		"#Sector_afterglow"	"余晖"
+		"#Sector_parallax"	"视差"
+		"#Sector_supernova"	"超新星"
+		"#Sector_homecoming"	"归途"
+	}
+}

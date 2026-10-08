@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"bulgarian"
+	"Tokens"
+	{
+		"#Menus"	"В менютата"
+		"#Journey"	"Сектор %sector% · {#Sector_%name%}"
+		"#Practice"	"Тренира сектор %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Първа светлина"
+		"#Sector_satellites"	"Спътници"
+		"#Sector_slipstream"	"Въздушна следа"
+		"#Sector_resonance"	"Резонанс"
+		"#Sector_prism"	"Призма"
+		"#Sector_crossfade"	"Преливане"
+		"#Sector_undertow"	"Подводно течение"
+		"#Sector_moonrise"	"Изгрев на луната"
+		"#Sector_afterglow"	"Отблясък"
+		"#Sector_parallax"	"Паралакс"
+		"#Sector_supernova"	"Свръхнова"
+		"#Sector_homecoming"	"Завръщане"
+	}
+}

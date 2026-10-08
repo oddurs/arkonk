@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"tchinese"
+	"Tokens"
+	{
+		"#Menus"	"在選單中"
+		"#Journey"	"星區 %sector% · {#Sector_%name%}"
+		"#Practice"	"正在練習星區 %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"晨光"
+		"#Sector_satellites"	"衛星"
+		"#Sector_slipstream"	"滑流"
+		"#Sector_resonance"	"共振"
+		"#Sector_prism"	"稜鏡"
+		"#Sector_crossfade"	"交錯"
+		"#Sector_undertow"	"暗流"
+		"#Sector_moonrise"	"月出"
+		"#Sector_afterglow"	"餘暉"
+		"#Sector_parallax"	"視差"
+		"#Sector_supernova"	"超新星"
+		"#Sector_homecoming"	"歸途"
+	}
+}

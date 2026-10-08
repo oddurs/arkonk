@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"japanese"
+	"Tokens"
+	{
+		"#Menus"	"メニュー画面"
+		"#Journey"	"セクター %sector%・{#Sector_%name%}"
+		"#Practice"	"セクター %sector%・{#Sector_%name%} を練習中"
+		"#Sector_first_light"	"夜明けの光"
+		"#Sector_satellites"	"サテライト"
+		"#Sector_slipstream"	"スリップストリーム"
+		"#Sector_resonance"	"共鳴"
+		"#Sector_prism"	"プリズム"
+		"#Sector_crossfade"	"クロスフェード"
+		"#Sector_undertow"	"引き潮"
+		"#Sector_moonrise"	"月の出"
+		"#Sector_afterglow"	"残光"
+		"#Sector_parallax"	"視差"
+		"#Sector_supernova"	"超新星"
+		"#Sector_homecoming"	"帰還"
+	}
+}

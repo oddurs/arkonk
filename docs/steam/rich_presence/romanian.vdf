@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"romanian"
+	"Tokens"
+	{
+		"#Menus"	"În meniuri"
+		"#Journey"	"Sectorul %sector% · {#Sector_%name%}"
+		"#Practice"	"Se antrenează în sectorul %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Prima lumină"
+		"#Sector_satellites"	"Sateliți"
+		"#Sector_slipstream"	"Siaj"
+		"#Sector_resonance"	"Rezonanță"
+		"#Sector_prism"	"Prismă"
+		"#Sector_crossfade"	"Fondu"
+		"#Sector_undertow"	"Curent de fund"
+		"#Sector_moonrise"	"Răsărit de lună"
+		"#Sector_afterglow"	"Licăr de apus"
+		"#Sector_parallax"	"Paralaxă"
+		"#Sector_supernova"	"Supernovă"
+		"#Sector_homecoming"	"Întoarcere acasă"
+	}
+}

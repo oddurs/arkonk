@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"finnish"
+	"Tokens"
+	{
+		"#Menus"	"Valikoissa"
+		"#Journey"	"Sektori %sector% · {#Sector_%name%}"
+		"#Practice"	"Harjoittelee sektoria %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Ensivalo"
+		"#Sector_satellites"	"Satelliitit"
+		"#Sector_slipstream"	"Imuvirta"
+		"#Sector_resonance"	"Resonanssi"
+		"#Sector_prism"	"Prisma"
+		"#Sector_crossfade"	"Ristihäivytys"
+		"#Sector_undertow"	"Pohjavirta"
+		"#Sector_moonrise"	"Kuunnousu"
+		"#Sector_afterglow"	"Jälkihehku"
+		"#Sector_parallax"	"Parallaksi"
+		"#Sector_supernova"	"Supernova"
+		"#Sector_homecoming"	"Kotiinpaluu"
+	}
+}

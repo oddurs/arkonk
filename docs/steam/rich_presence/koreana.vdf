@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"koreana"
+	"Tokens"
+	{
+		"#Menus"	"메뉴 화면"
+		"#Journey"	"섹터 %sector% · {#Sector_%name%}"
+		"#Practice"	"섹터 %sector% · {#Sector_%name%} 연습 중"
+		"#Sector_first_light"	"첫 빛"
+		"#Sector_satellites"	"위성"
+		"#Sector_slipstream"	"슬립스트림"
+		"#Sector_resonance"	"공명"
+		"#Sector_prism"	"프리즘"
+		"#Sector_crossfade"	"크로스페이드"
+		"#Sector_undertow"	"역류"
+		"#Sector_moonrise"	"월출"
+		"#Sector_afterglow"	"잔광"
+		"#Sector_parallax"	"시차"
+		"#Sector_supernova"	"초신성"
+		"#Sector_homecoming"	"귀환"
+	}
+}

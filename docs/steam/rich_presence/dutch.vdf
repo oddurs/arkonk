@@ -1,0 +1,22 @@
+"lang"
+{
+	"Language"	"dutch"
+	"Tokens"
+	{
+		"#Menus"	"In de menu’s"
+		"#Journey"	"Sector %sector% · {#Sector_%name%}"
+		"#Practice"	"Oefent sector %sector% · {#Sector_%name%}"
+		"#Sector_first_light"	"Eerste licht"
+		"#Sector_satellites"	"Satellieten"
+		"#Sector_slipstream"	"Zuigstroom"
+		"#Sector_resonance"	"Resonantie"
+		"#Sector_prism"	"Prisma"
+		"#Sector_crossfade"	"Overvloeier"
+		"#Sector_undertow"	"Onderstroom"
+		"#Sector_moonrise"	"Maansopkomst"
+		"#Sector_afterglow"	"Avondgloed"
+		"#Sector_parallax"	"Parallax"
+		"#Sector_supernova"	"Supernova"
+		"#Sector_homecoming"	"Thuiskomst"
+	}
+}
