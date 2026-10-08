@@ -917,3 +917,31 @@ fn a_wall_bounce_lights_the_wall_where_the_ball_struck() {
     assert_eq!(flash.wall, Wall::Left);
     assert!((flash.along - 500.0).abs() < 6.0, "{flash:?}");
 }
+
+/// A flat piece's one-pixel parts, such as the Compact seam's charge pips,
+/// land on whole pixels at their full size wherever they start; rounding
+/// each edge on its own once rounded them away.
+#[test]
+fn one_pixel_parts_of_flat_pieces_never_round_away() {
+    let fonts = ark_glyphs::fonts(Locale::En).unwrap();
+    let atlas = Atlas::build(&fonts).unwrap();
+    let view = View::fit(240.0, 240.0, 1.0).unwrap();
+    assert_eq!(view.class, Class::Compact);
+    let ui = Ui::default();
+    let v = Scene::new(
+        None,
+        (&atlas, &fonts, Locale::En),
+        &view,
+        &ui,
+        String::new(),
+        None,
+    );
+    let px = 1.0 / view.density;
+    for k in 0..40 {
+        let at = 700.0 + k as f32 * px / 8.0;
+        let r = pieces::place(&v, Rect::new(at, at, px, px), true);
+        assert!((r.w - px).abs() < 1e-4 && (r.h - px).abs() < 1e-4, "{r:?}");
+        let on_grid = |x: f32| ((x * view.density).round() - x * view.density).abs() < 1e-3;
+        assert!(on_grid(r.x) && on_grid(r.y), "{r:?}");
+    }
+}

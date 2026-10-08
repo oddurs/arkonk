@@ -742,7 +742,7 @@ fn seam(v: &Scene, game: &Game, body: Rect) {
     let anchor = charges > 0 || game.balls().iter().any(|b| b.active && b.held);
     if !anchor {
         let (w, h) = if flat { (3.0 * px, px) } else { (13.0, 2.5) };
-        let r = v.snap_rect(Rect::new(c.x - w / 2.0, c.y - h / 2.0, w, h));
+        let r = place(v, Rect::new(c.x - w / 2.0, c.y - h / 2.0, w, h), flat);
         if flat {
             v.rect(r.x, r.y, r.w, r.h, CYAN);
         } else {
@@ -756,13 +756,24 @@ fn seam(v: &Scene, game: &Game, body: Rect) {
         // Used from the left, so what is left reads as a count.
         let lit = i >= ANCHOR_CHARGES - charges;
         let x = c.x - total / 2.0 + f32::from(i) * (w + gap);
-        let r = v.snap_rect(Rect::new(x, c.y - h / 2.0, w, h));
+        let r = place(v, Rect::new(x, c.y - h / 2.0, w, h), flat);
         if flat {
             v.rect(r.x, r.y, r.w, r.h, if lit { CYAN } else { SEAM_OUT });
         } else {
             let fill = if lit { SEAM } else { Fill::flat(SEAM_OUT) };
             v.shape(r, [h / 2.0; 4], fill);
         }
+    }
+}
+
+/// `r` on whole pixels. A flat piece's parts are a pixel or two, so they
+/// keep their exact size and only move: snapping both edges of a
+/// one-pixel rect can round it away.
+pub(super) fn place(v: &Scene, r: Rect, flat: bool) -> Rect {
+    if flat {
+        Rect::new(v.snap(r.x), v.snap(r.y), r.w, r.h)
+    } else {
+        v.snap_rect(r)
     }
 }
 
