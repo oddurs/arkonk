@@ -136,6 +136,7 @@ pub(super) fn draw(
             (i == 0, i == spec.focus),
             None,
         );
+        v.hits.borrow_mut().push(row_rect);
         y += row_rect.h + ROW_GAP;
     }
     if help_lines > 0
@@ -312,7 +313,6 @@ pub(super) fn row(
             lit,
         );
     }
-    v.hits.borrow_mut().push(r);
 }
 
 /// The back glyph at a sheet's top corner.

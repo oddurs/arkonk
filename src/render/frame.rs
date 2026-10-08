@@ -3,6 +3,7 @@
 //! sides are the walls, and the open bottom fades into the night where a
 //! ball drains. Nothing is drawn outside the arch.
 use super::*;
+use crate::ui::Prompt;
 
 /// The arch's outer edge. Its last fifth fades to night, as the design's
 /// mask does, so the one open side is the one a ball can leave by.
@@ -204,4 +205,126 @@ fn lives(v: &Scene, right: f32, mid: f32, lives: u8, entry: u8) {
             v.ring(p, D / 2.0 - t, t, hex(0x3a4256));
         }
     }
+}
+
+/// A count out of a total as a figure, the total muted: `6 / 36`, ending
+/// at `right` on `baseline`.
+fn out_of(v: &Scene, (count, total): (u32, u32), style: Style, (right, baseline): (f32, f32)) {
+    let total = Figures::of(|f| {
+        f.write_str(" / ")?;
+        ark_text::grouped(f, v.locale, total)
+    });
+    let count = Figures::count(v.locale, count);
+    let tail = v.measure(total.as_str(), style);
+    v.put(
+        total.as_str(),
+        style,
+        Slot::right(right, tail, baseline),
+        MUTED,
+    );
+    let head = v.measure(count.as_str(), style);
+    v.put(
+        count.as_str(),
+        style,
+        Slot::right(right - tail, head, baseline),
+        INK,
+    );
+}
+
+/// A Label over a band figure: 15 tall, 8 apart, 28 tall, centred in the
+/// band.
+const PAIR_BLOCK: f32 = 15.0 + 8.0 + 28.0;
+
+/// The band on the title: the best score, the journey (the saved sector
+/// lit), and the medals.
+pub(super) fn band_title(v: &Scene, profile: &Profile) {
+    let (left, right) = (BAND.x + BAND_PAD, BAND.x + BAND.w - BAND_PAD);
+    let mid = BAND.y + BAND.h / 2.0;
+    let top = mid - PAIR_BLOCK / 2.0;
+    let label = v.snap(baseline(top, 15.0, 1.0));
+    let figure = v.snap(baseline(top + 23.0, 28.0, 1.0));
+    let side = 270.0;
+    let style = Style::from(Role::Figure).sized(28.0);
+    v.say(
+        TextId::StatBest,
+        &[],
+        Role::Label,
+        Slot::left(left, side, label),
+        DIM,
+    );
+    let best = Figures::count(v.locale, profile.progress.best_score());
+    v.put(best.as_str(), style, Slot::left(left, side, figure), INK);
+    v.say(
+        TextId::StatMedals,
+        &[],
+        Role::Label,
+        Slot::right(right, side, label),
+        DIM,
+    );
+    let medals = (profile.progress.medal_count(), 3 * SECTOR_COUNT as u32);
+    out_of(v, medals, style, (right, figure));
+    // The journey: twelve pips over how many sectors are open.
+    let block = 3.0 + 10.0 + 15.0 * 1.4;
+    let top = mid - block / 2.0;
+    let open = profile.progress.unlocked_count();
+    let here = profile.progress.checkpoint().map(|c| c.sector);
+    pips(v, WIDTH / 2.0, top, here, profile);
+    let caption = Style::from(Role::Caption).sized(15.0);
+    let args = [Arg::Count(open as u32), Arg::Count(SECTOR_COUNT as u32)];
+    let at = v.snap(baseline(top + 13.0, 15.0, 1.4));
+    v.say(
+        TextId::SectorsOf,
+        &args,
+        caption,
+        Slot::centered(WIDTH / 2.0, 260.0, at),
+        DIM,
+    );
+}
+
+/// The band on sector select: the way back, where you are, the medals.
+pub(super) fn band_sectors(v: &Scene, profile: &Profile) {
+    let (left, right) = (BAND.x + BAND_PAD, BAND.x + BAND.w - BAND_PAD);
+    let mid = BAND.y + BAND.h / 2.0;
+    let chip = chips::chip(
+        v,
+        Prompt::Back,
+        (left, mid),
+        sheet::CHIP,
+        chips::Lit::Neutral,
+    );
+    let text = left + chip + 10.0;
+    let at = v.snap(mid + v.cap(Role::Caption) / 2.0);
+    let back = v.width_of(TextId::ActionBack, &[], Role::Caption);
+    v.say(
+        TextId::ActionBack,
+        &[],
+        Role::Caption,
+        Slot::left(text, 200.0, at),
+        DIM,
+    );
+    v.hits.borrow_mut().back = Some(Rect::new(
+        left,
+        mid - 20.0,
+        chip + 10.0 + back.min(200.0),
+        40.0,
+    ));
+    let at = v.snap(mid + v.cap(Role::Title) / 2.0);
+    v.say(
+        TextId::SectorsHeading,
+        &[],
+        Role::Title,
+        Slot::centered(WIDTH / 2.0, 320.0, at),
+        INK,
+    );
+    let style = Style::from(Role::Figure).sized(24.0);
+    let figure = v.snap(mid + v.cap(style) / 2.0);
+    let medals = (profile.progress.medal_count(), 3 * SECTOR_COUNT as u32);
+    out_of(v, medals, style, (right, figure));
+    let total = Figures::of(|f| write!(f, "{} / {}", medals.0, medals.1));
+    let w = v.measure(total.as_str(), style);
+    sheet::medal_pip(
+        v,
+        Rect::new(right - w - 10.0 - 16.0, mid - 2.0, 16.0, 4.0),
+        true,
+    );
 }

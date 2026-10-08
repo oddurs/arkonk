@@ -35,7 +35,6 @@ pub const HEIGHT: f32 = 900.0;
 const NIGHT: Color = hex(0x07080e);
 const PEARL_RIM: Color = hex(0xcdd8e8);
 const SURFACE: Color = Color::new(0.050, 0.060, 0.092, 1.0);
-const RAISED: Color = Color::new(0.078, 0.091, 0.135, 1.0);
 const BORDER: Color = Color::new(0.135, 0.155, 0.210, 1.0);
 const INK: Color = hex(0xedf2fa);
 const DIM: Color = hex(0x8794ab);
@@ -55,30 +54,16 @@ const PALETTE: [Color; 7] = [
     Color::new(0.95, 0.39, 0.78, 1.0),
 ];
 
-/// The spacing scale, in scene units. Layouts step by these and nothing in
-/// between, so related things always sit visibly closer than unrelated ones.
+/// The spacing scale, in scene units (4, 8, 12, 16, 24, 32, 48, 64).
+/// Layouts step by these and nothing in between, so related things always
+/// sit visibly closer than unrelated ones: 8 between action rows, 12 from
+/// a chip to its text, 16 band padding and actions to their help line, 24
+/// between groups and from a title to its content, 32 inside a sheet.
 const S8: f32 = 8.0;
 const S12: f32 = 12.0;
 const S16: f32 = 16.0;
 const S24: f32 = 24.0;
 const S32: f32 = 32.0;
-const S48: f32 = 48.0;
-/// A label and its value, or a name and its detail.
-const PAIR: f32 = S8;
-/// Between the groups of one section, such as items of a hint row.
-const GROUP: f32 = S24;
-/// Between the sections of a screen.
-const SECTION: f32 = S48;
-/// Inside a panel's edge.
-const PAD: f32 = S32;
-
-/// The height of a role's capitals in scene units, as laid out. Gaps on
-/// the spacing scale run from one line's baseline to the next line's
-/// capitals, so a line's baseline is the one above plus gap plus this.
-const fn cap_height(role: Role) -> f32 {
-    // Noto Sans and Noto Sans Display capitals are 714 units of the em.
-    spec::style(role).0 * 0.714
-}
 
 /// How a piece of text is set: its role, whether it is emphasised (body
 /// text on a primary or focused action), and its size in scene units,
@@ -130,8 +115,6 @@ impl Style {
 /// Side margin for full-width text, and the widest a centred line may be.
 const MARGIN: f32 = 64.0;
 const FULL: f32 = WIDTH - 2.0 * MARGIN;
-/// Baseline-to-baseline for body text.
-const LINE: f32 = 28.0;
 /// Baseline-to-baseline for wrapped lines of `style`.
 fn leading(style: impl Into<Style>) -> f32 {
     let style = style.into();
@@ -139,9 +122,6 @@ fn leading(style: impl Into<Style>) -> f32 {
 }
 /// The footer's last baseline; rows stack upward from it.
 const FOOTER: f32 = 872.0;
-/// Baseline-to-baseline distance between footer rows: captions are smaller
-/// than body text, so the rows need more air to read as separate lines.
-const FOOTER_LINE: f32 = 30.0;
 
 fn opacity(c: Color, alpha: f32) -> Color {
     Color::new(c.r, c.g, c.b, alpha)
@@ -909,155 +889,16 @@ impl Scene<'_> {
         })
     }
 
-    // Controls.
-
-    fn cap_width(&self, cap: Cap) -> f32 {
-        match cap {
-            Cap::Pad(Glyph::Start) => 30.0,
-            Cap::Pad(_) => 22.0,
-        }
-    }
-    /// A key or button cap, centred on the capitals of body text at `baseline`.
-    fn cap_glyph(&self, cap: Cap, x: f32, baseline: f32, beside: Role) {
-        let w = self.cap_width(cap);
-        let cy = baseline - self.cap(beside) / 2.0;
-        match cap {
-            Cap::Pad(Glyph::Start) => {
-                self.rounded(x, cy - 10.0, w, 20.0, 10.0, DIM);
-                for dy in [-4.0, 0.0, 4.0] {
-                    self.rect(x + 9.0, cy + dy - 0.75, 12.0, 1.5, NIGHT);
-                }
-            }
-            Cap::Pad(glyph) => {
-                let (label, fill) = match glyph {
-                    Glyph::A => ("A", PALETTE[3]),
-                    _ => ("B", RED),
-                };
-                self.circle(V2::new(x + w / 2.0, cy), w / 2.0, fill);
-                let y = cy + self.cap(Role::Label) / 2.0;
-                self.put(label, Role::Label, Slot::centered(x + w / 2.0, w, y), NIGHT);
-            }
-        }
-    }
-    fn item_width(&self, item: &Item, role: Role) -> f32 {
-        let cap = item.cap.map_or(0.0, |c| self.cap_width(c) + PAIR);
-        cap + self.width_of(item.id, item.arg.as_slice(), role)
-    }
-    /// Lays `items` into centred lines of at most `room` width; calls
-    /// `line` with each line's items and width. Returns the line count.
-    fn pack(
-        &self,
-        items: &[Item],
-        role: Role,
-        room: f32,
-        mut line: impl FnMut(&[Item], f32),
-    ) -> usize {
-        let mut start = 0;
-        let mut lines = 0;
-        while start < items.len() {
-            let mut width = self.item_width(&items[start], role);
-            let mut end = start + 1;
-            while end < items.len() {
-                let next = width + GROUP + self.item_width(&items[end], role);
-                if next > room {
-                    break;
-                }
-                width = next;
-                end += 1;
-            }
-            line(&items[start..end], width);
-            lines += 1;
-            start = end;
-        }
-        lines
-    }
-    /// Draws one packed line of hint items, centred, on `baseline`.
-    fn hint_line(&self, items: &[Item], width: f32, baseline: f32, color: Color, role: Role) {
-        let mut x = WIDTH / 2.0 - width.min(FULL) / 2.0;
-        for item in items {
-            if let Some(cap) = item.cap {
-                self.cap_glyph(cap, x, baseline, role);
-                x += self.cap_width(cap) + PAIR;
-            }
-            let w = self.width_of(item.id, item.arg.as_slice(), role);
-            self.say(
-                item.id,
-                item.arg.as_slice(),
-                role,
-                Slot::left(x, w.min(FULL), baseline),
-                color,
-            );
-            x += w + GROUP;
-        }
-    }
-    /// Rows of hints stacked up from the bottom of the screen, in the
-    /// caption tier. A save failure, when there is one, sits on top in ink:
-    /// it is the one footer line that is news.
-    fn footer(&self, rows: &[&[Item]], save_error: bool) {
-        let count: usize = rows
-            .iter()
-            .map(|items| self.pack(items, Role::Caption, FULL, |_, _| {}))
-            .sum::<usize>()
-            + usize::from(save_error);
-        if count > 4
-            && let Some(log) = self.misfits
-        {
-            log.borrow_mut().push(Misfit {
-                text: "footer".into(),
-                need: count as f32,
-                room: 4.0,
-                missing: None,
-            });
-        }
-        let mut y = FOOTER - (count.saturating_sub(1)) as f32 * FOOTER_LINE;
+    /// The save warning, until the band reports it.
+    fn footer(&self, save_error: bool) {
         if save_error {
-            self.say(TextId::SaveFailed, &[], Role::Caption, Slot::line(y), INK);
-            y += FOOTER_LINE;
-        }
-        for &items in rows {
-            self.pack(items, Role::Caption, FULL, |line, width| {
-                self.hint_line(line, width, y, DIM, Role::Caption);
-                y += FOOTER_LINE;
-            });
-        }
-    }
-    /// The screen's primary action is filled; every other action is plain
-    /// text. The focused one, primary or not, gets a cyan edge and label.
-    /// A `detail` caption sits under the label, inside the button.
-    fn button(
-        &self,
-        r: Rect,
-        id: TextId,
-        args: &[Arg],
-        (primary, focused): (bool, bool),
-        detail: Option<(TextId, &[Arg])>,
-    ) {
-        if primary {
-            self.rounded(r.x, r.y, r.w, r.h, 10.0, opacity(CYAN, 0.13));
-        }
-        if focused {
-            self.outline(r, 10.0, 1.5, opacity(CYAN, 0.7));
-        }
-        let color = if focused { CYAN } else { INK };
-        let line = |y| Slot::centered(r.x + r.w / 2.0, r.w - 2.0 * S16, y);
-        let body = Style::from(Role::Body);
-        let label = if primary || focused {
-            body.strong()
-        } else {
-            body
-        };
-        match detail {
-            None => {
-                let baseline = r.y + r.h / 2.0 + self.cap(Role::Body) / 2.0;
-                self.say(id, args, label, line(baseline), color);
-            }
-            Some((detail, detail_args)) => {
-                let block = cap_height(Role::Body) + PAIR + cap_height(Role::Caption);
-                let name = r.y + (r.h - block) / 2.0 + cap_height(Role::Body);
-                self.say(id, args, label, line(name), color);
-                let below = name + PAIR + cap_height(Role::Caption);
-                self.say(detail, detail_args, Role::Caption, line(below), DIM);
-            }
+            self.say(
+                TextId::SaveFailed,
+                &[],
+                Role::Caption,
+                Slot::line(FOOTER),
+                INK,
+            );
         }
     }
     fn logo(&self, x: f32, y: f32, cell: f32) {
@@ -1111,40 +952,6 @@ fn pixel_lines<'t>(
         rest = rest[end..].trim_start();
     }
     count
-}
-
-/// Xbox face-button names; Steam Deck and Steam Input present this layout.
-#[derive(Clone, Copy, PartialEq)]
-enum Glyph {
-    A,
-    B,
-    Start,
-}
-/// What sits before a hint: a keyboard key or a gamepad button.
-#[derive(Clone, Copy, PartialEq)]
-enum Cap {
-    Pad(Glyph),
-}
-/// One hint: an optional cap, then text.
-#[derive(Clone, Copy)]
-struct Item {
-    cap: Option<Cap>,
-    id: TextId,
-    arg: Option<Arg>,
-}
-const fn hint(id: TextId) -> Item {
-    Item {
-        cap: None,
-        id,
-        arg: None,
-    }
-}
-const fn pad(glyph: Glyph, id: TextId) -> Item {
-    Item {
-        cap: Some(Cap::Pad(glyph)),
-        id,
-        arg: None,
-    }
 }
 
 #[derive(Clone, Copy, Default)]
@@ -1461,9 +1268,9 @@ fn scene(
     frame::arch(v, fx.wall_flash);
     if ui.screen != Screen::Play {
         if ui.screen == Screen::Title {
-            attract(v, ui, profile);
+            screens::title(v, ui, profile);
         } else {
-            sectors(v, ui, profile);
+            screens::sectors(v, ui, profile);
         }
         if let Some(row) = ui.settings {
             sheet::dim(v, ui.sheet_open);
@@ -1542,10 +1349,10 @@ fn scene(
     } else if ui.paused {
         sheet::dim(v, ui.sheet_open);
         sheet::pause(v, ui, game);
-        v.footer(&[], footer_error);
+        v.footer(footer_error);
     } else {
         match stage {
-            Stage::Ready => ready(v, game),
+            Stage::Ready => screens::ready(v, game),
             Stage::Cleared => {
                 sheet::dim(v, ui.sheet_open);
                 sheet::cleared(v, ui, game, summary);
@@ -1553,7 +1360,7 @@ fn scene(
             Stage::GameOver | Stage::Victory => {
                 sheet::dim(v, ui.sheet_open);
                 sheet::results(v, ui, game, stage == Stage::Victory);
-                v.footer(&[], footer_error);
+                v.footer(footer_error);
             }
             Stage::Playing => {}
         }
@@ -1804,397 +1611,6 @@ fn balls(v: &Scene, fx: &Fx, game: &Game, alpha: f32) {
         v.circle(pos, RADIUS, INK);
     }
 }
-/// The eyebrow's baseline on the ready card; the rest stacks under it.
-const READY_TOP: f32 = 540.0;
-fn ready(v: &Scene, game: &Game) {
-    let id = game.sector();
-    let chapter = id.sector().chapter;
-    let eyebrow = [Arg::Text(TextId::ChapterName(chapter)), Arg::Sector(id)];
-    let hue = sector_color(0, chapter);
-    let line = Slot::line(READY_TOP);
-    v.say(TextId::ReadyEyebrow, &eyebrow, Role::Label, line, hue);
-    let name = READY_TOP + S12 + cap_height(Role::Display);
-    v.say(
-        TextId::SectorName(id),
-        &[],
-        Role::Display,
-        Slot::line(name),
-        INK,
-    );
-    // Display descenders and a tip's capsule chips both reach into the gap.
-    let tip = name + S16 + cap_height(Role::Body);
-    let slot = Slot::centered(WIDTH / 2.0, 720.0, tip);
-    let lines = v.paragraph((TextId::SectorTip(id), &[]), Role::Body, slot, 2, DIM);
-    let last = tip + lines.saturating_sub(1) as f32 * LINE;
-    // The one inline hint: what to do next, in the interactive colour.
-    let y = last + GROUP + cap_height(Role::Body);
-    let words = (TextId::ActionServe, Role::Body.into());
-    let w = chips::prompt_width(v, Prompt::Serve, words, sheet::CHIP);
-    let at = (v.snap(WIDTH / 2.0 - w / 2.0), v.snap(y));
-    chips::prompt(v, Prompt::Serve, words, at, sheet::CHIP, CYAN);
-    let start = game.balls()[0].pos;
-    let direction = game.launch_velocity().normalized();
-    for i in 1..=5 {
-        v.circle(
-            start + direction * (14.0 * i as f32),
-            1.5,
-            opacity(CYAN, 0.45 - i as f32 * 0.06),
-        );
-    }
-}
-/// Draws the title's `menu` with `focus` on one row, and records its rows
-/// for the pointer. `detail` is the Continue row's second line.
-fn menu(v: &Scene, menu: &Menu, focus: usize, detail: Option<(TextId, &[Arg])>) {
-    v.hits.borrow_mut().list = Some((*menu).into());
-    for (i, &action) in menu.actions.iter().enumerate() {
-        let detail = detail.filter(|_| action == Action::Continue);
-        sheet::row(
-            v,
-            menu.column(ui::TITLE_TOP, i),
-            (sheet::label(action, false), &[]),
-            (i == 0, i == focus),
-            detail,
-        );
-    }
-}
-
-/// The logo's top edge and cell size; the title stacks down from it.
-const LOGO_TOP: f32 = 184.0;
-const LOGO_CELL: f32 = 12.0;
-fn attract(v: &Scene, ui: &Ui, profile: &Profile) {
-    v.logo(270.0, LOGO_TOP, LOGO_CELL);
-    let tagline = LOGO_TOP + 7.0 * LOGO_CELL + GROUP + cap_height(Role::Body);
-    v.say(TextId::Tagline, &[], Role::Body, Slot::line(tagline), DIM);
-    let saved = profile.progress.checkpoint();
-    let title = ui::title_menu(saved.is_some());
-    // Where the journey stands belongs on the button that resumes it.
-    let detail = saved.map(|c| {
-        [
-            Arg::Sector(c.sector),
-            Arg::Text(TextId::SectorName(c.sector)),
-            Arg::Count(c.score),
-        ]
-    });
-    let detail = detail
-        .as_ref()
-        .map(|args| (TextId::ContinueDetail, &args[..]));
-    menu(v, &title, ui.choice, detail);
-
-    // Progress: three label-value pairs spanning the menu's width. The
-    // outer columns are wider: the best score is the longest figure.
-    let last = title.column(ui::TITLE_TOP, title.actions.len() - 1);
-    let label = last.bottom() + SECTION + cap_height(Role::Label);
-    let value = label + PAIR + cap_height(Role::Body);
-    let span = title.column(ui::TITLE_TOP, 0);
-    let (outer, middle) = (span.w * 0.36, span.w * 0.28);
-    for (i, name) in [TextId::StatSectors, TextId::StatMedals, TextId::StatBest]
-        .into_iter()
-        .enumerate()
-    {
-        let slot = |y| match i {
-            0 => Slot::left(span.x, outer, y),
-            1 => Slot::centered(WIDTH / 2.0, middle, y),
-            _ => Slot::right(span.x + span.w, outer, y),
-        };
-        v.say(name, &[], Role::Label, slot(label), DIM);
-        let total = |n: u32| [Arg::Count(n), Arg::Count(SECTOR_COUNT as u32 * n)];
-        match i {
-            0 => {
-                let mut args = total(1);
-                args[0] = Arg::Count(profile.progress.unlocked_count() as u32);
-                v.say(TextId::Fraction, &args, Role::Body, slot(value), INK);
-            }
-            1 => {
-                let mut args = total(3);
-                args[0] = Arg::Count(profile.progress.medal_count());
-                v.say(TextId::Fraction, &args, Role::Body, slot(value), INK);
-            }
-            _ => {
-                let best = Figures::count(v.locale, profile.progress.best_score());
-                v.put(best.as_str(), Role::Body, slot(value), INK);
-            }
-        }
-    }
-    let hints = match v.device {
-        Device::KeyboardMouse => [
-            hint(TextId::KeysMove),
-            hint(TextId::KeysServe),
-            hint(TextId::KeysPause),
-        ],
-        Device::Gamepad(_) => [
-            hint(TextId::PadMove),
-            pad(Glyph::A, TextId::ActionServe),
-            Item {
-                cap: Some(Cap::Pad(Glyph::Start)),
-                id: TextId::ActionPause,
-                arg: None,
-            },
-        ],
-    };
-    v.footer(&[&hints], ui.save_error);
-}
-fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
-    let back = ui::back_rect();
-    v.rounded(back.x, back.y, back.w, back.h, 8.0, RAISED);
-    let baseline = back.y + back.h / 2.0 + v.cap(Role::Body) / 2.0;
-    match v.device {
-        Device::KeyboardMouse => {
-            let cy = back.y + back.h / 2.0;
-            v.line(
-                V2::new(back.x + 20.0, cy - 5.0),
-                V2::new(back.x + 15.0, cy),
-                1.5,
-                DIM,
-            );
-            v.line(
-                V2::new(back.x + 15.0, cy),
-                V2::new(back.x + 20.0, cy + 5.0),
-                1.5,
-                DIM,
-            );
-            let slot = Slot::left(back.x + 28.0, back.w - 38.0, baseline);
-            v.say(TextId::ActionBack, &[], Role::Body, slot, DIM);
-        }
-        Device::Gamepad(_) => {
-            v.cap_glyph(Cap::Pad(Glyph::B), back.x + 10.0, baseline, Role::Body);
-            let slot = Slot::left(back.x + 40.0, back.w - 50.0, baseline);
-            v.say(TextId::ActionBack, &[], Role::Body, slot, DIM);
-        }
-    }
-    v.say(
-        TextId::SectorsHeading,
-        &[],
-        Role::Title,
-        Slot::centered(WIDTH / 2.0, 480.0, 80.0),
-        INK,
-    );
-    for chapter in Chapter::ALL {
-        let r = ui::sector_rect(chapter.first_sector().index());
-        let slot = Slot::left(r.x, r.w, r.y - S12);
-        v.say(
-            TextId::ChapterName(chapter),
-            &[],
-            Role::Label,
-            slot,
-            sector_color(0, chapter),
-        );
-    }
-    for id in SectorId::all() {
-        sector_card(v, id, id == ui.sector, profile);
-    }
-    sector_detail(v, ui.sector, profile);
-    let hints = match v.device {
-        Device::KeyboardMouse => [
-            hint(TextId::KeysBrowse),
-            hint(TextId::KeysPlay),
-            hint(TextId::KeysBack),
-        ],
-        Device::Gamepad(_) => [
-            hint(TextId::PadBrowse),
-            pad(Glyph::A, TextId::ActionPlay),
-            pad(Glyph::B, TextId::ActionBack),
-        ],
-    };
-    v.footer(&[&hints], ui.save_error);
-}
-/// A card in the sector grid: the name, the layout in miniature, and a pip
-/// per medal; a padlock instead of pips while locked. Times live in the
-/// detail panel, next to the medal they decide.
-fn sector_card(v: &Scene, id: SectorId, selected: bool, profile: &Profile) {
-    let (r, level) = (ui::sector_rect(id.index()), id.sector());
-    let unlocked = profile.progress.is_unlocked(id);
-    v.rounded(
-        r.x,
-        r.y,
-        r.w,
-        r.h,
-        8.0,
-        if selected { RAISED } else { SURFACE },
-    );
-    if selected {
-        let edge = if unlocked { CYAN } else { MUTED };
-        v.outline(r, 8.0, 1.5, edge);
-    }
-    let inner = r.x + S16;
-    let name = r.y + S12 + cap_height(Role::Body);
-    v.say(
-        TextId::SectorName(id),
-        &[],
-        Role::Body,
-        Slot::left(inner, r.w - 2.0 * S16, name),
-        if unlocked { INK } else { DIM },
-    );
-    // Bricks at their field proportions, on a 9 by 5 pitch, bottom-aligned
-    // with the card's padding.
-    let top = r.y + r.h - S12 - 33.0;
-    for cell in FieldCell::all() {
-        if level.layout.hp[cell.index()] > 0 {
-            v.rect(
-                inner + cell.col() as f32 * 9.0,
-                top + cell.row() as f32 * 5.0,
-                7.0,
-                3.0,
-                if !unlocked {
-                    opacity(MUTED, 0.45)
-                } else if level.layout.cores.contains(cell) {
-                    AMBER
-                } else {
-                    shade(sector_color(cell.row(), level.chapter), 0.8)
-                },
-            );
-        }
-    }
-    let cy = top + 16.5;
-    let right = r.x + r.w - S16;
-    if unlocked {
-        let record = profile.progress.record(id);
-        for (j, medal) in MEDAL_ORDER.into_iter().enumerate() {
-            let earned = record.medals.contains(medal);
-            let x = right - 4.0 - (2 - j) as f32 * 16.0;
-            v.circle(V2::new(x, cy), 4.0, if earned { AMBER } else { MUTED });
-        }
-    } else {
-        v.padlock(right - 8.0, cy, MUTED);
-    }
-}
-/// The selected sector: where it sits, its name and tip, the medals and
-/// how to earn them, and Play, or what unlocks it.
-fn sector_detail(v: &Scene, id: SectorId, profile: &Profile) {
-    let panel = ui::detail_rect();
-    v.panel(panel.x, panel.y, panel.w, panel.h);
-    let (level, record) = (id.sector(), profile.progress.record(id));
-    let x = panel.x + PAD;
-    let w = panel.w - 2.0 * PAD;
-    let eyebrow = panel.y + PAD + cap_height(Role::Label);
-    let args = [
-        Arg::Text(TextId::ChapterName(level.chapter)),
-        Arg::Sector(id),
-    ];
-    let hue = sector_color(0, level.chapter);
-    v.say(
-        TextId::ReadyEyebrow,
-        &args,
-        Role::Label,
-        Slot::left(x, w, eyebrow),
-        hue,
-    );
-    let name = eyebrow + PAIR + cap_height(Role::Body);
-    v.say(
-        TextId::SectorName(id),
-        &[],
-        Role::Body,
-        Slot::left(x, w, name),
-        INK,
-    );
-    // A tip may open with a capsule chip, which stands taller than capitals.
-    let tip = name + S12 + cap_height(Role::Body);
-    let tip_slot = Slot::left(x, w, tip);
-    v.paragraph((TextId::SectorTip(id), &[]), Role::Body, tip_slot, 2, DIM);
-
-    // The medals as a checklist: chip, then what earns it. Rows start a
-    // group below the tip's second line, whether or not it wraps.
-    let table = w - ui::DETAIL_ACTION - S32;
-    let medals = [
-        (TextId::MedalClear, TextId::MedalClearHow),
-        (TextId::MedalClean, TextId::MedalCleanHow),
-        (TextId::MedalSwift, TextId::SwiftWithin),
-    ];
-    let chip = medals
-        .iter()
-        .map(|&(medal, _)| v.width_of(medal, &[], Role::Label) + 2.0 * S8)
-        .fold(0.0, f32::max);
-    let text = Slot::left(x + chip + S16, table - chip - S16, 0.0);
-    let par = [Arg::Clock(level.par_seconds)];
-    let rows = tip + LINE + GROUP;
-    for (i, (medal, how)) in medals.into_iter().enumerate() {
-        let top = rows + i as f32 * S32;
-        medal_chip(
-            v,
-            medal,
-            (x, top, chip),
-            record.medals.contains(MEDAL_ORDER[i]),
-        );
-        let cy = top + S12;
-        let args: &[Arg] = if how == TextId::SwiftWithin {
-            &par
-        } else {
-            &[]
-        };
-        let baseline = cy + v.cap(Role::Body) / 2.0;
-        v.say(
-            how,
-            args,
-            Role::Body,
-            Slot {
-                y: baseline,
-                ..text
-            },
-            DIM,
-        );
-    }
-    // The best time sits under the target it is measured against.
-    if record.best_ticks > 0 {
-        let cy = rows + 3.0 * S32 + S12;
-        let label = Slot::left(x, chip + S16, cy + v.cap(Role::Label) / 2.0);
-        v.say(TextId::StatBest, &[], Role::Label, label, DIM);
-        let t = Figures::of(|f| write!(f, "{}", Clock(record.best_ticks)));
-        let baseline = cy + v.cap(Role::Body) / 2.0;
-        v.put(
-            t.as_str(),
-            Role::Body,
-            Slot {
-                y: baseline,
-                ..text
-            },
-            INK,
-        );
-    }
-
-    let play = ui::play_rect();
-    let column = |y| Slot::centered(play.x + play.w / 2.0, play.w, y);
-    if profile.progress.is_unlocked(id) {
-        v.button(
-            play,
-            TextId::PlaySector,
-            &[Arg::Sector(id)],
-            (true, true),
-            None,
-        );
-        // The footnote qualifies Play, so it sits right under it.
-        let note = play.y + play.h + PAIR + cap_height(Role::Caption);
-        v.paragraph(
-            (TextId::PracticeNote, &[]),
-            Role::Caption,
-            column(note),
-            2,
-            DIM,
-        );
-    } else {
-        let before = [Arg::Sector(SectorId::clamped(id.index().saturating_sub(1)))];
-        v.padlock(play.x + play.w / 2.0, play.y + 4.0, MUTED);
-        let hint = play.y + S24 + cap_height(Role::Body);
-        v.paragraph(
-            (TextId::UnlockHint, &before),
-            Role::Body,
-            column(hint),
-            2,
-            DIM,
-        );
-    }
-}
-/// A medal as a pill, `w` wide from `x`: amber when earned, muted when not.
-fn medal_chip(v: &Scene, medal: TextId, (x, top, w): (f32, f32, f32), earned: bool) {
-    let tone = if earned { AMBER } else { MUTED };
-    v.rounded(x, top, w, S24, S12, opacity(tone, 0.16));
-    let y = top + S12 + v.cap(Role::Label) / 2.0;
-    v.say(
-        medal,
-        &[],
-        Role::Label,
-        Slot::centered(x + w / 2.0, w - S8, y),
-        tone,
-    );
-}
 /// A short run of figures formatted on the stack, so drawing scores and
 /// times allocates nothing.
 struct Figures {
@@ -2330,6 +1746,7 @@ fn power_color(power: Power) -> Color {
 
 mod chips;
 mod frame;
+mod screens;
 mod sheet;
 #[cfg(test)]
 mod tests;

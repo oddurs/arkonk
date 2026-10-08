@@ -132,22 +132,27 @@ fn arguments_follow_each_languages_word_order() {
         format(Locale::Ja, TextId::PlaySector, &[Arg::Sector(sector)]),
         "セクター 03 をプレイ"
     );
-    let saved = [
-        Arg::Sector(sector),
-        Arg::Text(TextId::SectorName(sector)),
-        Arg::Count(2450),
-    ];
+    let saved = [Arg::Text(TextId::SectorName(sector)), Arg::Count(2450)];
     assert_eq!(
         format(Locale::En, TextId::ContinueDetail, &saved),
-        "Sector 03 · Slipstream · 2,450"
+        "Slipstream · 2,450"
     );
     assert_eq!(
         format(Locale::Ja, TextId::ContinueDetail, &saved),
-        "セクター 03・スリップストリーム・2,450"
+        "スリップストリーム・2,450"
+    );
+    let open = [Arg::Count(4), Arg::Count(12)];
+    assert_eq!(
+        format(Locale::Ko, TextId::SectorsOf, &open),
+        "12개 섹터 중 4개"
     );
     assert_eq!(
-        format(Locale::Ja, TextId::SwiftWithin, &[Arg::Clock(83)]),
-        "01:23 以内にクリア"
+        format(
+            Locale::De,
+            TextId::TargetBest,
+            &[Arg::Clock(110), Arg::Clock(129)]
+        ),
+        "01:50 · Bestzeit 02:09"
     );
 }
 

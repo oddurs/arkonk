@@ -34,34 +34,23 @@ text_ids! {
     NewJourney,
     SectorSelect,
     /// The second line of the Continue button: `{0}` the saved sector's
-    /// number, `{1}` its name, `{2}` the score saved with it.
+    /// name, `{1}` the score saved with it.
     ContinueDetail,
-    StatSectors,
     StatMedals,
     StatBest,
-    /// `{0}` of `{1}`, such as unlocked sectors of all sectors.
-    Fraction,
+    /// The journey under the title band's pips: `{0}` sectors open of
+    /// `{1}`.
+    SectorsOf,
 
     // Keyboard and mouse hints.
-    KeysMove,
-    KeysServe,
-    KeysPause,
-    KeysRelease,
-    KeysBrowse,
-    KeysPlay,
-    KeysBack,
     // Key names on keycap glyphs.
     KeySpace,
     KeyEsc,
     // Gamepad hints: a button glyph, then one of these.
-    PadMove,
-    PadBrowse,
     ActionServe,
-    ActionPause,
     ActionRelease,
     ActionSelect,
     ActionResume,
-    ActionPlay,
     ActionBack,
 
     // Settings.
@@ -83,10 +72,8 @@ text_ids! {
     MedalClear,
     MedalClean,
     MedalSwift,
-    MedalClearHow,
-    MedalCleanHow,
-    /// How to earn Swift: `{0}` the sector's target time.
-    SwiftWithin,
+    /// The Swift target, `{0}`, and the best time, `{1}`.
+    TargetBest,
     /// `{0}` sector number.
     PlaySector,
     /// What opens a locked sector: `{0}` the number of the sector before it.
@@ -161,9 +148,8 @@ impl TextId {
     pub const fn arity(self) -> usize {
         use TextId::*;
         match self {
-            ContinueDetail => 3,
-            Fraction | ReadyEyebrow => 2,
-            SwiftWithin | PlaySector | UnlockHint | Plus => 1,
+            ContinueDetail | SectorsOf | ReadyEyebrow | TargetBest => 2,
+            PlaySector | UnlockHint | Plus => 1,
             _ => 0,
         }
     }
@@ -171,15 +157,12 @@ impl TextId {
     pub const fn role(self) -> Role {
         use TextId::*;
         match self {
-            StatSectors | StatMedals | StatBest | MedalClear | MedalClean | MedalSwift
-            | ReadyEyebrow | StatPoints | StatTime | StatBonus | StatChain | ChapterName(_) => {
-                Role::Label
-            }
+            StatMedals | StatBest | MedalClear | MedalClean | MedalSwift | ReadyEyebrow
+            | StatPoints | StatTime | StatBonus | StatChain | ChapterName(_) => Role::Label,
             SectorsHeading | Paused | JourneyComplete | OneMoreOrbit | SectorClear => Role::Title,
             SectorName(_) => Role::Display,
-            KeysMove | KeysServe | KeysPause | KeysRelease | KeysBrowse | KeysPlay | KeysBack
-            | PadMove | PadBrowse | ActionServe | ActionPause | ActionRelease | ActionSelect
-            | ActionPlay | ActionBack | Fullscreen | SaveFailed | ContinueDetail | PracticeNote
+            ActionServe | ActionRelease | ActionSelect | ActionBack | Fullscreen | SaveFailed
+            | ContinueDetail | PracticeNote | SectorsOf | TargetBest | UnlockHint | Tagline
             | HelpResume | HelpRetry | HelpMainMenu | HelpSectors | HelpNewJourney | ExtraLife
             | HelpSettings | DisplayWindow | LanguageSystem | ActionAdjust => Role::Caption,
             _ => Role::Body,
@@ -195,7 +178,9 @@ impl TextId {
         use TextId::*;
         match self {
             SectorName(_) => &[Role::Title, Role::Caption],
-            Plus | Fraction => &[Role::Figure],
+            // The ready card sets a tip as body text, the detail sheet as a caption.
+            SectorTip(_) => &[Role::Caption],
+            Plus => &[Role::Figure],
             Settings => &[Role::Title],
             // Keycaps set their names in the Label cut, untracked.
             KeySpace | KeyEsc => &[Role::Label],

@@ -117,8 +117,10 @@ pub struct Hits {
     pub list: Option<List>,
     rows: [Rect; MAX_ROWS],
     count: usize,
-    /// A sheet's back glyph.
+    /// A sheet's or the band's back glyph.
     pub back: Option<Rect>,
+    /// The sector detail's Play action.
+    pub play: Option<Rect>,
 }
 impl Hits {
     pub fn push(&mut self, row: Rect) {
@@ -139,6 +141,9 @@ impl Hits {
     }
     pub fn back_at(&self, p: Vec2) -> bool {
         self.back.is_some_and(|r| r.contains(p))
+    }
+    pub fn play_at(&self, p: Vec2) -> bool {
+        self.play.is_some_and(|r| r.contains(p))
     }
 }
 
@@ -188,6 +193,8 @@ pub enum Action {
 pub enum List {
     Menu(Menu),
     Settings,
+    /// The sector cards, one row per sector in order.
+    Sectors,
 }
 impl From<Menu> for List {
     fn from(menu: Menu) -> Self {
@@ -205,12 +212,12 @@ pub struct Menu {
 
 /// The title's menu column: its width, the height of a one-line row and
 /// of the Continue row with its caption, and the space between rows.
-pub const MENU_WIDTH: f32 = 432.0;
+pub const MENU_WIDTH: f32 = 400.0;
 pub const ROW: f32 = 48.0;
 pub const TALL_ROW: f32 = 64.0;
 pub const ROW_GAP: f32 = 8.0;
 /// The top of the title menu's first row.
-pub const TITLE_TOP: f32 = 352.0;
+pub const TITLE_TOP: f32 = 392.0;
 
 impl Menu {
     fn height(&self, row: usize) -> f32 {
@@ -280,38 +287,6 @@ pub fn cleared_menu() -> Menu {
         actions: &[Action::Next],
     }
 }
-pub fn back_rect() -> Rect {
-    Rect::new(56.0, 46.0, 150.0, 36.0)
-}
-/// The panel under the sector grid that describes the selected sector.
-pub fn detail_rect() -> Rect {
-    Rect::new(96.0, 520.0, 768.0, 296.0)
-}
-/// The panel's padding, and the width of its action column.
-pub const DETAIL_PAD: f32 = 32.0;
-pub const DETAIL_ACTION: f32 = 288.0;
-/// Play, in the panel's action column, above two lines of footnote.
-pub fn play_rect() -> Rect {
-    let panel = detail_rect();
-    Rect::new(
-        panel.x + panel.w - DETAIL_PAD - DETAIL_ACTION,
-        panel.y + 176.0,
-        DETAIL_ACTION,
-        ROW,
-    )
-}
-pub fn sector_rect(index: usize) -> Rect {
-    Rect::new(
-        96.0 + (index / 4) as f32 * 260.0,
-        152.0 + (index % 4) as f32 * 88.0,
-        248.0,
-        80.0,
-    )
-}
-pub fn hover_sector(mouse: Vec2) -> Option<SectorId> {
-    SectorId::all().find(|s| sector_rect(s.index()).contains(mouse))
-}
-
 #[derive(Default)]
 pub struct Controls {
     pub click: bool,
@@ -424,17 +399,5 @@ mod tests {
         ui.paused = false;
         ui.track_sheet(Stage::GameOver, 0.1);
         assert_eq!((ui.sheet, ui.sheet_open), (Some(Sheet::GameOver), 0.0));
-    }
-    #[test]
-    fn play_sits_in_the_detail_panel_below_the_grid() {
-        let panel = detail_rect();
-        let play = play_rect();
-        assert!(play.x >= panel.x + DETAIL_PAD && play.right() <= panel.right() - DETAIL_PAD);
-        assert!(play.y > panel.y && play.bottom() < panel.bottom() - DETAIL_PAD);
-        for s in SectorId::all() {
-            let card = sector_rect(s.index());
-            assert!(card.bottom() < panel.y, "{s:?} overlaps the panel");
-            assert_eq!(hover_sector(card.center()), Some(s));
-        }
     }
 }

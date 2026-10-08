@@ -353,3 +353,51 @@ fn figures_group_on_the_stack() {
     let t = Figures::of(|f| write!(f, "{}", Clock(83 * TICK_HZ)));
     assert_eq!(t.as_str(), "01:23");
 }
+
+/// Each row is hit once, where it was drawn: a click on the second row
+/// must choose the second action.
+#[test]
+fn every_drawn_row_is_one_hit_area() {
+    let fonts = ark_glyphs::fonts(Locale::En).unwrap();
+    let atlas = Atlas::build(&fonts).unwrap();
+    for (ui, menu) in [
+        (
+            Ui {
+                screen: Screen::Play,
+                paused: true,
+                ..Ui::default()
+            },
+            ui::pause_menu(),
+        ),
+        (Ui::default(), ui::title_menu(false)),
+    ] {
+        let v = Scene {
+            texture: None,
+            atlas: &atlas,
+            fonts: &fonts,
+            locale: Locale::En,
+            density: 1.0,
+            device: Device::KeyboardMouse,
+            mouse: false,
+            pressed: Pressed::default(),
+            buffer: RefCell::new(String::new()),
+            misfits: None,
+            hits: RefCell::default(),
+            motion: Shared::new((1.0, 0.0)),
+        };
+        scene(
+            &v,
+            &Fx::default(),
+            &Game::new(),
+            &ui,
+            &Profile::default(),
+            1.0,
+            None,
+        );
+        let hits = v.hits.into_inner();
+        assert_eq!(hits.rows().len(), menu.actions.len());
+        for (i, r) in hits.rows().iter().enumerate() {
+            assert_eq!(hits.row_at(menu, r.center()), Some(i));
+        }
+    }
+}

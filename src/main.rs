@@ -486,16 +486,19 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 if right {
                     ui.sector = SectorId::clamped(at + 4);
                 }
+                let hovered = renderer
+                    .hits()
+                    .row_at(ui::List::Sectors, pointer)
+                    .map(SectorId::clamped);
                 if (moved || click)
-                    && let Some(index) = ui::hover_sector(pointer)
+                    && let Some(index) = hovered
                 {
                     ui.sector = index;
                 }
-                if click && ui::back_rect().contains(pointer) {
+                if click && renderer.hits().back_at(pointer) {
                     home(&mut ui);
                 }
-                let play = click
-                    && (ui::hover_sector(pointer).is_some() || ui::play_rect().contains(pointer));
+                let play = click && (hovered.is_some() || renderer.hits().play_at(pointer));
                 if (confirm || play)
                     && ui.sector.index() < profile.progress.unlocked_count()
                     && ui.screen == Screen::Sectors
