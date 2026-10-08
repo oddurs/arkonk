@@ -58,6 +58,23 @@ fn preview(stage: Stage) -> Option<Preview> {
 fn flag(name: &str) -> bool {
     std::env::args().any(|a| a == name)
 }
+/// `--frame-preview WxH`: the screen size to lay out and draw for, as a
+/// development aid. `Err` names what is wrong with the value.
+fn frame_preview(args: impl Iterator<Item = String>) -> Result<Option<(u32, u32)>, String> {
+    let mut args = args.skip_while(|a| a != "--frame-preview");
+    if args.next().is_none() {
+        return Ok(None);
+    }
+    let value = args
+        .next()
+        .ok_or("--frame-preview needs a size, such as 240x240")?;
+    let size = value
+        .split_once('x')
+        .and_then(|(w, h)| Some((w.parse::<u32>().ok()?, h.parse::<u32>().ok()?)))
+        .filter(|&(w, h)| w > 0 && h > 0);
+    size.map(Some)
+        .ok_or_else(|| format!("--frame-preview takes WIDTHxHEIGHT in pixels, not {value:?}"))
+}
 fn config(fullscreen: bool) -> Conf {
     Conf {
         window_title: "ARKONK".into(),
@@ -186,6 +203,14 @@ fn main() {
     if std::env::args().skip(1).any(|a| a == "--version") {
         println!("arkonk {}", env!("CARGO_PKG_VERSION"));
         return;
+    }
+    match frame_preview(std::env::args()) {
+        Ok(Some((w, h))) => render::preview(w, h),
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(2);
+        }
     }
     let smoke = [
         "--smoke-test",
@@ -478,6 +503,11 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     home(&mut ui);
                 }
                 let at = ui.sector.index();
+                // A Compact screen shows one sector a page, so left and
+                // right turn one page; elsewhere they cross a chapter.
+                let compact =
+                    render::View::current().map(|v| v.class) == Some(render::Class::Compact);
+                let across = if compact { 1 } else { 4 };
                 if up {
                     ui.sector = SectorId::clamped(at.saturating_sub(1));
                 }
@@ -485,10 +515,10 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     ui.sector = SectorId::clamped(at + 1);
                 }
                 if left {
-                    ui.sector = SectorId::clamped(at.saturating_sub(4));
+                    ui.sector = SectorId::clamped(at.saturating_sub(across));
                 }
                 if right {
-                    ui.sector = SectorId::clamped(at + 4);
+                    ui.sector = SectorId::clamped(at + across);
                 }
                 let hovered = renderer
                     .hits()
@@ -874,5 +904,24 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             diagnostics::error(format_args!("Could not save progress: {e}"));
         }
         diagnostics::info("Quit");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::frame_preview;
+    fn args(line: &str) -> impl Iterator<Item = String> {
+        line.split(' ').map(String::from)
+    }
+    #[test]
+    fn frame_preview_reads_a_size_or_explains() {
+        assert_eq!(frame_preview(args("arkonk")), Ok(None));
+        assert_eq!(
+            frame_preview(args("arkonk --frame-preview 240x160")),
+            Ok(Some((240, 160)))
+        );
+        assert!(frame_preview(args("arkonk --frame-preview")).is_err());
+        assert!(frame_preview(args("arkonk --frame-preview 240")).is_err());
+        assert!(frame_preview(args("arkonk --frame-preview 0x10")).is_err());
     }
 }

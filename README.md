@@ -171,8 +171,24 @@ focused on arrival and the only filled button, and focus is a cyan edge.
 Cyan marks focus and interaction, amber medals and achievements, chapter
 hues chapters; text is ink, dim or muted by importance. Layouts step on a
 4–48 spacing scale named in `src/render.rs`: a label and its value sit 8
-apart, groups 24, sections 48, and panels pad 32. Control hints live in
-the footer, or inline beside the one thing they act on.
+apart, groups 24, sections 48, and panels pad 32. Input glyphs sit on the
+focused row or beside the one thing they act on; there are no hint bars.
+
+The frame's width in physical pixels picks one of three layouts
+(`src/render/view.rs`). **Regular**, 720 px and wider, is the design as
+drawn. **Small**, 400 to 719 px (the smallest desktop window is 480), has a
+72-unit band, 12-unit rails, sheets as wide as the field less 16, and sector
+select one chapter at a time, paged with the arrows or the shoulder buttons.
+**Compact**, under 400 px, sets text in the 5×7 pixel font at whole pixels,
+the band as one 8 px strip, sheets as full-screen lists, glyphs as bracketed
+text (`[A]`, `[Esc]`), and sector select one sector a page. Text never goes
+below its physical floor (body 12 px, captions 11, labels 10, pointer rows
+32, glyph chips 18, hairlines 1); floors only raise sizes and the layout
+reflows. Where text does not fit, the fit chain wraps it, then uses its
+authored short form, then steps down one size, then grows the sheet; an
+ellipsis is the last resort, and the layout test fails on one. A safe-area
+hook insets the band and sheets where a platform reports overscan; no
+desktop does.
 
 Brick-hit flashes, floating scores, paddle impact lights, and pickup rings use
 fixed pools in the renderer. A restart reuses them.
@@ -341,6 +357,17 @@ logs alone.
 The OpenGL smoke test also renders play, title, and sector screens offscreen at
 1280×800 (Steam Deck), 1920×1080, 2560×1440, 3440×1440, and 1024×768 into
 `target/layout-*.png`, then checks that a 10×10 window request is refused.
+
+`--frame-preview WxH` is a development aid for the Small and Compact layouts,
+which a desktop window cannot always reach: the game lays out and draws as if
+the screen were W×H physical pixels, shown a whole number of times larger in
+the window so every pixel stays square. Text and shapes snap to the
+previewed pixels; rounded edges are rasterized at the window's resolution.
+
+```sh
+cargo run --locked --release --bin arkonk -- --frame-preview 240x240   # Compact
+cargo run --locked --release --bin arkonk -- --frame-preview 600x560   # Small
+```
 It also switches language mid-run, which rebuilds the glyph atlas, and writes
 `target/locale-switch.png`. Run it with `--locale <tag>` to capture every
 screen in another language.
