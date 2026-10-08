@@ -1,4 +1,4 @@
-use crate::input::Device;
+use crate::{input::Device, render::WIDTH};
 use ark::{SectorSummary, Stage, sectors::SectorId};
 use macroquad::prelude::{Rect, Vec2};
 #[derive(Clone, Copy, PartialEq)]
@@ -34,7 +34,7 @@ impl Default for Ui {
         Self {
             screen: Screen::Title,
             paused: false,
-            choice: 1,
+            choice: 0,
             sector: SectorId::FIRST,
             save_error: false,
             device: Device::KeyboardMouse,
@@ -42,8 +42,100 @@ impl Default for Ui {
         }
     }
 }
-pub fn menu_rect(row: usize) -> Rect {
-    Rect::new(310.0, 380.0 + row as f32 * 56.0, 340.0, 46.0)
+/// What a menu row does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Action {
+    Continue,
+    NewJourney,
+    Sectors,
+    Resume,
+    Retry,
+    MainMenu,
+}
+
+/// A column of buttons. The first row is the screen's primary action and
+/// takes the focus when the menu opens. A menu lists only what can be done
+/// now, so rows, hit areas and focus steps all come from `actions`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Menu {
+    pub actions: &'static [Action],
+    /// Top of the first row, in scene units.
+    pub top: f32,
+}
+
+/// Menu buttons: their width, the height of a one-line row, and the space
+/// between rows. The Continue row is taller: it carries a caption line.
+pub const MENU_WIDTH: f32 = 400.0;
+pub const ROW: f32 = 48.0;
+pub const TALL_ROW: f32 = 64.0;
+pub const ROW_GAP: f32 = 8.0;
+
+impl Menu {
+    fn height(&self, row: usize) -> f32 {
+        if self.actions[row] == Action::Continue {
+            TALL_ROW
+        } else {
+            ROW
+        }
+    }
+    pub fn rect(&self, row: usize) -> Rect {
+        let y = self.top + (0..row).map(|r| self.height(r) + ROW_GAP).sum::<f32>();
+        Rect::new(
+            WIDTH / 2.0 - MENU_WIDTH / 2.0,
+            y,
+            MENU_WIDTH,
+            self.height(row),
+        )
+    }
+    pub fn hover(&self, mouse: Vec2) -> Option<usize> {
+        (0..self.actions.len()).find(|&i| self.rect(i).contains(mouse))
+    }
+    /// Moves the focus one row, wrapping at either end.
+    pub fn step(&self, choice: usize, up: bool, down: bool) -> usize {
+        let last = self.actions.len() - 1;
+        match (up, down) {
+            (true, false) if choice == 0 => last,
+            (true, false) => choice - 1,
+            (false, true) if choice >= last => 0,
+            (false, true) => choice + 1,
+            _ => choice.min(last),
+        }
+    }
+    pub fn action(&self, choice: usize) -> Action {
+        self.actions[choice.min(self.actions.len() - 1)]
+    }
+}
+
+/// The title menu: Continue only when there is a journey to continue.
+pub fn title_menu(saved: bool) -> Menu {
+    use Action::*;
+    Menu {
+        actions: if saved {
+            &[Continue, NewJourney, Sectors]
+        } else {
+            &[NewJourney, Sectors]
+        },
+        top: 380.0,
+    }
+}
+pub fn pause_menu() -> Menu {
+    use Action::*;
+    Menu {
+        actions: &[Resume, Retry, MainMenu],
+        top: 380.0,
+    }
+}
+/// After the last life or the last sector.
+pub fn result_menu(victory: bool) -> Menu {
+    use Action::*;
+    Menu {
+        actions: if victory {
+            &[Sectors, NewJourney, MainMenu]
+        } else {
+            &[Sectors, Retry, MainMenu]
+        },
+        top: 380.0,
+    }
 }
 /// The single action on the sector-clear card.
 pub fn next_rect() -> Rect {
@@ -62,19 +154,6 @@ pub fn sector_rect(index: usize) -> Rect {
         248.0,
         104.0,
     )
-}
-pub fn hover_menu(mouse: Vec2) -> Option<usize> {
-    (0..3).find(|&i| menu_rect(i).contains(mouse))
-}
-/// Moves through the three menu rows, wrapping, never landing below `first`.
-pub fn step_menu(choice: usize, first: usize, up: bool, down: bool) -> usize {
-    match (up, down) {
-        (true, false) if choice <= first => 2,
-        (true, false) => choice - 1,
-        (false, true) if choice >= 2 => first,
-        (false, true) => choice + 1,
-        _ => choice,
-    }
 }
 pub fn hover_sector(mouse: Vec2) -> Option<SectorId> {
     SectorId::all().find(|s| sector_rect(s.index()).contains(mouse))
@@ -116,11 +195,44 @@ impl Controls {
 mod tests {
     use super::*;
     #[test]
-    fn menu_steps_skip_unavailable_rows() {
-        assert_eq!(step_menu(1, 1, true, false), 2);
-        assert_eq!(step_menu(2, 1, false, true), 1);
-        assert_eq!(step_menu(0, 0, true, false), 2);
-        assert_eq!(step_menu(2, 0, false, true), 0);
-        assert_eq!(step_menu(1, 0, false, false), 1);
+    fn menus_offer_only_what_can_be_done() {
+        use Action::*;
+        assert_eq!(title_menu(false).actions, [NewJourney, Sectors]);
+        assert_eq!(title_menu(true).actions, [Continue, NewJourney, Sectors]);
+        assert_eq!(pause_menu().action(0), Resume);
+    }
+    #[test]
+    fn menu_steps_wrap_over_the_rows_shown() {
+        let two = title_menu(false);
+        assert_eq!(two.step(0, true, false), 1);
+        assert_eq!(two.step(1, false, true), 0);
+        assert_eq!(two.step(0, false, true), 1);
+        let three = pause_menu();
+        assert_eq!(three.step(0, true, false), 2);
+        assert_eq!(three.step(2, false, true), 0);
+        assert_eq!(three.step(1, false, false), 1);
+        // A focus left over from a longer menu lands on the last row.
+        assert_eq!(two.step(2, false, false), 1);
+    }
+    #[test]
+    fn every_row_is_hit_at_its_centre_and_rows_never_overlap() {
+        for menu in [
+            title_menu(false),
+            title_menu(true),
+            pause_menu(),
+            result_menu(true),
+        ] {
+            for row in 0..menu.actions.len() {
+                let r = menu.rect(row);
+                assert_eq!(menu.hover(r.center()), Some(row));
+                if row > 0 {
+                    let above = menu.rect(row - 1);
+                    assert_eq!(r.y - (above.y + above.h), ROW_GAP);
+                }
+            }
+            let below = menu.rect(menu.actions.len() - 1);
+            assert_eq!(menu.hover(Vec2::new(480.0, below.y + below.h + 1.0)), None);
+        }
+        assert_eq!(title_menu(true).rect(0).h, TALL_ROW);
     }
 }

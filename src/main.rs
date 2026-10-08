@@ -38,7 +38,7 @@ use render::Renderer;
 use std::{path::PathBuf, time::Instant};
 use steam::Steam;
 use storage::{Origin, Profile};
-use ui::{Controls, Preview, Screen, Ui};
+use ui::{Action, Controls, Preview, Screen, Ui};
 
 /// A results card for screens the smoke test shows without playing to them.
 fn preview(stage: Stage) -> Option<Preview> {
@@ -142,10 +142,18 @@ fn enter(
     renderer.reset();
     clock.reset();
 }
-fn home(ui: &mut Ui, profile: &Profile) {
+/// The title screen, focused on its primary action.
+fn home(ui: &mut Ui) {
     ui.screen = Screen::Title;
     ui.paused = false;
-    ui.choice = usize::from(profile.progress.checkpoint().is_none());
+    ui.choice = 0;
+}
+/// Starts a journey from sector 01, replacing the checkpoint but keeping
+/// unlocks, medals, times and the best score.
+fn new_journey(profile: &mut Profile) -> Game {
+    let fresh = Game::new();
+    profile.progress.begin(&fresh);
+    fresh
 }
 /// A GUI-subsystem process starts without a console. When launched from a
 /// terminal (`--version`, smoke and perf tests), borrow the parent's console so
@@ -247,7 +255,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
     let mut perf = Perf::new();
     let mut trace = perf::FrameTrace::new(perf_test);
     let mut ui = Ui::default();
-    home(&mut ui, &profile);
+    home(&mut ui);
     ui.save_error = save_blocked;
     if smoke && !flow {
         ui.screen = Screen::Play;
@@ -373,18 +381,17 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         let mut changed = false;
         match ui.screen {
             Screen::Title => {
-                // Continue is unavailable without a checkpoint; never select it.
-                let first = usize::from(profile.progress.checkpoint().is_none());
-                let hovered = ui::hover_menu(pointer).filter(|&row| row >= first);
-                ui.choice = ui::step_menu(ui.choice, first, up, down);
+                let menu = ui::title_menu(profile.progress.checkpoint().is_some());
+                let hovered = menu.hover(pointer);
+                ui.choice = menu.step(ui.choice, up, down);
                 if (moved || click)
                     && let Some(row) = hovered
                 {
                     ui.choice = row;
                 }
                 if confirm || (click && hovered.is_some()) {
-                    match ui.choice {
-                        0 => {
+                    match menu.action(ui.choice) {
+                        Action::Continue => {
                             if let Some(c) = profile.progress.checkpoint() {
                                 enter(
                                     Game::resume(c),
@@ -396,23 +403,23 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                                 changed = true;
                             }
                         }
-                        1 => {
-                            let fresh = Game::new();
-                            profile.progress.begin(&fresh);
+                        Action::NewJourney => {
+                            let fresh = new_journey(&mut profile);
                             dirty = true;
                             enter(fresh, &mut game, &mut ui, &mut renderer, &mut clock);
                             changed = true;
                         }
-                        _ => {
+                        Action::Sectors => {
                             ui.screen = Screen::Sectors;
                             ui.sector = SectorId::clamped(profile.progress.unlocked_count() - 1);
                         }
+                        Action::Resume | Action::Retry | Action::MainMenu => {}
                     }
                 }
             }
             Screen::Sectors => {
                 if escape {
-                    home(&mut ui, &profile);
+                    home(&mut ui);
                 }
                 let at = ui.sector.index();
                 if up {
@@ -433,7 +440,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     ui.sector = index;
                 }
                 if click && ui::back_rect().contains(pointer) {
-                    home(&mut ui, &profile);
+                    home(&mut ui);
                 }
                 let play = click
                     && (ui::hover_sector(pointer).is_some() || ui::play_rect().contains(pointer));
@@ -454,7 +461,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             Screen::Play => {
                 if pause {
                     if terminal {
-                        home(&mut ui, &profile);
+                        home(&mut ui);
                     } else {
                         ui.paused = !ui.paused;
                         ui.choice = 0;
@@ -464,44 +471,67 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     changed = true;
                 }
                 if ui.screen == Screen::Play && (ui.paused || terminal) {
-                    ui.choice = ui::step_menu(ui.choice, 0, up, down);
+                    let menu = if ui.paused {
+                        ui::pause_menu()
+                    } else {
+                        ui::result_menu(game.stage() == Stage::Victory)
+                    };
+                    let hovered = menu.hover(pointer);
+                    ui.choice = menu.step(ui.choice, up, down);
                     if (moved || click)
-                        && let Some(row) = ui::hover_menu(pointer)
+                        && let Some(row) = hovered
                     {
                         ui.choice = row;
                     }
-                    if !changed
-                        && (restart || confirm || (click && ui::hover_menu(pointer).is_some()))
-                    {
-                        let action = if restart { 1 } else { ui.choice };
-                        match action {
-                            0 if ui.paused => {
-                                ui.paused = false;
-                                clock.reset();
-                            }
-                            0 => {
-                                ui.screen = Screen::Sectors;
-                                ui.sector = game.sector();
-                            }
-                            1 => {
-                                let fresh = if game.mode() == Mode::Journey {
-                                    // Retrying restores the entry checkpoint; scores cannot be farmed.
-                                    profile
-                                        .progress
-                                        .checkpoint()
-                                        .map_or_else(Game::new, Game::resume)
-                                } else {
-                                    Game::start(game.sector(), Mode::Practice)
-                                };
-                                if fresh.mode() == Mode::Journey {
-                                    profile.progress.begin(&fresh);
-                                    dirty = true;
-                                }
-                                enter(fresh, &mut game, &mut ui, &mut renderer, &mut clock);
-                            }
-                            _ => home(&mut ui, &profile),
+                    // R and X retry wherever the menu offers Retry.
+                    let action = if restart {
+                        menu.actions
+                            .contains(&Action::Retry)
+                            .then_some(Action::Retry)
+                    } else if confirm || (click && hovered.is_some()) {
+                        Some(menu.action(ui.choice))
+                    } else {
+                        None
+                    };
+                    match action.filter(|_| !changed) {
+                        Some(Action::Resume) => {
+                            ui.paused = false;
+                            clock.reset();
+                            changed = true;
                         }
-                        changed = true;
+                        Some(Action::Sectors) => {
+                            ui.screen = Screen::Sectors;
+                            ui.sector = game.sector();
+                            changed = true;
+                        }
+                        Some(Action::Retry) => {
+                            let fresh = if game.mode() == Mode::Journey {
+                                // Retrying restores the entry checkpoint; scores cannot be farmed.
+                                profile
+                                    .progress
+                                    .checkpoint()
+                                    .map_or_else(Game::new, Game::resume)
+                            } else {
+                                Game::start(game.sector(), Mode::Practice)
+                            };
+                            if fresh.mode() == Mode::Journey {
+                                profile.progress.begin(&fresh);
+                                dirty = true;
+                            }
+                            enter(fresh, &mut game, &mut ui, &mut renderer, &mut clock);
+                            changed = true;
+                        }
+                        Some(Action::NewJourney) => {
+                            let fresh = new_journey(&mut profile);
+                            dirty = true;
+                            enter(fresh, &mut game, &mut ui, &mut renderer, &mut clock);
+                            changed = true;
+                        }
+                        Some(Action::MainMenu) => {
+                            home(&mut ui);
+                            changed = true;
+                        }
+                        Some(Action::Continue) | None => {}
                     }
                 } else if !changed && game.stage() == Stage::Cleared {
                     let next = confirm || (click && ui::next_rect().contains(pointer));

@@ -4,7 +4,7 @@ use crate::{
     perf::Perf,
     pixel_font,
     storage::Profile,
-    ui::{self, Screen, Ui},
+    ui::{self, Action, Menu, Screen, Ui},
 };
 use ark::{
     Events, Game, Medals, Mode, Power, SectorSummary, Stage,
@@ -51,13 +51,20 @@ const PALETTE: [Color; 7] = [
     Color::new(0.95, 0.39, 0.78, 1.0),
 ];
 
+/// The spacing scale, in scene units. Layouts step by these and nothing in
+/// between, so related things always sit visibly closer than unrelated ones.
+const S8: f32 = 8.0;
+const S24: f32 = 24.0;
+/// A label and its value, or a name and its detail.
+const PAIR: f32 = S8;
+/// Between the groups of one section, such as items of a hint row.
+const GROUP: f32 = S24;
+
 /// Side margin for full-width text, and the widest a centred line may be.
 const MARGIN: f32 = 64.0;
 const FULL: f32 = WIDTH - 2.0 * MARGIN;
 /// Baseline-to-baseline for body text.
 const LINE: f32 = 26.0;
-/// Space between the items of a hint row.
-const GAP: f32 = 28.0;
 /// The footer's last baseline; rows stack upward from it.
 const FOOTER: f32 = 872.0;
 /// Baseline-to-baseline distance between footer rows: captions are smaller
@@ -325,6 +332,42 @@ impl Scene<'_> {
     fn panel(&self, x: f32, y: f32, w: f32, h: f32) {
         self.rounded(x - 1.0, y - 1.0, w + 2.0, h + 2.0, 13.0, BORDER);
         self.rounded(x, y, w, h, 12.0, SURFACE);
+    }
+    /// A rounded rectangle's edge, `t` thick, drawn inside its bounds.
+    #[allow(clippy::too_many_arguments)]
+    fn outline(&self, x: f32, y: f32, w: f32, h: f32, r: f32, t: f32, color: Color) {
+        const STEPS: usize = 6;
+        let r = r.min(w / 2.0).min(h / 2.0).max(t);
+        self.rect(x + r, y, w - 2.0 * r, t, color);
+        self.rect(x + r, y + h - t, w - 2.0 * r, t, color);
+        self.rect(x, y + r, t, h - 2.0 * r, color);
+        self.rect(x + w - t, y + r, t, h - 2.0 * r, color);
+        let zero = self.vertex(Vec2::ZERO, color);
+        let mut vertices = [zero; 4 * (STEPS + 1) * 2];
+        let mut indices = [0_u16; 4 * STEPS * 6];
+        for (corner, (cx, cy, start)) in [
+            (x + r, y + r, 2.0),
+            (x + w - r, y + r, 3.0),
+            (x + w - r, y + h - r, 0.0),
+            (x + r, y + h - r, 1.0),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let center = vec2(cx, cy);
+            let first = corner * (STEPS + 1) * 2;
+            for i in 0..=STEPS {
+                let direction = Vec2::from_angle((start + i as f32 / STEPS as f32) * FRAC_PI_2);
+                vertices[first + i * 2] = self.vertex(center + direction * r, color);
+                vertices[first + i * 2 + 1] = self.vertex(center + direction * (r - t), color);
+                if i < STEPS {
+                    let k = (first + i * 2) as u16;
+                    let at = (corner * STEPS + i) * 6;
+                    indices[at..at + 6].copy_from_slice(&[k, k + 1, k + 2, k + 2, k + 1, k + 3]);
+                }
+            }
+        }
+        self.mesh(&vertices, &indices);
     }
     /// Oversized so it also covers the letterbox at any aspect ratio.
     fn cover(&self, color: Color) {
@@ -608,7 +651,7 @@ impl Scene<'_> {
         }
     }
     fn item_width(&self, item: &Item, role: Role) -> f32 {
-        let cap = item.cap.map_or(0.0, |c| self.cap_width(c) + 8.0);
+        let cap = item.cap.map_or(0.0, |c| self.cap_width(c) + PAIR);
         cap + self.width_of(item.id, item.arg.as_slice(), role)
     }
     /// Lays `items` into centred lines of at most `FULL` width; calls
@@ -620,7 +663,7 @@ impl Scene<'_> {
             let mut width = self.item_width(&items[start], role);
             let mut end = start + 1;
             while end < items.len() {
-                let next = width + GAP + self.item_width(&items[end], role);
+                let next = width + GROUP + self.item_width(&items[end], role);
                 if next > FULL {
                     break;
                 }
@@ -639,7 +682,7 @@ impl Scene<'_> {
         for item in items {
             if let Some(cap) = item.cap {
                 self.cap_glyph(cap, x, baseline, role);
-                x += self.cap_width(cap) + 8.0;
+                x += self.cap_width(cap) + PAIR;
             }
             let w = self.width_of(item.id, item.arg.as_slice(), role);
             self.say(
@@ -649,7 +692,7 @@ impl Scene<'_> {
                 Slot::left(x, w.min(FULL), baseline),
                 color,
             );
-            x += w + GAP;
+            x += w + GROUP;
         }
     }
     /// Rows of hints stacked up from the bottom of the screen. A save
@@ -686,9 +729,9 @@ impl Scene<'_> {
     fn pairs(&self, pairs: &[(TextId, u32)], baseline: f32, room: f32) {
         let pair_width = |&(label, n): &(TextId, u32)| {
             let value = Figures::count(self.locale, n);
-            self.width_of(label, &[], Role::Label) + 8.0 + self.measure(value.as_str(), Role::Body)
+            self.width_of(label, &[], Role::Label) + PAIR + self.measure(value.as_str(), Role::Body)
         };
-        let width = pairs.iter().map(pair_width).sum::<f32>() + GAP * (pairs.len() as f32 - 1.0);
+        let width = pairs.iter().map(pair_width).sum::<f32>() + GROUP * (pairs.len() as f32 - 1.0);
         if width > room
             && let Some(log) = self.misfits
         {
@@ -703,32 +746,32 @@ impl Scene<'_> {
         for &(label, n) in pairs {
             let w = self.width_of(label, &[], Role::Label);
             self.say(label, &[], Role::Label, Slot::left(x, w, baseline), DIM);
-            x += w + 8.0;
+            x += w + PAIR;
             let value = Figures::count(self.locale, n);
             x += self.put(
                 value.as_str(),
                 Role::Body,
                 Slot::left(x, room, baseline),
                 INK,
-            ) + GAP;
+            ) + GROUP;
         }
     }
-    fn button(&self, r: Rect, id: TextId, args: &[Arg], selected: bool, enabled: bool) {
-        if selected && enabled {
+    /// The screen's primary action is filled; every other action is plain
+    /// text. The focused one, primary or not, gets a cyan edge and label.
+    fn button(&self, r: Rect, id: TextId, args: &[Arg], primary: bool, focused: bool) {
+        if primary {
             self.rounded(r.x, r.y, r.w, r.h, 10.0, opacity(CYAN, 0.13));
         }
-        let color = match (enabled, selected) {
-            (false, _) => MUTED,
-            (true, true) => CYAN,
-            (true, false) => opacity(INK, 0.82),
-        };
+        if focused {
+            self.outline(r.x, r.y, r.w, r.h, 10.0, 1.5, opacity(CYAN, 0.7));
+        }
         let baseline = r.y + r.h / 2.0 + self.cap(Role::Body) / 2.0;
         self.say(
             id,
             args,
             Role::Body,
             Slot::centered(r.x + r.w / 2.0, r.w - 32.0, baseline),
-            color,
+            if focused { CYAN } else { INK },
         );
     }
     fn logo(&self, x: f32, y: f32, cell: f32) {
@@ -1175,12 +1218,7 @@ fn scene(
             Slot::centered(WIDTH / 2.0, PANEL, 342.0),
             INK,
         );
-        menu(
-            v,
-            ui.choice,
-            [TextId::ActionResume, TextId::RetrySector, TextId::MainMenu],
-            None,
-        );
+        menu(v, &ui::pause_menu(), ui.choice);
         let note = Slot::centered(WIDTH / 2.0, PANEL, 576.0);
         v.paragraph(TextId::RetryNote, Role::Body, note, 2, DIM);
         match v.device {
@@ -1221,17 +1259,7 @@ fn scene(
                     368.0,
                     PANEL,
                 );
-                let second = if stage == Stage::Victory {
-                    TextId::NewJourney
-                } else {
-                    TextId::RetrySector
-                };
-                menu(
-                    v,
-                    ui.choice,
-                    [TextId::SectorSelect, second, TextId::MainMenu],
-                    None,
-                );
+                menu(v, &ui::result_menu(stage == Stage::Victory), ui.choice);
                 v.say(
                     TextId::ProgressSaved,
                     &[],
@@ -1639,30 +1667,27 @@ fn options(profile: &Profile, device: Device) -> [Item; 3] {
         },
     ]
 }
-fn menu(v: &Scene, selected: usize, labels: [TextId; 3], disabled: Option<usize>) {
-    for (i, label) in labels.into_iter().enumerate() {
-        v.button(
-            ui::menu_rect(i),
-            label,
-            &[],
-            i == selected,
-            disabled != Some(i),
-        );
+/// The label of a menu action.
+fn action_label(action: Action) -> TextId {
+    match action {
+        Action::Continue => TextId::ContinueJourney,
+        Action::NewJourney => TextId::NewJourney,
+        Action::Sectors => TextId::SectorSelect,
+        Action::Resume => TextId::ActionResume,
+        Action::Retry => TextId::RetrySector,
+        Action::MainMenu => TextId::MainMenu,
+    }
+}
+fn menu(v: &Scene, menu: &Menu, focus: usize) {
+    for (i, &action) in menu.actions.iter().enumerate() {
+        v.button(menu.rect(i), action_label(action), &[], i == 0, i == focus);
     }
 }
 fn attract(v: &Scene, ui: &Ui, profile: &Profile) {
     v.logo(270.0, 170.0, 12.0);
     v.say(TextId::Tagline, &[], Role::Body, Slot::line(300.0), DIM);
-    menu(
-        v,
-        ui.choice,
-        [
-            TextId::ContinueJourney,
-            TextId::NewJourney,
-            TextId::SectorSelect,
-        ],
-        profile.progress.checkpoint().is_none().then_some(0),
-    );
+    let saved = profile.progress.checkpoint().is_some();
+    menu(v, &ui::title_menu(saved), ui.choice);
     match profile.progress.checkpoint() {
         Some(c) => {
             let args = [
@@ -1901,8 +1926,8 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
     while start < legend.len() {
         let mut width = widths[start];
         let mut end = start + 1;
-        while end < legend.len() && width + GAP + widths[end] <= FULL {
-            width += GAP + widths[end];
+        while end < legend.len() && width + GROUP + widths[end] <= FULL {
+            width += GROUP + widths[end];
             end += 1;
         }
         let mut x = WIDTH / 2.0 - width / 2.0;
@@ -1917,7 +1942,7 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
                 Slot::left(x + label + 8.0, text, y),
                 DIM,
             );
-            x += widths[start + k] + GAP;
+            x += widths[start + k] + GROUP;
         }
         y += LINE;
         legend_lines += 1;
@@ -1933,23 +1958,19 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
             missing: None,
         });
     }
-    let open = ui.sector.index() < profile.progress.unlocked_count();
-    if open {
+    let play = ui::play_rect();
+    if ui.sector.index() < profile.progress.unlocked_count() {
         v.button(
-            ui::play_rect(),
+            play,
             TextId::PlaySector,
             &[Arg::Sector(ui.sector)],
             true,
             true,
         );
     } else {
-        v.button(
-            ui::play_rect(),
-            TextId::ClearPreviousFirst,
-            &[],
-            true,
-            false,
-        );
+        let baseline = play.y + play.h / 2.0 + v.cap(Role::Body) / 2.0;
+        let slot = Slot::centered(WIDTH / 2.0, play.w, baseline);
+        v.say(TextId::ClearPreviousFirst, &[], Role::Body, slot, DIM);
     }
     let hints = match v.device {
         Device::KeyboardMouse => [
