@@ -70,11 +70,37 @@ pub const LADDER: [u8; 25] = [
 ];
 
 /// Physical pixels per scene unit on the displays the layouts are checked
-/// at: 720p (1280 × 720), Steam Deck (1280 × 800), a 960 × 900 window at
-/// 100 %, 1080p, 1440p, a Retina window at 200 %, and 4K. The 720p strikes
-/// keep body text in small windows near its planned size instead of a
-/// fifth larger.
-pub const DENSITIES: [f32; 7] = [0.8, 800.0 / 900.0, 1.0, 1.2, 1.6, 2.0, 2.4];
+/// at. Regular frames: the 720-pixel-wide frame where Regular begins,
+/// 720p (1280 × 720), Steam Deck (1280 × 800), a 960 × 900 window at
+/// 100 %, 1080p, 1440p, a Retina window at 200 %, and 4K. Small frames,
+/// 400 to 719 pixels wide: where Small begins, the smallest desktop window
+/// (480 × 450) and one between, where floors hold text above its scale.
+pub const DENSITIES: [f32; 11] = [
+    400.0 / 960.0,
+    0.5,
+    0.6,
+    0.75,
+    0.8,
+    800.0 / 900.0,
+    1.0,
+    1.2,
+    1.6,
+    2.0,
+    2.4,
+];
+
+/// The smallest pixel size a role is ever set at: the physical floors.
+/// Floors only raise sizes; the layout reflows around them. A Label's
+/// capitals stay at least 7 px tall (10 px type); headings and figures
+/// never drop below body text.
+pub const fn floor(role: Role) -> f32 {
+    match role {
+        Role::Body => 12.0,
+        Role::Caption => 11.0,
+        Role::Label => 10.0,
+        Role::Display | Role::Title | Role::Figure => 14.0,
+    }
+}
 
 /// The ladder entry nearest `px`, comparing ratios rather than differences.
 pub fn nearest(px: f32) -> u8 {
@@ -97,12 +123,13 @@ fn closest(px: f32, rungs: impl IntoIterator<Item = u8>) -> Option<u8> {
     best
 }
 
-/// The sizes baked for `role`: the nearest ladder entry at each density.
+/// The sizes baked for `role`: the nearest ladder entry at each density,
+/// never below the role's floor.
 pub fn rungs(role: Role) -> impl Iterator<Item = u8> {
     let (size, _, _) = style(role);
     let mut seen = [0_u8; DENSITIES.len()];
     DENSITIES.into_iter().enumerate().filter_map(move |(i, d)| {
-        let rung = nearest(size * d);
+        let rung = nearest((size * d).max(floor(role)));
         let fresh = !seen[..i].contains(&rung);
         seen[i] = rung;
         fresh.then_some(rung)
@@ -112,26 +139,31 @@ pub fn rungs(role: Role) -> impl Iterator<Item = u8> {
 /// The baked size for `role` at `density`: the nearest ladder entry, or
 /// the largest baked size below it when that entry was not baked (the
 /// density lies between the checked ones). Text is then never more than
-/// half a ladder step larger than its layout planned. `None` below about
-/// 87 % of the smallest baked size, where the pixel font takes over.
-pub fn ppem(role: Role, density: f32) -> Option<u8> {
+/// half a ladder step larger than its layout planned, except where a
+/// floor raises it.
+pub fn ppem(role: Role, density: f32) -> u8 {
     ppem_px(role, style(role).0 * density)
 }
 
 /// [`ppem`] for text of `role` laid out `px` physical pixels tall, for the
 /// few places set off the role's own size (a card's name, the band's
 /// smaller figures).
-pub fn ppem_px(role: Role, px: f32) -> Option<u8> {
-    let smallest = rungs(role).min()?;
-    if px < f32::from(smallest) * 0.87 {
-        return None;
-    }
-    let ladder = nearest(px);
+pub fn ppem_px(role: Role, px: f32) -> u8 {
+    let ladder = nearest(px.max(floor(role)));
+    let smallest = rungs(role).min().unwrap_or(LADDER[0]);
     rungs(role)
         .filter(|&r| r <= ladder)
         .max()
-        .or(Some(smallest))
+        .unwrap_or(smallest)
 }
+
+/// The baked size one step below `ppem` for `role`, the fit chain's
+/// third step, if it does not breach the floor.
+pub fn step_down(role: Role, ppem: u8) -> Option<u8> {
+    let floor = nearest(floor(role));
+    rungs(role).filter(|&r| r < ppem && r >= floor).max()
+}
+
 /// Characters drawn from the CJK faces; everything else comes from Noto Sans.
 pub const fn is_cjk(c: char) -> bool {
     matches!(c as u32,

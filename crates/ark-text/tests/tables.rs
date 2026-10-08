@@ -47,17 +47,77 @@ fn every_translation_has_the_sources_slots() {
     }
 }
 
+/// A short form is never longer than the full one. Where the full one is
+/// already as short as the word can be ("Sound"), the short form repeats
+/// it, so the fit chain finds one for every action and band item.
 #[test]
-fn short_forms_are_shorter() {
+fn short_forms_are_never_longer() {
     for locale in real_locales() {
         for id in TextId::all() {
             if let Some(short) = short_template(locale, id) {
                 let full = template(locale, id);
                 assert!(
-                    short.chars().count() < full.chars().count(),
-                    "{locale:?} {id:?}: {short:?} is not shorter than {full:?}"
+                    short.chars().count() <= full.chars().count(),
+                    "{locale:?} {id:?}: {short:?} is longer than {full:?}"
                 );
             }
+        }
+    }
+}
+
+/// The fit chain's second step needs a short form for every action, for
+/// everything the band shows, and for the help lines, settings and news.
+#[test]
+fn every_action_and_band_item_has_a_short_form() {
+    use TextId::*;
+    let ids = [
+        ContinueJourney,
+        NewJourney,
+        SectorSelect,
+        ActionResume,
+        RetrySector,
+        MainMenu,
+        NextSector,
+        BackToSectors,
+        PlaySector,
+        Settings,
+        ActionServe,
+        ActionRelease,
+        ActionSelect,
+        ActionBack,
+        ActionAdjust,
+        StatBest,
+        StatMedals,
+        SectorsOf,
+        SectorsHeading,
+        SaveFailed,
+        LifeGained,
+        KeyEsc,
+        KeySpace,
+        HelpResume,
+        HelpRetry,
+        HelpMainMenu,
+        HelpSectors,
+        HelpNewJourney,
+        HelpSettings,
+        SettingSound,
+        SettingVolume,
+        SettingDisplay,
+        SettingLanguage,
+        DisplayWindow,
+        Fullscreen,
+        LanguageSystem,
+        ExtraLife,
+        ReadyEyebrow,
+    ]
+    .into_iter()
+    .chain(ark::sectors::SectorId::all().map(SectorName));
+    for id in ids {
+        for locale in real_locales() {
+            assert!(
+                short_template(locale, id).is_some(),
+                "{locale:?} {id:?} has no short form"
+            );
         }
     }
 }

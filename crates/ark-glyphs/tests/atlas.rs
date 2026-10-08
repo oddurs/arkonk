@@ -166,20 +166,29 @@ fn lines_wrap_by_script() {
 }
 
 #[test]
-fn every_role_snaps_to_a_baked_size() {
+fn every_role_snaps_to_a_baked_size_above_its_floor() {
     for role in spec::ROLES {
         for d in spec::DENSITIES {
-            let ppem = spec::ppem(role, d).expect("checked densities use Noto");
+            let ppem = spec::ppem(role, d);
             assert!(spec::rungs(role).any(|r| r == ppem));
+            assert!(
+                f32::from(ppem) >= spec::floor(role) - 0.5,
+                "{role:?} at {d}"
+            );
         }
-        // A tiny window falls back to the pixel font.
-        assert_eq!(spec::ppem(role, 0.5), None);
+        // However small the frame, text holds its floor.
+        assert!(f32::from(spec::ppem(role, 0.1)) >= spec::floor(role) - 0.5);
+        if let Some(below) = spec::step_down(role, spec::ppem(role, 1.0)) {
+            assert!(below < spec::ppem(role, 1.0) && f32::from(below) >= spec::floor(role) - 0.5);
+        }
     }
-    assert_eq!(spec::ppem(Role::Body, 2.0), Some(40));
-    assert_eq!(spec::ppem(Role::Label, 800.0 / 900.0), Some(13));
+    assert_eq!(spec::ppem(Role::Body, 2.0), 40);
+    assert_eq!(spec::ppem(Role::Label, 800.0 / 900.0), 13);
     // Steam Deck body text sits on the 18 px strike, lowercase just over 9 px.
-    assert_eq!(spec::ppem(Role::Body, 800.0 / 900.0), Some(18));
-    assert_eq!(spec::ppem(Role::Caption, 800.0 / 900.0), Some(14));
+    assert_eq!(spec::ppem(Role::Body, 800.0 / 900.0), 18);
+    assert_eq!(spec::ppem(Role::Caption, 800.0 / 900.0), 14);
+    // The smallest window holds body text at its 12 px floor.
+    assert_eq!(spec::ppem(Role::Body, 0.5), 12);
 }
 
 #[test]

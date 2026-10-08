@@ -38,6 +38,12 @@ impl Class {
 pub const STRIP: f32 = 8.0;
 const STRIP_GAP: f32 = 1.0;
 
+/// The fraction of each screen edge the platform says a television may
+/// hide. Desktops and handhelds show every pixel, so this is zero on
+/// every platform the game ships on; a port to one that reports overscan
+/// sets it there, and the band and sheets keep inside the safe area.
+const OVERSCAN: f32 = 0.0;
+
 /// Where the fixed scene sits in the window: uniform scale, centred.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct View {
@@ -48,11 +54,28 @@ pub struct View {
     /// Physical pixels per scene unit: what text and hairlines snap to.
     pub density: f32,
     pub class: Class,
+    /// The part of the screen sure to be seen, in scene units: the whole
+    /// screen unless the platform reports overscan.
+    pub safe: Rect,
 }
 impl View {
     /// `None` while the window has no drawable area (minimized, or zero-sized
     /// mid-transition): there is nothing to draw and no pointer to map.
     pub fn fit(width: f32, height: f32, dpi: f32) -> Option<Self> {
+        Self::fit_inset(width, height, dpi, OVERSCAN)
+    }
+    /// [`Self::fit`] on a screen that may hide `overscan` of each edge.
+    pub fn fit_inset(width: f32, height: f32, dpi: f32, overscan: f32) -> Option<Self> {
+        let view = Self::place(width, height, dpi)?;
+        let (ix, iy) = (width * overscan, height * overscan);
+        let corner = view.to_scene(ix, iy);
+        let far = view.to_scene(width - ix, height - iy);
+        Some(Self {
+            safe: Rect::new(corner.x, corner.y, far.x - corner.x, far.y - corner.y),
+            ..view
+        })
+    }
+    fn place(width: f32, height: f32, dpi: f32) -> Option<Self> {
         // `f32::min` ignores NaN, so every input is checked, not just the scale.
         let usable = |v: f32| v.is_finite() && v > 0.0;
         if !(usable(width) && usable(height) && usable(dpi)) {
@@ -76,6 +99,7 @@ impl View {
                 y: snap(top - TOP * scale),
                 density: scale * dpi,
                 class,
+                safe: Rect::default(),
             });
         }
         Some(Self {
@@ -84,6 +108,7 @@ impl View {
             y: snap((height - HEIGHT * scale) / 2.0),
             density: scale * dpi,
             class,
+            safe: Rect::default(),
         })
     }
     /// The view of the window, or of the frame preview inside it.
@@ -104,6 +129,7 @@ impl View {
             y: (oy + inner.y * k) / dpi,
             density: inner.density,
             class: inner.class,
+            safe: inner.safe,
         })
     }
     pub fn to_scene(self, x: f32, y: f32) -> V2 {

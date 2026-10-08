@@ -86,6 +86,10 @@ fixed-length arrays for the same reason. `es-419` deliberately falls back to
   minimum grouping digits of 2). Times are `mm:ss` everywhere.
 - **Short forms.** `short` in a table gives a narrower wording, used only
   when the full one does not fit (for example `Continue journey` → `Continue`).
+  Every action, everything the band shows, the help lines, the settings and
+  the news must have one in every table (a test checks); where the word is
+  already as short as it gets (`Sound`), the short form repeats it. A short
+  form is never longer than the full one.
   A short form may leave a slot out (the Continue button's caption drops the
   sector number and keeps the name); it never adds one.
 - **Quoted strings.** A slot filled with another string (`Arg::Text`) sets
@@ -133,8 +137,8 @@ For each language, a native speaker who plays games should check:
 
 The UI is set in **Noto Sans** (Regular and Medium) and **Noto Sans CJK**
 (SC, JP and KR subsets, Regular and Medium), both SIL Open Font License 1.1.
-The 5×7 pixel font draws the ARKONK logo and the app icons, and takes over
-for text when a window is too small for Noto to stay legible.
+The 5×7 pixel font draws the ARKONK logo and the app icons, and sets the
+text of the Compact layout, for frames under 400 px wide.
 
 | Role | Size (scene units) | Weight | Use |
 | --- | ---: | --- | --- |
@@ -170,11 +174,18 @@ never scaled. Only the sizes the checked displays need are baked:
 | Retina window at 200 % | 2.00 | 30 | 32 | 40 | 64 |
 | 4K | 2.40 | 36 | 40 | 48 | 64 |
 
-Between those densities a style takes the nearest ladder size, or the largest
-baked size below it. Above 2.4 text stays at the 4K sizes. Below about 0.76,
-where even the smallest strike would be far larger than the layout planned,
-Latin text switches to the pixel font; scripts it cannot spell keep the
-smallest strike. The Small and Compact layouts will handle tiny displays.
+Small frames (400 to 719 px wide) add densities 0.42, 0.5, 0.6 and 0.75.
+Between the checked densities a style takes the nearest ladder size, or the
+largest baked size below it. Above 2.4 text stays at the 4K sizes.
+
+No role is ever set under its physical floor: body text 12 px, captions
+11 px, labels 10 px (capitals about 7 px), headings and figures 14 px
+(`spec::floor`). A floor raises the size and the layout reflows round it.
+The fit chain may step a role down one baked size, never below its floor.
+
+On a Compact frame (under 400 px) text the 5×7 font can spell is set in it
+at whole pixels, headings doubled; a string with letters it lacks (accents,
+Cyrillic, CJK) is set in Noto at its floor, whole paragraphs at once.
 
 **Steam Deck legibility.** Valve asks for text at least 9 px tall at 1280 × 800.
 The smallest text is a label at 13 px, whose capitals are 9.3 px tall;
@@ -183,12 +194,16 @@ pins the cap-height check and the Deck strike for each role.
 
 ### Layout check
 
-`every_string_fits_its_place_in_every_locale` (`src/render/tests.rs`) draws
-every screen in every locale, including pseudo, with keyboard and gamepad
-prompts, at each density above and at the density just past every size
-switch (where text is widest for its layout). It uses the renderer's own
-measuring code, so it fails on any string wider than its slot, any wrapped
-text past its lines, and any glyph missing from the atlas.
+`every_screen_lays_out_in_every_locale_and_class` (`src/render/tests.rs`)
+draws every screen and sheet in every locale, including pseudo, with the
+keyboard, Xbox and PlayStation glyphs, at the frame widths where the layout
+classes meet (399, 400, 719 and 720 px), at 1920×1080, 1280×800, 3440×1440,
+3840×2160, 1024×768, 1080×1920, 240×240 and 160×128, and at the density just
+past every size switch (where text is widest for its layout). It uses the
+renderer's own measuring code and fails on any string wider than its slot,
+wrapped past its lines or cut to an ellipsis; any glyph missing from the
+atlas; text overlapping other text or leaving its box or the screen; and
+text, glyph chips or pointer rows under their physical floors.
 
 ## Baking the atlases
 
@@ -225,10 +240,13 @@ macOS arm64 release binary, symbols kept:
 
 | Atlas file | Holds | Bytes |
 | --- | --- | ---: |
-| `latin.bin` | Latin, Cyrillic, figures; 203 Regular + 126 Medium glyphs | 175,509 |
-| `zh.bin` | 219 + 36 Simplified Chinese glyphs | 324,282 |
-| `ja.bin` | 205 + 52 Japanese glyphs | 286,940 |
-| `ko.bin` | 204 + 45 Korean glyphs | 192,553 |
+| `latin.bin` | Latin, Cyrillic, figures, in the Regular, Medium and Display cuts | 363,750 |
+| `zh.bin` | Simplified Chinese glyphs | 537,712 |
+| `ja.bin` | Japanese glyphs | 498,762 |
+| `ko.bin` | Korean glyphs | 335,605 |
+
+The Small layout's strikes (densities 0.42 to 0.75) and the short forms
+added 218,845 bytes (14 %) across the four files.
 
 The rest of the change, about 134 KB, is code and string tables: the new
 renderer text path, the twelve tables (with their CJK and Cyrillic UTF-8),

@@ -1,7 +1,10 @@
-use crate::{input::Device, render::WIDTH};
-use ark::{SectorSummary, Stage, sectors::SectorId};
-/// The most rows any menu has.
-const MAX_ROWS: usize = 8;
+use crate::input::Device;
+use ark::{
+    SectorSummary, Stage,
+    sectors::{SECTOR_COUNT, SectorId},
+};
+/// The most rows any list has: sector select's, a card per sector.
+const MAX_ROWS: usize = SECTOR_COUNT;
 use macroquad::prelude::{Rect, Vec2};
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
@@ -125,6 +128,12 @@ pub struct Hits {
     pub play: Option<Rect>,
 }
 impl Hits {
+    /// Starts the rows of `list`, dropping any drawn under it: a sheet
+    /// over the title must not answer with the title's rows.
+    pub fn begin(&mut self, list: impl Into<List>) {
+        self.list = Some(list.into());
+        self.count = 0;
+    }
     pub fn push(&mut self, row: Rect) {
         if let Some(slot) = self.rows.get_mut(self.count) {
             *slot = row;
@@ -213,33 +222,10 @@ pub struct Menu {
     pub actions: &'static [Action],
 }
 
-/// The title's menu column: its width, the height of a one-line row and
-/// of the Continue row with its caption, and the space between rows.
-pub const MENU_WIDTH: f32 = 400.0;
-pub const ROW: f32 = 48.0;
-pub const TALL_ROW: f32 = 64.0;
-pub const ROW_GAP: f32 = 8.0;
 /// The top of the title menu's first row.
 pub const TITLE_TOP: f32 = 392.0;
 
 impl Menu {
-    fn height(&self, row: usize) -> f32 {
-        if self.actions[row] == Action::Continue {
-            TALL_ROW
-        } else {
-            ROW
-        }
-    }
-    /// A row of the menu laid out as a centred column from `top`.
-    pub fn column(&self, top: f32, row: usize) -> Rect {
-        let y = top + (0..row).map(|r| self.height(r) + ROW_GAP).sum::<f32>();
-        Rect::new(
-            WIDTH / 2.0 - MENU_WIDTH / 2.0,
-            y,
-            MENU_WIDTH,
-            self.height(row),
-        )
-    }
     /// Moves the focus one row, wrapping at either end.
     pub fn step(&self, choice: usize, up: bool, down: bool) -> usize {
         let last = self.actions.len() - 1;
@@ -358,23 +344,46 @@ mod tests {
             ..Hits::default()
         };
         let menu = pause_menu();
-        for row in 0..menu.actions.len() {
-            hits.push(menu.column(100.0, row));
+        let row = |i: usize| Rect::new(280.0, 100.0 + i as f32 * 56.0, 400.0, 48.0);
+        for i in 0..menu.actions.len() {
+            hits.push(row(i));
         }
-        for row in 0..menu.actions.len() {
-            let r = menu.column(100.0, row);
-            assert_eq!(hits.row_at(menu, r.center()), Some(row));
+        for i in 0..menu.actions.len() {
+            assert_eq!(hits.row_at(menu, row(i).center()), Some(i));
         }
-        let below = menu.column(100.0, menu.actions.len() - 1);
+        let below = row(menu.actions.len() - 1);
         assert_eq!(
             hits.row_at(menu, Vec2::new(480.0, below.bottom() + 1.0)),
             None
         );
         // A stale frame's rows never answer for another menu.
-        assert_eq!(
-            hits.row_at(title_menu(false), menu.column(100.0, 0).center()),
-            None
-        );
+        assert_eq!(hits.row_at(title_menu(false), row(0).center()), None);
+    }
+    #[test]
+    fn a_list_drawn_over_another_starts_its_rows_afresh() {
+        let mut hits = Hits::default();
+        hits.begin(title_menu(false));
+        let title_row = Rect::new(280.0, 400.0, 400.0, 48.0);
+        hits.push(title_row);
+        hits.begin(List::Settings);
+        let setting = Rect::new(240.0, 200.0, 480.0, 48.0);
+        hits.push(setting);
+        // The title row under the sheet once answered as setting 0.
+        assert_eq!(hits.rows(), [setting]);
+        assert_eq!(hits.row_at(List::Settings, title_row.center()), None);
+        assert_eq!(hits.row_at(List::Settings, setting.center()), Some(0));
+    }
+    #[test]
+    fn every_sector_card_is_a_row() {
+        let mut hits = Hits {
+            list: Some(List::Sectors),
+            ..Hits::default()
+        };
+        for i in 0..SECTOR_COUNT {
+            hits.push(Rect::new(i as f32 * 10.0, 0.0, 10.0, 10.0));
+        }
+        // The last chapter's cards were dropped once the list held eight.
+        assert_eq!(hits.row_at(List::Sectors, Vec2::new(115.0, 5.0)), Some(11));
     }
     #[test]
     fn a_pressed_glyph_flashes_briefly() {

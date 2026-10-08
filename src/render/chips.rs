@@ -49,6 +49,82 @@ fn face(prompt: Prompt, device: Device, mouse: bool) -> Face {
     }
 }
 
+/// A chip's height beside body text and inside buttons (`body`), or
+/// beside captions: 28 and 22 on a Regular screen, 22 on a Small one,
+/// never under 18 pixels. A Compact screen sets glyphs as bracketed
+/// text, one pixel-font line tall.
+pub(super) fn size(v: &Scene, body: bool) -> f32 {
+    match v.class {
+        Class::Compact => 7.0 / v.density,
+        Class::Regular if body => v.at_least(28.0, 18.0),
+        Class::Regular | Class::Small => v.at_least(22.0, 18.0),
+    }
+}
+
+/// What a Compact screen writes between the brackets: a key's name, a
+/// letter, or a 5×7 icon.
+enum Inside {
+    Name(TextId),
+    Letter(char),
+    Icon([u8; 7]),
+}
+fn inside(v: &Scene, face: Face) -> Inside {
+    match face {
+        // A name the pixel font cannot spell would stand taller than the
+        // line it sits in; the key's shape stands in for it.
+        Face::Key(id) if !v.format(id, &[], Form::Short, |t| t.chars().all(pixel_font::spells)) => {
+            Inside::Icon(if id == TextId::KeySpace {
+                [0, 0, 0, 0, 17, 31, 0]
+            } else {
+                [0, 4, 8, 31, 8, 4, 0]
+            })
+        }
+        Face::Key(id) => Inside::Name(id),
+        Face::Enter => Inside::Icon([1, 1, 9, 31, 8, 0, 0]),
+        Face::Arrow(true) | Face::DPad(true) => Inside::Letter('<'),
+        Face::Arrow(false) | Face::DPad(false) => Inside::Letter('>'),
+        Face::Mouse => Inside::Icon([14, 21, 31, 17, 17, 14, 0]),
+        Face::Button(Pad::Xbox, n) => Inside::Letter(if n == CROSS { 'A' } else { 'B' }),
+        Face::Button(Pad::PlayStation, CROSS) => Inside::Icon([0, 17, 10, 4, 10, 17, 0]),
+        Face::Button(Pad::PlayStation, _) => Inside::Icon([0, 14, 17, 17, 17, 14, 0]),
+    }
+}
+/// A glyph as bracketed text, `[A]` or `[Esc]`, from `x` with its middle
+/// at `mid`; returns its width. With `draw` false, only measures.
+fn bracketed(v: &Scene, face: Face, (x, mid): (f32, f32), ink: Color, draw: bool) -> f32 {
+    let style = Style::from(Role::Label).untracked();
+    let baseline = v.snap(mid + v.cap(style) / 2.0);
+    match inside(v, face) {
+        // A key's short name, so a Compact strip reads [Esc] in French too.
+        Inside::Name(id) => v.format(id, &[], Form::Short, |name| {
+            let text = Line::of(|l| write!(l, "[{name}]"));
+            let w = v.measure(text.as_str(), style);
+            if draw {
+                v.put(text.as_str(), style, Slot::left(x, w, baseline), ink);
+            }
+            w
+        }),
+        Inside::Letter(c) => {
+            let text = Figures::of(|f| write!(f, "[{c}]"));
+            let w = v.measure(text.as_str(), style);
+            if draw {
+                v.put(text.as_str(), style, Slot::left(x, w, baseline), ink);
+            }
+            w
+        }
+        Inside::Icon(bits) => {
+            let px = 1.0 / v.density;
+            if draw {
+                let slot = |at: f32| Slot::left(at, 5.0 * px, baseline);
+                v.put("[", style, slot(x), ink);
+                v.bits(bits, (v.snap(x + 6.0 * px), baseline - 7.0 * px), px, ink);
+                v.put("]", style, slot(x + 12.0 * px), ink);
+            }
+            17.0 * px
+        }
+    }
+}
+
 /// The chip's label size for a chip `size` tall.
 fn label_size(size: f32) -> f32 {
     size * 13.0 / 28.0
@@ -57,7 +133,11 @@ fn label_size(size: f32) -> f32 {
 /// How wide `prompt`'s chip is at `size`: at least square, keys grow
 /// with their label.
 pub(super) fn width(v: &Scene, prompt: Prompt, size: f32) -> f32 {
-    match face(prompt, v.device, v.mouse) {
+    let face = face(prompt, v.device, v.mouse);
+    if v.class == Class::Compact {
+        return bracketed(v, face, (0.0, 0.0), INK, false);
+    }
+    match face {
         Face::Key(id) => {
             let label = v.width_of(id, &[], label_style(size));
             (label + 2.0 * size * 8.0 / 28.0).max(size)
@@ -79,6 +159,23 @@ pub(super) fn chip(v: &Scene, prompt: Prompt, (x, mid): (f32, f32), size: f32, l
         lit
     };
     let face = face(prompt, v.device, v.mouse);
+    if v.class == Class::Compact {
+        let ink = match lit {
+            Lit::Neutral => hex(0xcfd6e3),
+            Lit::Primary => CYAN,
+            Lit::Pressed => WHITE,
+            Lit::Unavailable => MUTED,
+        };
+        return bracketed(v, face, (x, mid), ink, true);
+    }
+    if size * v.density < 18.0 - 0.5 {
+        v.note(|| {
+            format!(
+                "{prompt:?} chip {:.1} px, under its floor",
+                size * v.density
+            )
+        });
+    }
     let w = width(v, prompt, size);
     // Pressed chips sink by a unit.
     let drop = if lit == Lit::Pressed { 1.0 } else { 0.0 };

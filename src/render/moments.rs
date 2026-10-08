@@ -13,7 +13,8 @@ pub(super) fn release(v: &Scene, game: &Game) {
         return;
     }
     let words = (TextId::ActionRelease, Role::Caption.into());
-    let w = chips::prompt_width(v, Prompt::Serve, words, sheet::CHIP_SMALL);
+    let size = chips::size(v, false);
+    let w = chips::prompt_width(v, Prompt::Serve, words, size);
     let paddle = game.paddle();
     let right = paddle.x + paddle.width / 2.0 + S16;
     let x = if right + w <= RIGHT - S16 {
@@ -21,16 +22,12 @@ pub(super) fn release(v: &Scene, game: &Game) {
     } else {
         paddle.x - paddle.width / 2.0 - S16 - w
     };
+    // Where neither side has room, as on a Compact screen, it stays in
+    // the field and may cross the paddle.
+    let x = x.min(RIGHT - S16 - w).max(LEFT + S16);
     let mid = PADDLE_Y + PADDLE_HEIGHT / 2.0;
     let baseline = v.snap(mid + v.cap(Role::Caption) / 2.0);
-    chips::prompt(
-        v,
-        Prompt::Serve,
-        words,
-        (v.snap(x), baseline),
-        sheet::CHIP_SMALL,
-        CYAN,
-    );
+    chips::prompt(v, Prompt::Serve, words, (v.snap(x), baseline), size, CYAN);
 }
 
 /// A caught power's name rises 10 units above the paddle in its hue,
@@ -50,10 +47,10 @@ pub(super) fn power(v: &Scene, game: &Game) {
     v.say(TextId::PowerName(power), &[], Role::Label, slot, colour);
 }
 
-/// News in the band's centre while it lasts: a stroked warning sign and
-/// one ink caption.
-pub(super) fn status(v: &Scene, mid: f32, id: TextId) {
-    let room = 420.0;
+/// News in the band's centre while it lasts, no wider than `room`: a
+/// stroked warning sign and one ink caption.
+pub(super) fn status(v: &Scene, mid: f32, id: TextId, room: f32) {
+    let room = room.min(420.0 + 26.0) - 26.0;
     let text = v.width_of(id, &[], Role::Caption).min(room);
     let w = 16.0 + 10.0 + text;
     let x = v.snap(WIDTH / 2.0 - w / 2.0);

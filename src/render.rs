@@ -75,6 +75,11 @@ struct Style {
     size: f32,
     /// Letter spacing in em; the role's own unless set otherwise.
     tracking: f32,
+    /// Baked sizes below the role's own, taken by the fit chain.
+    step: u8,
+    /// Set in Noto even where the pixel font could spell it: a line of a
+    /// paragraph that, as a whole, it cannot.
+    noto: bool,
 }
 impl From<Role> for Style {
     fn from(role: Role) -> Self {
@@ -83,6 +88,8 @@ impl From<Role> for Style {
             strong: false,
             size: spec::style(role).0,
             tracking: spec::style(role).2,
+            step: 0,
+            noto: false,
         }
     }
 }
@@ -90,6 +97,13 @@ impl Style {
     fn strong(self) -> Self {
         Self {
             strong: true,
+            ..self
+        }
+    }
+    /// One baked size smaller: the fit chain's third step.
+    fn smaller(self) -> Self {
+        Self {
+            step: self.step + 1,
             ..self
         }
     }
@@ -115,11 +129,6 @@ impl Style {
 /// Side margin for full-width text, and the widest a centred line may be.
 const MARGIN: f32 = 64.0;
 const FULL: f32 = WIDTH - 2.0 * MARGIN;
-/// Baseline-to-baseline for wrapped lines of `style`.
-fn leading(style: impl Into<Style>) -> f32 {
-    let style = style.into();
-    style.size * spec::line(style.role)
-}
 
 fn opacity(c: Color, alpha: f32) -> Color {
     Color::new(c.r, c.g, c.b, alpha)
@@ -220,56 +229,6 @@ impl Path {
     }
 }
 
-/// Where the fixed scene sits in the window: uniform scale, centered.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct View {
-    pub scale: f32,
-    pub x: f32,
-    pub y: f32,
-}
-impl View {
-    /// `None` while the window has no drawable area (minimized, or zero-sized
-    /// mid-transition): there is nothing to draw and no pointer to map.
-    pub fn fit(width: f32, height: f32, dpi: f32) -> Option<Self> {
-        // `f32::min` ignores NaN, so every input is checked, not just the scale.
-        let usable = |v: f32| v.is_finite() && v > 0.0;
-        if !(usable(width) && usable(height) && usable(dpi)) {
-            return None;
-        }
-        let scale = (width / WIDTH).min(height / HEIGHT);
-        // A letterbox offset on whole physical pixels keeps glyphs on the pixel grid.
-        let snap = |value: f32| (value * dpi).round() / dpi;
-        Some(Self {
-            scale,
-            x: snap((width - WIDTH * scale) / 2.0),
-            y: snap((height - HEIGHT * scale) / 2.0),
-        })
-    }
-    pub fn current() -> Option<Self> {
-        Self::fit(screen_width(), screen_height(), screen_dpi_scale())
-    }
-    pub fn to_scene(self, x: f32, y: f32) -> V2 {
-        V2::new((x - self.x) / self.scale, (y - self.y) / self.scale)
-    }
-    /// Maps the whole window onto scene units, centering the fixed scene.
-    fn camera(&self, width: f32, height: f32) -> Camera2D {
-        let w = width / self.scale;
-        let h = height / self.scale;
-        Camera2D {
-            target: vec2(w / 2.0 - self.x / self.scale, h / 2.0 - self.y / self.scale),
-            zoom: vec2(2.0 / w, 2.0 / h),
-            ..Default::default()
-        }
-    }
-}
-/// The pointer in scene units; `None` when the window cannot map it, so a
-/// minimized window can never feed a non-finite position to the paddle.
-pub fn mouse() -> Option<V2> {
-    let (x, y) = mouse_position();
-    let p = View::current()?.to_scene(x, y);
-    (p.x.is_finite() && p.y.is_finite()).then_some(p)
-}
-
 /// How a line sits in its slot.
 #[derive(Clone, Copy, PartialEq)]
 enum Align {
@@ -317,15 +276,26 @@ impl Slot {
     }
 }
 
-/// Text that does not fit where the layout puts it, or has no glyph. The
-/// layout tests collect and read these; a normal frame records nothing.
-#[derive(Debug)]
+/// What a test frame records about its layout: each problem the drawing
+/// noticed (text wider than its place, wrapped past its lines, cut to an
+/// ellipsis, a glyph missing, a size under its floor), and where every
+/// line of text landed, so the tests can find overlaps and clipping. A
+/// normal frame records nothing.
+#[derive(Default)]
 #[cfg_attr(not(test), allow(dead_code))]
-pub struct Misfit {
+pub struct Log {
+    pub problems: Vec<String>,
+    pub placed: Vec<Placed>,
+}
+/// A line of text as drawn: its ink, from the capitals' top to the
+/// descenders, the sheet layer it belongs to, and the box it must keep
+/// inside.
+#[cfg_attr(not(test), allow(dead_code))]
+pub struct Placed {
     pub text: String,
-    pub need: f32,
-    pub room: f32,
-    pub missing: Option<char>,
+    pub rect: Rect,
+    pub layer: u8,
+    pub within: Rect,
 }
 
 /// How one role is set at the current density.
@@ -348,13 +318,20 @@ struct Scene<'a> {
     locale: Locale,
     /// Physical pixels per scene unit.
     density: f32,
+    class: Class,
     device: Device,
     /// The mouse, not the keyboard, has been driving the paddle.
     mouse: bool,
     /// Glyphs whose input just fired.
     pressed: Pressed,
     buffer: RefCell<String>,
-    misfits: Option<&'a RefCell<Vec<Misfit>>>,
+    log: Option<&'a RefCell<Log>>,
+    /// The part of the scene sure to be seen; the band and sheets keep
+    /// inside it.
+    safe: Rect,
+    /// The sheet layer being drawn (0 under any sheet) and the box its
+    /// text must keep inside, for the layout tests.
+    within: Shared<(u8, Rect)>,
     /// What this frame drew that the pointer can hit.
     hits: RefCell<Hits>,
     /// Opacity and downward offset for what is being drawn: a sheet fades
@@ -362,7 +339,46 @@ struct Scene<'a> {
     motion: Shared<(f32, f32)>,
 }
 
-impl Scene<'_> {
+impl<'a> Scene<'a> {
+    /// A frame's drawing context: the atlas and fonts for `locale`, at
+    /// `density` physical pixels per unit, for a screen of `class`.
+    fn new(
+        texture: Option<&'a Texture2D>,
+        (atlas, fonts, locale): (&'a Atlas, &'a Fonts, Locale),
+        view: &View,
+        ui: &Ui,
+        buffer: String,
+        log: Option<&'a RefCell<Log>>,
+    ) -> Self {
+        Self {
+            texture,
+            atlas,
+            fonts,
+            locale,
+            density: view.density,
+            class: view.class,
+            device: ui.device,
+            mouse: ui.mouse,
+            pressed: ui.pressed,
+            buffer: RefCell::new(buffer),
+            log,
+            safe: view.safe,
+            within: Shared::new((0, Rect::new(0.0, 0.0, WIDTH, HEIGHT))),
+            hits: RefCell::default(),
+            motion: Shared::new((1.0, 0.0)),
+        }
+    }
+    /// Records a layout problem for the tests; free in a normal frame.
+    fn note(&self, problem: impl FnOnce() -> String) {
+        if let Some(log) = self.log {
+            log.borrow_mut().problems.push(problem());
+        }
+    }
+    /// Text drawn from here on belongs to sheet layer `layer` and must
+    /// keep inside `r`.
+    fn region(&self, layer: u8, r: Rect) {
+        self.within.set((layer, r));
+    }
     fn mesh(&self, vertices: &[Vertex], indices: &[u16]) {
         let Some(texture) = self.texture else { return };
         // SAFETY: main-thread draw recording between frames, as Macroquad's own
@@ -672,22 +688,91 @@ impl Scene<'_> {
 
     // Text.
 
-    /// How `role` is set here. Below the smallest legible Noto strike the
-    /// 5×7 font takes over, for text it can spell; the Small and Compact
-    /// layouts will decide the rest.
+    /// How `style` is set here: the baked strike for its size, raised to
+    /// its floor and lowered by any fit-chain steps. A Compact screen sets
+    /// what the 5×7 font can spell in it, at whole pixels; anything else
+    /// keeps the smallest strike its floor allows.
     fn face(&self, style: Style, text: &str) -> Face {
         let role = style.role;
-        match spec::ppem_px(role, style.size * self.density) {
-            Some(ppem) => Face::Noto(ppem),
-            None if text.chars().all(pixel_font::has) => {
-                Face::Pixel(if matches!(role, Role::Display | Role::Title) {
-                    2.0
-                } else {
-                    1.0
-                })
-            }
-            None => Face::Noto(spec::rungs(role).min().unwrap_or(spec::LADDER[0])),
+        if self.class == Class::Compact && !style.noto && text.chars().all(pixel_font::spells) {
+            // Headings are set double until the fit chain steps them down.
+            let big = matches!(role, Role::Display | Role::Title) && style.step == 0;
+            return Face::Pixel(if big { 2.0 } else { 1.0 });
         }
+        let mut ppem = spec::ppem_px(role, style.size * self.density);
+        for _ in 0..style.step {
+            ppem = spec::step_down(role, ppem).unwrap_or(ppem);
+        }
+        Face::Noto(ppem)
+    }
+    /// How many scene units tall `style` is set: its size, or more where a
+    /// floor raised it.
+    fn size_of(&self, style: impl Into<Style>) -> f32 {
+        let style = style.into();
+        match self.face(style, "A") {
+            Face::Noto(ppem) => style.size.max(f32::from(ppem) / self.density),
+            Face::Pixel(cell) => 7.0 * cell / self.density,
+        }
+    }
+    /// The height of one line of `style` set at its line height.
+    fn line_h(&self, style: impl Into<Style>) -> f32 {
+        let style = style.into();
+        self.snap(self.size_of(style) * spec::line(style.role).max(1.0))
+    }
+    /// The height of one line of `text` in `style`, in the face it is
+    /// actually set in: a Compact screen sets what the pixel font cannot
+    /// spell in Noto, at its floor.
+    fn pitch(&self, style: Style, text: &str) -> f32 {
+        match self.face(style, text) {
+            Face::Noto(ppem) => {
+                let size = style.size.max(f32::from(ppem) / self.density);
+                self.snap(size * spec::line(style.role).max(1.0))
+            }
+            // Seven rows of glyph and three of gap.
+            Face::Pixel(cell) => 10.0 * cell / self.density,
+        }
+    }
+    /// The height of capitals of `text` in `style`, in its own face.
+    fn cap_of(&self, style: Style, text: &str) -> f32 {
+        match self.face(style, text) {
+            Face::Pixel(cell) => 7.0 * cell / self.density,
+            Face::Noto(_) => self.cap(style.sized(style.size)),
+        }
+    }
+    /// The baseline of a line of `style` whose box starts at `top`: Noto's
+    /// ascender and descender (1.069 and 0.293 em) centred in the box, as a
+    /// browser sets it.
+    fn baseline(&self, style: impl Into<Style>, top: f32) -> f32 {
+        self.baseline_in(style.into(), "A", top)
+    }
+    /// [`Self::baseline`] for `text` in the face it is set in: pixel-font
+    /// text sits on the seventh row of its line.
+    fn baseline_in(&self, style: Style, text: &str, top: f32) -> f32 {
+        match self.face(style, text) {
+            Face::Pixel(cell) => self.snap(top + 7.0 * cell / self.density),
+            Face::Noto(ppem) => {
+                let size = style.size.max(f32::from(ppem) / self.density);
+                let line = spec::line(style.role).max(1.0);
+                self.snap(top + size * (line / 2.0 + (1.069 - 0.293) / 2.0))
+            }
+        }
+    }
+    /// The pitch and baseline of `id` set in `style` from `top`.
+    fn line_of(
+        &self,
+        (id, args): (TextId, &[Arg]),
+        style: impl Into<Style>,
+        top: f32,
+    ) -> (f32, f32) {
+        let style = style.into();
+        self.format(id, args, Form::Full, |t| {
+            (self.pitch(style, t), self.baseline_in(style, t, top))
+        })
+    }
+    /// `units`, or more if that would be under `px` physical pixels: the
+    /// floors for targets, chips and gaps.
+    fn at_least(&self, units: f32, px: f32) -> f32 {
+        units.max(px / self.density)
     }
     /// The advance width of `text`, in scene units.
     fn measure(&self, text: &str, style: impl Into<Style>) -> f32 {
@@ -698,8 +783,8 @@ impl Scene<'_> {
                 self.fonts.measure(text, style.weight(), ppem, tracking) / self.density
             }
             Face::Pixel(cell) => {
-                let n = text.chars().count() as f32;
-                (n * 6.0 - 1.0).max(0.0) * cell / self.density
+                let n: f32 = text.chars().map(pixel_font::advance).sum();
+                (n - 1.0).max(0.0) * cell / self.density
             }
         }
     }
@@ -710,18 +795,12 @@ impl Scene<'_> {
             (Face::Noto(ppem), Some(f)) => {
                 f32::from(f.cap_height) * f32::from(ppem) / f32::from(f.units_per_em) / self.density
             }
-            _ => style.size * 0.7,
+            (Face::Pixel(cell), _) => 7.0 * cell / self.density,
+            (Face::Noto(_), None) => style.size * 0.7,
         }
     }
     fn missing(&self, text: &str, c: char) {
-        if let Some(log) = self.misfits {
-            log.borrow_mut().push(Misfit {
-                text: text.into(),
-                need: 0.0,
-                room: 0.0,
-                missing: Some(c),
-            });
-        }
+        self.note(|| format!("no glyph for {c:?} in {text:?}"));
     }
     /// Draws `text` with its left end at `x` and its baseline at `y`.
     fn draw(&self, text: &str, style: impl Into<Style>, x: f32, y: f32, color: Color) {
@@ -732,6 +811,9 @@ impl Scene<'_> {
         let (ox, oy) = ((x * d).round(), (y * d).round());
         match self.face(style, text) {
             Face::Noto(ppem) => {
+                if f32::from(ppem) < spec::floor(style.role) - 0.5 {
+                    self.note(|| format!("{text:?} at {ppem} px, under its floor"));
+                }
                 let weight = style.weight();
                 let tracking = self.fonts.tracking(style.tracking, ppem);
                 self.fonts.layout(text, weight, ppem, tracking, |p| {
@@ -761,17 +843,41 @@ impl Scene<'_> {
                 });
             }
             Face::Pixel(cell) => {
-                for (i, c) in text.chars().enumerate() {
-                    let (sx, sy) = pixel_font::cell(c.to_ascii_uppercase());
-                    self.sprite(
-                        (ox + i as f32 * 6.0 * cell, oy - 7.0 * cell),
-                        (sx as f32, sy as f32, 5.0, 7.0),
-                        cell,
-                        color,
-                    );
+                let mut at = ox;
+                for c in text.chars() {
+                    if let Some(power) = icon_power(c) {
+                        self.pixel_capsule(power, (at / d, oy / d), cell);
+                    } else if let Some(bits) = pixel_font::extra(c) {
+                        let top = (oy - 7.0 * cell) / d;
+                        self.bits(bits, (at / d, top), cell / d, color);
+                    } else {
+                        let (sx, sy) = pixel_font::cell(c.to_ascii_uppercase());
+                        self.sprite(
+                            (at, oy - 7.0 * cell),
+                            (sx as f32, sy as f32, 5.0, 7.0),
+                            cell,
+                            color,
+                        );
+                    }
+                    at += pixel_font::advance(c) * cell;
                 }
             }
         }
+    }
+    /// A capsule in pixel-font text: its colour, and its letter in night,
+    /// on whole pixels from `x` on baseline `y`.
+    fn pixel_capsule(&self, power: Power, (x, y): (f32, f32), cell: f32) {
+        let px = cell / self.density;
+        let w = (pixel_font::advance(ark_text::icon(power)) - 1.0) * px;
+        self.rect(x, y - 7.0 * px, w, 7.0 * px, power_color(power));
+        let (sx, sy) = pixel_font::cell(capsule(power));
+        let d = self.density;
+        self.sprite(
+            ((x + 2.0 * px) * d, (y - 7.0 * px) * d),
+            (sx as f32, sy as f32, 5.0, 7.0),
+            cell,
+            NIGHT,
+        );
     }
     /// A capsule as the player sees it falling, `size` tall, sitting on the
     /// capitals of `beside` text whose baseline is `baseline`.
@@ -781,33 +887,37 @@ impl Scene<'_> {
         let mut letter = [0; 4];
         let letter = capsule(power).encode_utf8(&mut letter);
         let y = cy + self.cap(Role::Label) / 2.0;
-        self.put(
-            letter,
-            Role::Label,
-            Slot::centered(x + w / 2.0, w, y),
-            NIGHT,
-        );
+        // Drawn rather than put: the letter is part of the line it sits in.
+        let lx = x + (w - self.measure(letter, Role::Label)) / 2.0;
+        self.draw(letter, Role::Label, lx, y, NIGHT);
     }
     /// Draws `text` aligned in `slot`; text wider than the slot is drawn
     /// anyway and reported to the layout tests.
     fn put(&self, text: &str, style: impl Into<Style>, slot: Slot, color: Color) -> f32 {
         let style = style.into();
         let width = self.measure(text, style);
-        if width > slot.w + 0.5
-            && let Some(log) = self.misfits
-        {
-            log.borrow_mut().push(Misfit {
-                text: text.into(),
-                need: width,
-                room: slot.w,
-                missing: None,
-            });
+        if width > slot.w + 0.5 {
+            self.note(|| format!("{text:?} needs {width:.1}, has {:.1}", slot.w));
         }
         let x = match slot.align {
             Align::Left => slot.x,
             Align::Center => slot.x + (slot.w - width) / 2.0,
             Align::Right => slot.x + slot.w - width,
         };
+        if let Some(log) = self.log {
+            let (layer, within) = self.within.get();
+            let descent = match self.face(style, text) {
+                Face::Noto(ppem) => 0.25 * f32::from(ppem) / self.density,
+                Face::Pixel(_) => 0.0,
+            };
+            let top = slot.y - self.cap(style);
+            log.borrow_mut().placed.push(Placed {
+                text: text.into(),
+                rect: Rect::new(x, top, width, slot.y + descent - top),
+                layer,
+                within,
+            });
+        }
         self.draw(text, style, x, slot.y, color);
         width
     }
@@ -819,34 +929,89 @@ impl Scene<'_> {
         let _ = ark_text::write_icons(&mut *buffer, self.locale, form, id, args);
         with(&buffer)
     }
-    /// Sets `id` in `slot`, switching to its short wording if the full one
-    /// does not fit.
+    /// Sets `id` in `slot` by the fit chain: its full wording, then its
+    /// short one, then one baked size smaller (never under the floor),
+    /// and only then cut with an ellipsis, which the layout tests treat as
+    /// a failure. Wrapping, the first step, is [`Self::paragraph`]'s; the
+    /// container growing, the fourth, is the caller's.
     fn say(&self, id: TextId, args: &[Arg], style: impl Into<Style>, slot: Slot, color: Color) {
         let style = style.into();
-        let fits = self.format(id, args, Form::Full, |t| self.measure(t, style) <= slot.w);
-        let form = if fits { Form::Full } else { Form::Short };
-        self.format(id, args, form, |t| self.put(t, style, slot, color));
+        let mut tries = [style, style.smaller()];
+        if !self.can_step(style) {
+            tries[1] = style;
+        }
+        for style in tries {
+            for form in [Form::Full, Form::Short] {
+                let fits = self.format(id, args, form, |t| self.measure(t, style) <= slot.w + 0.5);
+                if fits {
+                    self.format(id, args, form, |t| self.put(t, style, slot, color));
+                    return;
+                }
+            }
+        }
+        self.format(id, args, Form::Short, |t| {
+            self.cut(t, tries[1], slot, color)
+        });
+    }
+    /// Whether `style` has a smaller size above its floor: a smaller
+    /// baked strike, or a doubled pixel heading.
+    fn can_step(&self, style: Style) -> bool {
+        match self.face(style, "A") {
+            Face::Noto(ppem) => spec::step_down(style.role, ppem).is_some(),
+            Face::Pixel(cell) => cell > 1.0,
+        }
+    }
+    /// The last resort: as much of `text` as fits with an ellipsis. Never
+    /// used on numbers, which are set with [`Self::put`] and reported.
+    fn cut(&self, text: &str, style: Style, slot: Slot, color: Color) {
+        let mut line = Line::default();
+        for (end, _) in text.char_indices().rev() {
+            line.clear();
+            let _ = write!(line, "{}…", &text[..end]);
+            if self.measure(line.as_str(), style) <= slot.w {
+                break;
+            }
+        }
+        self.note(|| format!("{text:?} cut to an ellipsis in {:.1}", slot.w));
+        self.put(line.as_str(), style, slot, color);
     }
     fn width_of(&self, id: TextId, args: &[Arg], style: impl Into<Style>) -> f32 {
         let style = style.into();
         self.format(id, args, Form::Full, |t| self.measure(t, style))
     }
-    /// How many lines `paragraph` would set `id` in, `width` wide.
+    /// How many lines `paragraph` would set `id` in, `width` wide, in
+    /// its full wording.
     fn lines(&self, (id, args): (TextId, &[Arg]), style: impl Into<Style>, width: f32) -> usize {
         let style = style.into();
-        self.format(id, args, Form::Full, |text| match self.face(style, text) {
+        self.format(id, args, Form::Full, |text| {
+            self.wrap(text, style, width, |_| {})
+        })
+    }
+    /// Breaks `text` into lines no wider than `width`, handing each to
+    /// `line`; returns the count. A Compact screen sets the whole text in
+    /// one face, so no line switches to the pixel font mid-paragraph.
+    fn wrap<'t>(
+        &self,
+        text: &'t str,
+        style: Style,
+        width: f32,
+        line: impl FnMut(&'t str),
+    ) -> usize {
+        match self.face(style, text) {
             Face::Noto(ppem) => {
                 let tracking = self.fonts.tracking(style.tracking, ppem);
                 let room = width * self.density;
                 self.fonts
-                    .wrap(text, style.weight(), ppem, tracking, room, |_| {})
+                    .wrap(text, style.weight(), ppem, tracking, room, line)
             }
-            Face::Pixel(_) => pixel_lines(text, width, |t| self.measure(t, style), |_| {}),
-        })
+            Face::Pixel(_) => pixel_lines(text, width, |t| self.measure(t, style), line),
+        }
     }
     /// Sets `id` across up to `max` lines from baseline `slot.y`, wrapping
-    /// at word (or, in Chinese and Japanese, character) boundaries.
-    /// Returns the lines used; more than `max` is reported.
+    /// at word (or, in Chinese and Japanese, character) boundaries: the fit
+    /// chain's first step. Where the full wording needs more than `max`
+    /// lines, its short one is set instead. Returns the lines used; more
+    /// than `max` is reported.
     fn paragraph(
         &self,
         (id, args): (TextId, &[Arg]),
@@ -856,38 +1021,53 @@ impl Scene<'_> {
         color: Color,
     ) -> usize {
         let style = style.into();
-        self.format(id, args, Form::Full, |text| {
+        let full = self.format(id, args, Form::Full, |t| {
+            self.wrap(t, style, slot.w, |_| {})
+        });
+        let form = if full > max { Form::Short } else { Form::Full };
+        self.format(id, args, form, |text| {
+            let style = match self.face(style, text) {
+                Face::Noto(_) => Style {
+                    noto: true,
+                    ..style
+                },
+                Face::Pixel(_) => style,
+            };
             let mut lines = 0;
-            let line = |line: &str| {
-                let y = slot.y + lines as f32 * leading(style);
+            let leading = self.pitch(style, text);
+            let count = self.wrap(text, style, slot.w, |line| {
+                let y = slot.y + lines as f32 * leading;
                 if lines < max {
                     self.put(line, style, Slot { y, ..slot }, color);
-                } else if let Some(log) = self.misfits {
-                    log.borrow_mut().push(Misfit {
-                        text: text.into(),
-                        need: (lines + 1) as f32,
-                        room: max as f32,
-                        missing: None,
-                    });
                 }
                 lines += 1;
-            };
-            match self.face(style, text) {
-                Face::Noto(ppem) => {
-                    let tracking = self.fonts.tracking(style.tracking, ppem);
-                    let room = slot.w * self.density;
-                    self.fonts
-                        .wrap(text, style.weight(), ppem, tracking, room, line);
-                }
-                Face::Pixel(_) => {
-                    pixel_lines(text, slot.w, |t| self.measure(t, style), line);
-                }
+            });
+            if count > max {
+                self.note(|| format!("{text:?} wraps past {max} lines"));
             }
-            lines.min(max)
+            count.min(max)
         })
     }
 
+    /// A 5×7 bitmap in `cell`-unit squares from its top-left corner.
+    fn bits(&self, bits: [u8; 7], (x, y): (f32, f32), cell: f32, color: Color) {
+        for (row, &line) in bits.iter().enumerate() {
+            for col in 0..5 {
+                if line & (1 << (4 - col)) != 0 {
+                    let (cx, cy) = (x + col as f32 * cell, y + row as f32 * cell);
+                    self.rect(cx, cy, cell, cell, color);
+                }
+            }
+        }
+    }
+    /// The 5×7 logo in `cell`-unit squares, the O in cyan. Cells a few
+    /// pixels wide are drawn solid; a gap would round away.
     fn logo(&self, x: f32, y: f32, cell: f32) {
+        let gap = if self.class == Class::Compact {
+            0.0
+        } else {
+            1.5
+        };
         for (letter, character) in "ARKONK".chars().enumerate() {
             let color = if character == 'O' { CYAN } else { INK };
             for (row, &bits) in pixel_font::glyph(character).iter().enumerate() {
@@ -896,8 +1076,8 @@ impl Scene<'_> {
                         self.rect(
                             x + (letter as f32 * 6.0 + col as f32) * cell,
                             y + row as f32 * cell,
-                            cell - 1.5,
-                            cell - 1.5,
+                            cell - gap,
+                            cell - gap,
                             color,
                         );
                     }
@@ -1170,14 +1350,7 @@ impl Renderer {
             return;
         };
         set_camera(&view.camera(screen_width(), screen_height()));
-        self.frame(
-            view.scale * screen_dpi_scale(),
-            game,
-            ui,
-            profile,
-            alpha,
-            perf,
-        );
+        self.frame(view, game, ui, profile, alpha, perf);
     }
     /// OpenGL only: renders one frame offscreen at an exact physical size, as
     /// on a 1x display, and writes it as PNG. Layouts can then be checked at
@@ -1201,7 +1374,7 @@ impl Renderer {
         camera.zoom.y = -camera.zoom.y;
         set_camera(&camera);
         let hits = self.hits;
-        self.frame(view.scale, game, ui, profile, 1.0, None);
+        self.frame(view, game, ui, profile, 1.0, None);
         // An offscreen capture is not what the player sees.
         self.hits = hits;
         // SAFETY: main thread, between draw calls; executes the batched frame.
@@ -1211,27 +1384,21 @@ impl Renderer {
     }
     fn frame(
         &mut self,
-        density: f32,
+        view: View,
         game: &Game,
         ui: &Ui,
         profile: &Profile,
         alpha: f32,
         perf: Option<&Perf>,
     ) {
-        let v = Scene {
-            texture: self.texture.as_ref(),
-            atlas: &self.kind.atlas,
-            fonts: &self.kind.fonts,
-            locale: self.kind.locale,
-            density,
-            device: ui.device,
-            mouse: ui.mouse,
-            pressed: ui.pressed,
-            buffer: RefCell::new(std::mem::take(&mut self.text)),
-            misfits: None,
-            hits: RefCell::default(),
-            motion: Shared::new((1.0, 0.0)),
-        };
+        let v = Scene::new(
+            self.texture.as_ref(),
+            (&self.kind.atlas, &self.kind.fonts, self.kind.locale),
+            &view,
+            ui,
+            std::mem::take(&mut self.text),
+            None,
+        );
         // Painting the background into the scene batch, rather than with
         // `clear_background`, saves a full-framebuffer pass: Macroquad has
         // already cleared once this frame.
@@ -1292,6 +1459,7 @@ fn scene(
     }
     balls(v, fx, game, alpha);
     frame::band_play(v, fx, game, profile, ui.notice > 0.0);
+    frame::field_region(v, 0);
     let mut letter = [0; 4];
     for drop in game.capsules() {
         if drop.active {
@@ -1585,30 +1753,44 @@ fn balls(v: &Scene, fx: &Fx, game: &Game, alpha: f32) {
         v.circle(pos, RADIUS, INK);
     }
 }
-/// A short run of figures formatted on the stack, so drawing scores and
-/// times allocates nothing.
-struct Figures {
-    bytes: [u8; 48],
+/// Text formatted on the stack, so drawing scores, times and the rare
+/// cut line allocates nothing. Overflow only truncates.
+struct Stack<const N: usize> {
+    bytes: [u8; N],
     len: usize,
 }
-impl Figures {
-    fn of(write: impl FnOnce(&mut Self) -> std::fmt::Result) -> Self {
-        let mut out = Self {
-            bytes: [0; 48],
+/// A run of figures: 48 bytes hold any u32 in any locale.
+type Figures = Stack<48>;
+/// One line of text, for the fit chain's ellipsis.
+type Line = Stack<256>;
+impl<const N: usize> Default for Stack<N> {
+    fn default() -> Self {
+        Self {
+            bytes: [0; N],
             len: 0,
-        };
-        // Overflow only truncates; 48 bytes hold any u32 in any locale.
+        }
+    }
+}
+impl<const N: usize> Stack<N> {
+    fn of(write: impl FnOnce(&mut Self) -> std::fmt::Result) -> Self {
+        let mut out = Self::default();
+        // A run longer than the buffer is cut short, never a panic.
         let _ = write(&mut out);
         out
     }
-    fn count(locale: Locale, n: u32) -> Self {
-        Self::of(|f| ark_text::grouped(f, locale, n))
+    fn clear(&mut self) {
+        self.len = 0;
     }
     fn as_str(&self) -> &str {
         std::str::from_utf8(&self.bytes[..self.len]).unwrap_or_default()
     }
 }
-impl Write for Figures {
+impl Figures {
+    fn count(locale: Locale, n: u32) -> Self {
+        Self::of(|f| ark_text::grouped(f, locale, n))
+    }
+}
+impl<const N: usize> Write for Stack<N> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         let end = self.len + s.len();
         let room = self.bytes.get_mut(self.len..end).ok_or(std::fmt::Error)?;
@@ -1719,7 +1901,10 @@ fn power_color(power: Power) -> Color {
 }
 
 mod chips;
+mod compact;
 mod frame;
+mod view;
+pub use view::{Class, View, mouse, preview};
 mod moments;
 mod screens;
 mod sheet;
