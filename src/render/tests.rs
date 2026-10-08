@@ -313,7 +313,14 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
             veteran(0),
         ));
     }
-    for (row, paused, screen) in [(0, false, Screen::Title), (3, true, Screen::Play)] {
+    // The last row: a Compact page too short for every row scrolls to it,
+    // and the reduced and high looks name their values.
+    let last = crate::settings::ROWS.len() - 1;
+    for (row, paused, screen) in [
+        (0, false, Screen::Title),
+        (3, true, Screen::Play),
+        (last, true, Screen::Play),
+    ] {
         let ui = Ui {
             screen,
             paused,
@@ -322,6 +329,8 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
         };
         let mut profile = veteran(3);
         profile.settings.fullscreen = paused;
+        profile.settings.reduced_effects = row == last;
+        profile.settings.high_contrast = row == last;
         out.push((format!("settings {row}"), held.clone(), ui, profile));
     }
     let profiles = [Profile::default(), veteran(3)];

@@ -249,8 +249,41 @@ pub(super) fn sheet(
     }
 }
 
+/// How a setting's row sits on a Compact page: its value's width, whether
+/// the value takes a line of its own, and the row's height.
+fn setting_row(page: &Page, setting: settings::Row, profile: &Profile) -> (f32, bool, f32) {
+    let v = page.v;
+    let px = page.px;
+    let caption = Style::from(Role::Caption);
+    let value = setting.value(&profile.settings);
+    let value_w = match value {
+        Value::Toggle(_) => 9.0 * px,
+        Value::Level(level, max) => {
+            let level = Figures::count(v.locale, u32::from(level));
+            v.measure(level.as_str(), caption) + 3.0 * px + f32::from(max) * 2.0 * px
+        }
+        Value::Text(id) => v.width_of(id, &[], caption).min(page.w),
+        Value::Native(name) => v.measure(name, caption),
+    };
+    // A value too wide to share the line takes the next one.
+    let gap = 4.0 * px;
+    let name = Style::from(Role::Body);
+    let alone = v.width_of(setting.name(), &[], name) + gap + value_w > page.w;
+    let mut h = page.pitch((setting.name(), &[]), name);
+    if alone {
+        h += match value {
+            Value::Native(name) => v.pitch(caption, name),
+            Value::Text(id) => v.format(id, &[], Form::Full, |t| v.pitch(caption, t)),
+            Value::Toggle(_) | Value::Level(..) => v.pitch(caption, "A"),
+        };
+    }
+    (value_w, alone, h)
+}
+
 /// Settings as a list: each setting's name, and its value at the right
-/// end of the line, drawn in pixels; how to change it under them.
+/// end of the line, drawn in pixels; how to change it under them. Where
+/// the page cannot hold every row, it scrolls to keep the focused one in
+/// view, and the help goes first.
 pub(super) fn settings(v: &Scene, profile: &Profile, focus: usize) {
     cover(v);
     frame::field_region(v, 1);
@@ -258,7 +291,24 @@ pub(super) fn settings(v: &Scene, profile: &Profile, focus: usize) {
     let px = page.px;
     heading(&mut page, TextId::Settings, true);
     v.hits.borrow_mut().begin(List::Settings);
-    for (i, &setting) in settings::ROWS.iter().enumerate() {
+    let rows = settings::ROWS;
+    let focus = focus.min(rows.len() - 1);
+    let bottom = BOTTOM - INSET * px;
+    let height = |i: usize| setting_row(&page, rows[i], profile).2;
+    // The first row shown: the earliest that still lets the focused one fit.
+    let mut first = 0;
+    while first < focus && page.y + (first..=focus).map(height).sum::<f32>() > bottom {
+        first += 1;
+    }
+    let mut full = false;
+    for (i, &setting) in rows.iter().enumerate() {
+        let (value_w, alone, h) = setting_row(&page, setting, profile);
+        full |= i >= first && page.y + h > bottom;
+        if i < first || full {
+            // Off the page: an empty hit area keeps the rows' numbering.
+            v.hits.borrow_mut().push(Rect::default());
+            continue;
+        }
         let focused = i == focus;
         let style = Style::from(Role::Body);
         let value = setting.value(&profile.settings);
@@ -268,17 +318,7 @@ pub(super) fn settings(v: &Scene, profile: &Profile, focus: usize) {
         };
         let level = Figures::count(v.locale, level);
         let caption = Style::from(Role::Caption);
-        let value_w = match value {
-            Value::Toggle(_) => 9.0 * px,
-            Value::Level(_, max) => {
-                v.measure(level.as_str(), caption) + 3.0 * px + f32::from(max) * 2.0 * px
-            }
-            Value::Text(id) => v.width_of(id, &[], caption).min(page.w),
-            Value::Native(name) => v.measure(name, caption),
-        };
-        // A value too wide to share the line takes the next one.
         let gap = 4.0 * px;
-        let alone = v.width_of(setting.name(), &[], style) + gap + value_w > page.w;
         let top = page.y;
         let colour = if focused { INK } else { ROW_INK };
         let room = if alone {
@@ -350,8 +390,12 @@ pub(super) fn settings(v: &Scene, profile: &Profile, focus: usize) {
         }
         v.hits.borrow_mut().push(r);
     }
+    let verb = rows[focus].verb();
+    let help = 2.0 * px + page.pitch((verb, &[]), Role::Caption.into());
+    if full || page.y + help > bottom {
+        return;
+    }
     page.gap(2.0);
-    let verb = settings::ROWS[focus.min(settings::ROWS.len() - 1)].verb();
     let mid = page.y + 3.5 * px;
     let pair = chips::width(v, Prompt::Left, 0.0) + 2.0 * px + chips::width(v, Prompt::Right, 0.0);
     let mut at = v.mirror(page.span(), page.x, pair);
