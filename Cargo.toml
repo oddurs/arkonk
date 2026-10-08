@@ -26,7 +26,7 @@ repository.workspace = true
 [features]
 default = ["scripts"]
 # Glyph atlases for Chinese, Japanese, Korean, Thai and Arabic, about
-# 1.3 MB; without them those languages fall back to the next preference.
+# 2.3 MB; without them those languages fall back to the next preference.
 # See docs/localization.md.
 scripts = ["ark-glyphs/scripts"]
 # Opt-in so development, CI tests and the benchmark never need a Steam client;

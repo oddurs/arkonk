@@ -288,56 +288,33 @@ update `packaging/licenses/fonts/`. Those license texts are appended to
 
 ### Size
 
-macOS arm64 release binary, symbols kept:
+macOS arm64 release binary, symbols kept, measured side by side:
 
 | Build | Bytes |
 | --- | ---: |
-| Before localization (`main` at #6, 5×7 font only) | 2,013,088 |
-| Twelve languages, the UI hierarchy (#7, #8) | 3,178,832 |
-| All thirty languages (default, `scripts` on) | 3,954,528 |
-| All thirty languages without `scripts` (Latin, Greek, Cyrillic only) | 2,550,816 |
+| Twelve languages (`main` before this change, `cjk` on) | 3,977,840 |
+| All thirty languages (default, `scripts` on) | 5,333,376 |
+| All thirty languages without `scripts` (Latin, Greek, Cyrillic only) | 2,971,648 |
 
-| Atlas file | Holds | Bytes |
-| --- | --- | ---: |
-| `latin.bin` | Latin, Cyrillic, figures, in the Regular, Medium and Display cuts | 363,750 |
-| `zh.bin` | Simplified Chinese glyphs | 537,712 |
-| `ja.bin` | Japanese glyphs | 498,762 |
-| `ko.bin` | Korean glyphs | 335,605 |
+| Atlas file | Holds | Twelve languages | Thirty |
+| --- | --- | ---: | ---: |
+| `latin.bin` | Latin, Greek, Cyrillic, Vietnamese, figures, in the Regular, Medium and Display cuts | 363,750 | 622,864 |
+| `zh.bin` | Simplified Chinese | 537,712 | 538,238 |
+| `tw.bin` | Traditional Chinese | – | 578,329 |
+| `ja.bin` | Japanese | 498,762 | 498,765 |
+| `ko.bin` | Korean | 335,605 | 335,608 |
+| `th.bin` | Thai clusters | – | 174,535 |
+| `ar.bin` | Arabic letter forms | – | 204,298 |
 
-The Small layout's strikes (densities 0.42 to 0.75) and the short forms
-added 218,845 bytes (14 %) across the four files.
-
-Deflated bytes per strike (each size carries only the glyphs of the roles
-drawn at it; Label and Display sizes hold far fewer than Body):
-
-| Size | Weight | Roles | Latin | zh | tw | ja | ko | th | ar |
-| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 26 | Medium | Display | 10,406 | 5,333 | 5,702 | 6,303 | 4,286 | 3,058 | 3,722 |
-| 28 | Medium | Display | 11,989 | 5,776 | 6,124 | 6,856 | 4,619 | 3,309 | 3,958 |
-| 32 | Medium | Display | 13,998 | 6,463 | 6,914 | 7,657 | 5,111 | 3,718 | 4,708 |
-| 40 | Medium | Display | 17,782 | 8,004 | 8,496 | 9,574 | 6,224 | 4,794 | 5,921 |
-| 48 | Medium | Display | 22,417 | 9,568 | 10,173 | 11,442 | 7,369 | 5,954 | 7,465 |
-| 64 | Medium | Display | 33,267 | 12,519 | 13,400 | 15,327 | 9,669 | 8,081 | 10,504 |
-| 12 | Regular | Label | 2,786 | 1,857 | 1,951 | 1,598 | 1,362 | 957 | 1,201 |
-| 13 | Regular | Label+Caption | 6,365 | 7,318 | 7,653 | 6,253 | 5,043 | 2,216 | 2,234 |
-| 14 | Regular | Caption | 6,190 | 6,305 | 6,720 | 5,993 | 4,702 | 2,055 | 2,253 |
-| 15 | Regular | Label | 3,446 | 2,448 | 2,594 | 2,103 | 1,722 | 1,283 | 1,681 |
-| 16 | Regular | Body+Caption | 10,043 | 18,391 | 19,141 | 15,086 | 10,259 | 3,534 | 3,387 |
-| 18 | Regular | Label+Body | 11,265 | 21,414 | 22,280 | 17,498 | 12,012 | 4,128 | 3,973 |
-| 20 | Regular | Body+Caption | 12,793 | 24,213 | 25,331 | 19,733 | 13,351 | 4,762 | 4,326 |
-| 24 | Regular | Label+Body | 15,916 | 29,282 | 31,177 | 24,059 | 15,884 | 5,583 | 5,157 |
-| 26 | Regular | Caption | 11,493 | 13,178 | 14,295 | 12,360 | 9,439 | 4,039 | 4,841 |
-| 30 | Regular | Label | 7,733 | 5,166 | 5,612 | 4,569 | 3,470 | 2,753 | 3,735 |
-| 32 | Regular | Body+Caption | 23,454 | 38,828 | 41,232 | 32,086 | 20,953 | 7,603 | 7,767 |
-| 36 | Regular | Label | 9,937 | 6,275 | 6,647 | 5,525 | 4,157 | 3,323 | 4,512 |
-| 40 | Regular | Body+Caption | 30,790 | 49,091 | 51,699 | 40,728 | 26,662 | 9,689 | 10,323 |
-| 48 | Regular | Body | 39,500 | 59,113 | 62,287 | 49,509 | 31,142 | 12,260 | 12,501 |
-
-The 4K body size (48 px) is the largest single cost in each CJK file.
+Latin grew most: Greek, Vietnamese's precomposed letters and the extra
+Cyrillic and Latin letters are baked in three cuts at every size up to the
+96 px Display strike. `fontbake` prints the deflated bytes of every strike;
+the largest single costs are the CJK body sizes at 40 and 48 px (50 to
+65 KB each) and Latin Display at 96 px (49 KB).
 
 Every non-Latin script atlas sits behind the cargo feature `scripts`, on by
 default, so every package ships all thirty languages. Building without it
-saves 1,379,999 bytes of atlas; those locales then fall back to the next
+saves 2,329,773 bytes of atlas; those locales then fall back to the next
 preference. The desktop size budget is measured without `scripts` (as Steam
 is measured separately): the Steam and desktop packages carry every
 language, while portable and minimal builds hold the size line.
