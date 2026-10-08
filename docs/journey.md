@@ -160,7 +160,7 @@ is the Swift medal's target, derived as described under [Par times](#par-times).
 | 60 | Polar Night | Anchor | 580 | 42 | 33 % | 10 % | 10 % | 80 % | 100 s |
 | 61 | Cathedral | Phase | 590 | 38 | 58 % | 21 % | 11 % | – | 135 s |
 | 62 | Shimmer | Multi | 600 | 54 | 30 % | 15 % | 13 % | – | 170 s |
-| 63 | Event Horizon | Phase | 610 | 56 | 36 % | 25 % | 39 % | – | 140 s |
+| 63 | Singularity | Phase | 610 | 56 | 36 % | 25 % | 39 % | – | 140 s |
 | 64 | Homecoming * | Phase | 625 | 58 | 31 % | 28 % | – | – | 75 s |
 
 ## Where the original twelve went
@@ -214,7 +214,8 @@ foot that drains toward the centre until it ghosts (the status grammar: a
 duration is a drain). As a ghost it is a dotted outline with the same line
 draining until it returns, and its glass fades back in over the last quarter
 second. Armour is nested rims; a gate never has them, so the two never read
-alike.
+alike. The beat line does not take the status grammar's last-two-seconds pulse:
+beats last one to four seconds, so it would pulse nearly all the time.
 
 ## Blue Hour's darkness
 
@@ -235,7 +236,7 @@ Aurora's Polar Night brings it back once, for the finale's remix.
   paddle under a part of the board is a way to look at it.
 - **Each brick's shade** is `darkness × (1 − light)`, from its nearest light,
   computed per brick per frame. Its colours mix toward the field by the shade:
-  body, glow and inner marks fully, its rim by at most 80 %, so every rim stays
+  body, glow and inner marks fully, its rim by at most 70 %, so every rim stays
   faintly visible and the board is never invisible.
 - **Relay cores carry their own light**: their shade is at most half, which is
   what Fireflies (44) is about.

@@ -350,10 +350,10 @@ fn sector_endings() {
 }
 
 /// Gates on their beat: the pilot plays Eclipse's set piece, whose gates
-/// ring the cores, and Event Horizon, whose blasts meet gates mid-beat.
+/// ring the cores, and Singularity, whose blasts meet gates mid-beat.
 fn gate_sessions() -> String {
     let mut out = String::new();
-    for (slug, seed) in [("totality", 30), ("event_horizon", 31)] {
+    for (slug, seed) in [("totality", 30), ("singularity", 31)] {
         let mut game = Game::start(named(slug), Mode::Practice);
         let mut r = Recorder::new(&format!("{slug} gates, seed {seed}"));
         r.run(&mut game, 8 * CHECKPOINT, pilot(seed));

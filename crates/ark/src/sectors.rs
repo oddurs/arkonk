@@ -1402,7 +1402,7 @@ pub const SECTORS: [Sector; SECTOR_COUNT] = [
         ]),
     },
     Sector {
-        slug: "event_horizon",
+        slug: "singularity",
         opening: Power::Phase,
         chapter: Chapter::Aurora,
         speed: 610.0,

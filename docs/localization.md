@@ -143,9 +143,9 @@ fixed-length arrays for the same reason. `es-419` deliberately falls back to
   lives in every language: it is an instrument, read at a glance during
   play, and one layout means a player switching languages, or watching a
   stream in another one, finds the score where it always is. The sector
-  grid keeps its chapters left to right, because the arrows move across it
-  in that direction; a bricks miniature is a map of the field and never
-  flips.
+  grid and its chapter tabs keep their order left to right, because the
+  arrows and shoulder buttons move across them in that direction; a bricks
+  miniature is a map of the field and never flips.
 - **No tracking** for Chinese, Japanese, Thai or Arabic: spacing would break
   the joins, the clusters or the even character grid.
 
@@ -318,6 +318,26 @@ saves 2,329,773 bytes of atlas; those locales then fall back to the next
 preference. The desktop size budget is measured without `scripts` (as Steam
 is measured separately): the Steam and desktop packages carry every
 language, while portable and minimal builds hold the size line.
+
+## Awaiting translation
+
+The 64-sector journey (`docs/journey.md`) added text that every table
+except English carries **in English, as a placeholder**, marked
+`// awaiting translation` on its line. Each locale is waiting on the same
+162 entries. `es-419` inherits them from `es`. Pseudo is generated
+from English, so it is complete.
+
+- **Chapter names** (`TextId::ChapterName`, Label role, capitals): `Morning`, `Zenith`, `GoldenHour`, `Eclipse`, `Aurora`.
+- **Sector names and their short forms** (`TextId::SectorName`, the `NAMES`
+  and `SHORT_NAMES` arrays), 52 sectors by slug: `drift`, `horizon`, `glimmer`, `skylark`, `lanterns`, `tidewater`, `sunrise`, `dewpoint`, `aperture`, `cloister`, `keystone`, `sundial`, `pinhole`, `windrose`, `filament`, `meridian`, `cascade`, `switchback`, `solstice`, `honeycomb`, `spindrift`, `harvest`, `kaleidoscope`, `tapestry`, `long_shadows`, `chrysalis`, `geode`, `citadel`, `nautilus`, `vespers`, `gloaming`, `lamplight`, `fireflies`, `lighthouse`, `nocturne`, `deep_field`, `constellation`, `penumbra`, `metronome`, `corona`, `syzygy`, `pulsar`, `shutter`, `umbra`, `totality`, `solar_wind`, `borealis`, `ribbons`, `polar_night`, `cathedral`, `shimmer`, `singularity`.
+- **Sector tips** (`TextId::SectorTip`, the `TIPS` array), 53 by slug: the
+  same 52 sectors, and `first_light`, whose English changed: it now
+  teaches Wide alone, since Slow has its own sector (`drift`).
+
+The other 3 chapter names and 11 sectors kept their slugs, and their existing
+drafts stay where they were. `docs/steam/rich_presence/*.vdf` show the
+placeholders too until the tables change; rerun
+`ARKONK_WRITE_PRESENCE=1 cargo test presence` after translating.
 
 ## Known gaps
 
