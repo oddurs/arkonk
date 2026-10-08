@@ -5,9 +5,12 @@ pub struct Audio {
     clips: [Option<Sound>; 17],
     pub muted: bool,
     pub volume: f32,
+    // Apart from `muted`, which follows the player's setting every frame.
+    silent: bool,
 }
 impl Audio {
-    pub async fn new() -> Self {
+    /// `silent` still decodes every clip, so a test run checks they load.
+    pub async fn new(silent: bool) -> Self {
         let mut clips = std::array::from_fn(|_| None);
         for (i, (start, end, seconds)) in [
             (640.0, 330.0, 0.07),
@@ -47,13 +50,14 @@ impl Audio {
             clips,
             muted: false,
             volume: 0.6,
+            silent,
         };
         crate::diagnostics::info(format_args!("Sounds loaded: {}/17", audio.loaded()));
         audio
     }
     pub fn play(&self, e: Events) {
         // Without a mixer thread every play would only print "Audio thread died".
-        if self.muted || crate::diagnostics::worker_panicked() {
+        if !self.audible() || crate::diagnostics::worker_panicked() {
             return;
         }
         for (i, enabled) in [
@@ -96,6 +100,9 @@ impl Audio {
             }
         }
     }
+    fn audible(&self) -> bool {
+        !self.muted && !self.silent
+    }
     pub fn loaded(&self) -> usize {
         self.clips.iter().filter(|s| s.is_some()).count()
     }
@@ -136,7 +143,23 @@ fn tone(start: f32, end: f32, seconds: f32, arpeggio: bool) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use super::tone;
+    use super::{Audio, tone};
+
+    #[test]
+    fn a_silent_run_stays_silent_when_settings_unmute() {
+        let mut audio = Audio {
+            clips: std::array::from_fn(|_| None),
+            muted: true,
+            volume: 1.0,
+            silent: true,
+        };
+        // The frame loop copies the saved setting into `muted` every frame.
+        audio.muted = false;
+        assert!(!audio.audible());
+        audio.silent = false;
+        assert!(audio.audible());
+    }
+
     /// The mixer decodes clips on the main thread and panics on a malformed
     /// file, so every synthesized clip must be a well-formed PCM WAV.
     #[test]
