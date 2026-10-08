@@ -24,5 +24,22 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libx11-dev libxi-dev libgl1-mesa-dev libudev-dev
       - run: scripts/task check
 
+  # Rebakes the glyph atlases from the pinned, hash-checked Noto releases
+  # and fails if the committed ones differ by a byte.
+  atlases:
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
+        with:
+          path: target/fontbake
+          key: fonts-${{ hashFiles('tools/fontbake/src/sources.rs') }}
+      - run: cargo run --locked --release -p fontbake -- --check
+
   package:
     uses: ./.github/workflows/package.yml

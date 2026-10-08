@@ -4,3 +4,5 @@ scripts/** text eol=lf
 packaging/steam/** text eol=lf
 *.ico binary
 *.icns binary
+# Baked glyph atlases; see docs/localization.md.
+crates/ark-glyphs/data/*.bin binary

@@ -1,0 +1,12 @@
+[package]
+name = "ark-text"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "ARKONK's display text: locales, typed string ids, string tables and locale-aware formatting"
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+ark = { path = "../ark" }

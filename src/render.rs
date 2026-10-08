@@ -1,25 +1,28 @@
 use crate::{
+    atlas::{Atlas, Cell},
     input::Device,
     perf::Perf,
-    pixel_font::{PixelFont, glyph},
+    pixel_font,
     storage::Profile,
-    text::{TextId, text},
     ui::{self, Screen, Ui},
 };
 use ark::{
     Events, Game, Medals, Mode, Power, SectorSummary, Stage,
     clock::{DT, TICK_HZ},
     field::{
-        BALL_RADIUS as RADIUS, BOTTOM, CELL_H, CELL_W, CELLS, Cell, LEFT, PADDLE_Y, RIGHT, TOP,
-        cell_rect,
+        BALL_RADIUS as RADIUS, BOTTOM, CELL_H, CELL_W, CELLS, Cell as FieldCell, LEFT, PADDLE_Y,
+        RIGHT, TOP, cell_rect,
     },
     geom::V2,
     sectors::{Chapter, SECTOR_COUNT, SectorId},
     tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
+use ark_glyphs::{Fonts, spec};
+use ark_text::{Arg, Form, Locale, Role, TextId, capsule};
 use macroquad::models::Vertex;
 use macroquad::prelude::*;
 use std::{
+    cell::RefCell,
     f32::consts::{FRAC_PI_2, TAU},
     fmt::Write,
 };
@@ -48,6 +51,21 @@ const PALETTE: [Color; 7] = [
     Color::new(0.95, 0.39, 0.78, 1.0),
 ];
 
+/// Side margin for full-width text, and the widest a centred line may be.
+const MARGIN: f32 = 64.0;
+const FULL: f32 = WIDTH - 2.0 * MARGIN;
+/// Baseline-to-baseline for body text.
+const LINE: f32 = 26.0;
+/// Space between the items of a hint row.
+const GAP: f32 = 28.0;
+/// The footer's last baseline; rows stack upward from it.
+const FOOTER: f32 = 872.0;
+/// Baseline-to-baseline distance between footer rows: captions are smaller
+/// than body text, so the rows need more air to read as separate lines.
+const FOOTER_LINE: f32 = 30.0;
+/// Text width inside the pause and results panels.
+const PANEL: f32 = 432.0;
+
 fn opacity(c: Color, alpha: f32) -> Color {
     Color::new(c.r, c.g, c.b, alpha)
 }
@@ -61,20 +79,6 @@ fn mix(a: Color, b: Color, t: f32) -> Color {
         a.b + (b.b - a.b) * t,
         a.a,
     )
-}
-/// Thousands separators keep large scores readable at a glance.
-fn grouped(out: &mut String, value: u32) {
-    let start = out.len();
-    let _ = write!(out, "{value}");
-    let mut i = out.len();
-    while i > start + 3 {
-        i -= 3;
-        out.insert(i, ',');
-    }
-}
-fn clock(out: &mut String, ticks: u32) {
-    let seconds = ticks / TICK_HZ;
-    let _ = write!(out, "{:02}:{:02}", seconds / 60, seconds % 60);
 }
 
 /// Where the fixed scene sits in the window: uniform scale, centered.
@@ -94,7 +98,7 @@ impl View {
             return None;
         }
         let scale = (width / WIDTH).min(height / HEIGHT);
-        // A letterbox offset on whole physical pixels keeps pixel text even.
+        // A letterbox offset on whole physical pixels keeps glyphs on the pixel grid.
         let snap = |value: f32| (value * dpi).round() / dpi;
         Some(Self {
             scale,
@@ -127,25 +131,104 @@ pub fn mouse() -> Option<V2> {
     (p.x.is_finite() && p.y.is_finite()).then_some(p)
 }
 
-/// Scene-space drawing helpers. Shapes sample a white cell of the font atlas,
-/// so geometry and text share one texture and batch into a single draw call;
-/// on Metal every draw call is a full-framebuffer render pass. Meshes are built
-/// in fixed arrays: drawing allocates nothing.
-struct Scene {
-    font: PixelFont,
-    device: Device,
+/// How a line sits in its slot.
+#[derive(Clone, Copy, PartialEq)]
+enum Align {
+    Left,
+    Center,
+    Right,
 }
-impl Scene {
+
+/// The room one line of text may take: from `x`, `w` wide, on baseline `y`.
+#[derive(Clone, Copy)]
+struct Slot {
+    x: f32,
+    w: f32,
+    y: f32,
+    align: Align,
+}
+impl Slot {
+    fn centered(cx: f32, w: f32, y: f32) -> Self {
+        Self {
+            x: cx - w / 2.0,
+            w,
+            y,
+            align: Align::Center,
+        }
+    }
+    /// A full-width line, centred on the scene.
+    fn line(y: f32) -> Self {
+        Self::centered(WIDTH / 2.0, FULL, y)
+    }
+    fn left(x: f32, w: f32, y: f32) -> Self {
+        Self {
+            x,
+            w,
+            y,
+            align: Align::Left,
+        }
+    }
+    fn right(right: f32, w: f32, y: f32) -> Self {
+        Self {
+            x: right - w,
+            w,
+            y,
+            align: Align::Right,
+        }
+    }
+}
+
+/// Text that does not fit where the layout puts it, or has no glyph. The
+/// layout tests collect and read these; a normal frame records nothing.
+#[derive(Debug)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub struct Misfit {
+    pub text: String,
+    pub need: f32,
+    pub room: f32,
+    pub missing: Option<char>,
+}
+
+/// How one role is set at the current density.
+#[derive(Clone, Copy)]
+enum Face {
+    /// A baked Noto strike, drawn 1:1.
+    Noto(u8),
+    /// The 5×7 font with cells this many physical pixels square.
+    Pixel(f32),
+}
+
+/// One frame's drawing context: geometry and text in scene units, batched
+/// into the shared atlas texture. Meshes are built in fixed arrays and text
+/// is formatted into a reused buffer, so drawing allocates nothing.
+struct Scene<'a> {
+    /// `None` when recording layout for tests: nothing reaches a GPU.
+    texture: Option<&'a Texture2D>,
+    atlas: &'a Atlas,
+    fonts: &'a Fonts,
+    locale: Locale,
+    /// Physical pixels per scene unit.
+    density: f32,
+    device: Device,
+    buffer: RefCell<String>,
+    misfits: Option<&'a RefCell<Vec<Misfit>>>,
+}
+
+impl Scene<'_> {
     fn mesh(&self, vertices: &[Vertex], indices: &[u16]) {
+        let Some(texture) = self.texture else { return };
         // SAFETY: main-thread draw recording between frames, as Macroquad's own
         // shape functions do; no other borrow of the context is live.
         let gl = unsafe { get_internal_gl() }.quad_gl;
-        gl.texture(Some(self.font.texture()));
+        gl.texture(Some(texture));
         gl.draw_mode(DrawMode::Triangles);
         gl.geometry(vertices, indices);
     }
+    fn uv(&self, x: f32, y: f32) -> Vec2 {
+        vec2(x / self.atlas.width as f32, y / self.atlas.height as f32)
+    }
     fn vertex(&self, p: Vec2, color: Color) -> Vertex {
-        let uv = PixelFont::WHITE_UV;
+        let uv = self.uv(Atlas::WHITE.0, Atlas::WHITE.1);
         Vertex::new(p.x, p.y, 0.0, uv.x, uv.y, color)
     }
     fn quad(&self, corners: [Vec2; 4], color: Color) {
@@ -161,6 +244,26 @@ impl Scene {
             ],
             color,
         );
+    }
+    /// A texture region drawn at physical pixel position `(px, py)`, 1:1.
+    fn sprite(
+        &self,
+        (px, py): (f32, f32),
+        (sx, sy, sw, sh): (f32, f32, f32, f32),
+        scale: f32,
+        color: Color,
+    ) {
+        let d = self.density;
+        let (x, y, w, h) = (px / d, py / d, sw * scale / d, sh * scale / d);
+        let (u0, u1) = (self.uv(sx, sy), self.uv(sx + sw, sy + sh));
+        let corners = [
+            (vec2(x, y), vec2(u0.x, u0.y)),
+            (vec2(x + w, y), vec2(u1.x, u0.y)),
+            (vec2(x + w, y + h), vec2(u1.x, u1.y)),
+            (vec2(x, y + h), vec2(u0.x, u1.y)),
+        ];
+        let vertices = corners.map(|(p, uv)| Vertex::new(p.x, p.y, 0.0, uv.x, uv.y, color));
+        self.mesh(&vertices, &[0, 1, 2, 0, 2, 3]);
     }
     /// Non-overlapping pieces, so translucent fills stay even at the corners.
     fn rounded(&self, x: f32, y: f32, w: f32, h: f32, r: f32, color: Color) {
@@ -299,75 +402,339 @@ impl Scene {
             ],
         );
     }
-    fn text(&self, text: &str, x: f32, y: f32, size: f32, color: Color) {
-        self.font.draw(text, x, y, size, color);
+
+    // Text.
+
+    /// How `role` is set here. Below the smallest legible Noto strike the
+    /// 5×7 font takes over, for text it can spell; the Small and Compact
+    /// layouts will decide the rest.
+    fn face(&self, role: Role, text: &str) -> Face {
+        match spec::ppem(role, self.density) {
+            Some(ppem) => Face::Noto(ppem),
+            None if text.chars().all(pixel_font::has) => {
+                Face::Pixel(if role == Role::Display { 2.0 } else { 1.0 })
+            }
+            None => Face::Noto(spec::rungs(role).min().unwrap_or(spec::LADDER[0])),
+        }
     }
-    fn right(&self, text: &str, x: f32, y: f32, size: f32, color: Color) {
-        self.text(text, x - self.font.width(text, size), y, size, color);
+    /// The advance width of `text`, in scene units.
+    fn measure(&self, text: &str, role: Role) -> f32 {
+        match self.face(role, text) {
+            Face::Noto(ppem) => {
+                let (_, weight, tracking) = spec::style(role);
+                let tracking = self.fonts.tracking(tracking, ppem);
+                self.fonts.measure(text, weight, ppem, tracking) / self.density
+            }
+            Face::Pixel(cell) => {
+                let n = text.chars().count() as f32;
+                (n * 6.0 - 1.0).max(0.0) * cell / self.density
+            }
+        }
     }
-    fn center_at(&self, text: &str, x: f32, y: f32, size: f32, color: Color) {
-        self.text(text, x - self.font.width(text, size) / 2.0, y, size, color);
+    /// The height of capitals, in scene units, for centring a line.
+    fn cap(&self, role: Role) -> f32 {
+        let (size, weight, _) = spec::style(role);
+        match (self.face(role, "A"), self.fonts.latin.face(weight)) {
+            (Face::Noto(ppem), Some(f)) => {
+                f32::from(f.cap_height) * f32::from(ppem) / f32::from(f.units_per_em) / self.density
+            }
+            _ => size * 0.7,
+        }
     }
-    fn centered(&self, text: &str, y: f32, size: f32, color: Color) {
-        self.center_at(text, WIDTH / 2.0, y, size, color);
+    fn missing(&self, text: &str, c: char) {
+        if let Some(log) = self.misfits {
+            log.borrow_mut().push(Misfit {
+                text: text.into(),
+                need: 0.0,
+                room: 0.0,
+                missing: Some(c),
+            });
+        }
     }
-    fn button(&self, r: Rect, label: &str, selected: bool, enabled: bool) {
+    /// Draws `text` with its left end at `x` and its baseline at `y`.
+    fn draw(&self, text: &str, role: Role, x: f32, y: f32, color: Color) {
+        let d = self.density;
+        // Whole physical pixels: the view's offset is snapped too, so every
+        // glyph lands exactly on the pixel grid.
+        let (ox, oy) = ((x * d).round(), (y * d).round());
+        match self.face(role, text) {
+            Face::Noto(ppem) => {
+                let (_, weight, tracking) = spec::style(role);
+                let tracking = self.fonts.tracking(tracking, ppem);
+                self.fonts.layout(text, weight, ppem, tracking, |p| {
+                    let cell = p
+                        .glyph
+                        .and_then(|g| self.atlas.glyph((p.source, weight, ppem, g)));
+                    match cell {
+                        Some(Cell { w: 0, .. }) => {}
+                        Some(c) => self.sprite(
+                            (ox + p.x.round() + f32::from(c.left), oy - f32::from(c.top)),
+                            (
+                                f32::from(c.x),
+                                f32::from(c.y),
+                                f32::from(c.w),
+                                f32::from(c.h),
+                            ),
+                            1.0,
+                            color,
+                        ),
+                        None => self.missing(text, p.c),
+                    }
+                });
+            }
+            Face::Pixel(cell) => {
+                for (i, c) in text.chars().enumerate() {
+                    let (sx, sy) = pixel_font::cell(c.to_ascii_uppercase());
+                    self.sprite(
+                        (ox + i as f32 * 6.0 * cell, oy - 7.0 * cell),
+                        (sx as f32, sy as f32, 5.0, 7.0),
+                        cell,
+                        color,
+                    );
+                }
+            }
+        }
+    }
+    /// Draws `text` aligned in `slot`; text wider than the slot is drawn
+    /// anyway and reported to the layout tests.
+    fn put(&self, text: &str, role: Role, slot: Slot, color: Color) -> f32 {
+        let width = self.measure(text, role);
+        if width > slot.w + 0.5
+            && let Some(log) = self.misfits
+        {
+            log.borrow_mut().push(Misfit {
+                text: text.into(),
+                need: width,
+                room: slot.w,
+                missing: None,
+            });
+        }
+        let x = match slot.align {
+            Align::Left => slot.x,
+            Align::Center => slot.x + (slot.w - width) / 2.0,
+            Align::Right => slot.x + slot.w - width,
+        };
+        self.draw(text, role, x, slot.y, color);
+        width
+    }
+    /// Formats `id` into the scene's buffer and hands it to `with`.
+    fn format<R>(&self, id: TextId, args: &[Arg], form: Form, with: impl FnOnce(&str) -> R) -> R {
+        let mut buffer = self.buffer.borrow_mut();
+        buffer.clear();
+        let _ = ark_text::write(&mut *buffer, self.locale, form, id, args);
+        with(&buffer)
+    }
+    /// Sets `id` in `slot`, switching to its short wording if the full one
+    /// does not fit.
+    fn say(&self, id: TextId, args: &[Arg], role: Role, slot: Slot, color: Color) {
+        let fits = self.format(id, args, Form::Full, |t| self.measure(t, role) <= slot.w);
+        let form = if fits { Form::Full } else { Form::Short };
+        self.format(id, args, form, |t| self.put(t, role, slot, color));
+    }
+    fn width_of(&self, id: TextId, args: &[Arg], role: Role) -> f32 {
+        self.format(id, args, Form::Full, |t| self.measure(t, role))
+    }
+    /// Sets `id` across up to `max` lines from baseline `slot.y`, wrapping
+    /// at word (or, in Chinese and Japanese, character) boundaries.
+    /// Returns the lines used; more than `max` is reported.
+    fn paragraph(&self, id: TextId, role: Role, slot: Slot, max: usize, color: Color) -> usize {
+        self.format(id, &[], Form::Full, |text| {
+            let (_, weight, tracking) = spec::style(role);
+            let ppem = match self.face(role, text) {
+                Face::Noto(ppem) => ppem,
+                // The pixel font does not wrap; one line, reported if long.
+                Face::Pixel(_) => {
+                    self.put(text, role, slot, color);
+                    return 1;
+                }
+            };
+            let tracking = self.fonts.tracking(tracking, ppem);
+            let room = slot.w * self.density;
+            let mut lines = 0;
+            self.fonts.wrap(text, weight, ppem, tracking, room, |line| {
+                let y = slot.y + lines as f32 * LINE;
+                if lines < max {
+                    self.put(line, role, Slot { y, ..slot }, color);
+                } else if let Some(log) = self.misfits {
+                    log.borrow_mut().push(Misfit {
+                        text: text.into(),
+                        need: (lines + 1) as f32,
+                        room: max as f32,
+                        missing: None,
+                    });
+                }
+                lines += 1;
+            });
+            lines.min(max)
+        })
+    }
+
+    // Controls.
+
+    fn cap_width(&self, cap: Cap) -> f32 {
+        match cap {
+            Cap::Key(label) => (self.measure(label, Role::Label) + 12.0).max(24.0),
+            Cap::Pad(Glyph::Start) => 30.0,
+            Cap::Pad(_) => 22.0,
+        }
+    }
+    /// A key or button cap, centred on the capitals of body text at `baseline`.
+    fn cap_glyph(&self, cap: Cap, x: f32, baseline: f32, beside: Role) {
+        let w = self.cap_width(cap);
+        let cy = baseline - self.cap(beside) / 2.0;
+        match cap {
+            Cap::Key(label) => {
+                self.rounded(x, cy - 12.0, w, 24.0, 6.0, BORDER);
+                self.rounded(x + 1.0, cy - 11.0, w - 2.0, 22.0, 5.0, RAISED);
+                let y = cy + self.cap(Role::Label) / 2.0;
+                self.put(label, Role::Label, Slot::centered(x + w / 2.0, w, y), INK);
+            }
+            Cap::Pad(Glyph::Start) => {
+                self.rounded(x, cy - 10.0, w, 20.0, 10.0, DIM);
+                for dy in [-4.0, 0.0, 4.0] {
+                    self.rect(x + 9.0, cy + dy - 0.75, 12.0, 1.5, BG);
+                }
+            }
+            Cap::Pad(glyph) => {
+                let (label, fill) = match glyph {
+                    Glyph::A => ("A", PALETTE[3]),
+                    Glyph::B => ("B", RED),
+                    _ => ("X", Color::new(0.30, 0.56, 1.0, 1.0)),
+                };
+                self.circle(V2::new(x + w / 2.0, cy), w / 2.0, fill);
+                let y = cy + self.cap(Role::Label) / 2.0;
+                self.put(label, Role::Label, Slot::centered(x + w / 2.0, w, y), BG);
+            }
+        }
+    }
+    fn item_width(&self, item: &Item, role: Role) -> f32 {
+        let cap = item.cap.map_or(0.0, |c| self.cap_width(c) + 8.0);
+        cap + self.width_of(item.id, item.arg.as_slice(), role)
+    }
+    /// Lays `items` into centred lines of at most `FULL` width; calls
+    /// `line` with each line's items and width. Returns the line count.
+    fn pack(&self, items: &[Item], role: Role, mut line: impl FnMut(&[Item], f32)) -> usize {
+        let mut start = 0;
+        let mut lines = 0;
+        while start < items.len() {
+            let mut width = self.item_width(&items[start], role);
+            let mut end = start + 1;
+            while end < items.len() {
+                let next = width + GAP + self.item_width(&items[end], role);
+                if next > FULL {
+                    break;
+                }
+                width = next;
+                end += 1;
+            }
+            line(&items[start..end], width);
+            lines += 1;
+            start = end;
+        }
+        lines
+    }
+    /// Draws one packed line of hint items, centred, on `baseline`.
+    fn hint_line(&self, items: &[Item], width: f32, baseline: f32, color: Color, role: Role) {
+        let mut x = WIDTH / 2.0 - width.min(FULL) / 2.0;
+        for item in items {
+            if let Some(cap) = item.cap {
+                self.cap_glyph(cap, x, baseline, role);
+                x += self.cap_width(cap) + 8.0;
+            }
+            let w = self.width_of(item.id, item.arg.as_slice(), role);
+            self.say(
+                item.id,
+                item.arg.as_slice(),
+                role,
+                Slot::left(x, w.min(FULL), baseline),
+                color,
+            );
+            x += w + GAP;
+        }
+    }
+    /// Rows of hints stacked up from the bottom of the screen. A save
+    /// failure, when there is one, sits on top.
+    fn footer(&self, rows: &[(&[Item], Color)], save_error: bool) {
+        let count: usize = rows
+            .iter()
+            .map(|(items, _)| self.pack(items, Role::Caption, |_, _| {}))
+            .sum::<usize>()
+            + usize::from(save_error);
+        if count > 4
+            && let Some(log) = self.misfits
+        {
+            log.borrow_mut().push(Misfit {
+                text: "footer".into(),
+                need: count as f32,
+                room: 4.0,
+                missing: None,
+            });
+        }
+        let mut y = FOOTER - (count.saturating_sub(1)) as f32 * FOOTER_LINE;
+        if save_error {
+            self.say(TextId::SaveFailed, &[], Role::Caption, Slot::line(y), AMBER);
+            y += FOOTER_LINE;
+        }
+        for &(items, color) in rows {
+            self.pack(items, Role::Caption, |line, width| {
+                self.hint_line(line, width, y, color, Role::Caption);
+                y += FOOTER_LINE;
+            });
+        }
+    }
+    /// A row of label–value pairs, centred: `POINTS 12,400   MEDALS 7`.
+    fn pairs(&self, pairs: &[(TextId, u32)], baseline: f32, room: f32) {
+        let pair_width = |&(label, n): &(TextId, u32)| {
+            let value = Figures::count(self.locale, n);
+            self.width_of(label, &[], Role::Label) + 8.0 + self.measure(value.as_str(), Role::Body)
+        };
+        let width = pairs.iter().map(pair_width).sum::<f32>() + GAP * (pairs.len() as f32 - 1.0);
+        if width > room
+            && let Some(log) = self.misfits
+        {
+            log.borrow_mut().push(Misfit {
+                text: "label and value pairs".into(),
+                need: width,
+                room,
+                missing: None,
+            });
+        }
+        let mut x = WIDTH / 2.0 - width / 2.0;
+        for &(label, n) in pairs {
+            let w = self.width_of(label, &[], Role::Label);
+            self.say(label, &[], Role::Label, Slot::left(x, w, baseline), DIM);
+            x += w + 8.0;
+            let value = Figures::count(self.locale, n);
+            x += self.put(
+                value.as_str(),
+                Role::Body,
+                Slot::left(x, room, baseline),
+                INK,
+            ) + GAP;
+        }
+    }
+    fn button(&self, r: Rect, id: TextId, args: &[Arg], selected: bool, enabled: bool) {
         if selected && enabled {
             self.rounded(r.x, r.y, r.w, r.h, 10.0, opacity(CYAN, 0.13));
         }
         let color = match (enabled, selected) {
             (false, _) => MUTED,
             (true, true) => CYAN,
-            (true, false) => opacity(INK, 0.78),
+            (true, false) => opacity(INK, 0.82),
         };
-        self.centered(label, r.y + r.h / 2.0 + 7.0, 14.0, color);
-    }
-    fn glyph_width(&self, glyph: Glyph, size: f32) -> f32 {
-        let pixel = self.font.pixel(size);
-        match glyph {
-            Glyph::Start => self.font.width("START", size) + 6.0 * pixel,
-            _ => 11.0 * pixel,
-        }
-    }
-    /// A filled button cap, centered on the cap height of text at `baseline`.
-    fn glyph(&self, glyph: Glyph, x: f32, baseline: f32, size: f32) {
-        let pixel = self.font.pixel(size);
-        let (label, fill) = match glyph {
-            Glyph::A => ("A", PALETTE[3]),
-            Glyph::B => ("B", RED),
-            Glyph::X => ("X", Color::new(0.30, 0.56, 1.0, 1.0)),
-            Glyph::Start => ("START", DIM),
-        };
-        let w = self.glyph_width(glyph, size);
-        let h = 11.0 * pixel;
-        self.rounded(x, baseline - 9.0 * pixel, w, h, h / 2.0, fill);
-        self.center_at(label, x + w / 2.0, baseline, size, BG);
-    }
-    fn prompt(&self, parts: &[Part], center: f32, baseline: f32, size: f32, color: Color) {
-        let width = |part: &Part| match *part {
-            Part::Text(text) => self.font.width(text, size),
-            Part::Pad(glyph) => self.glyph_width(glyph, size),
-        };
-        let mut x = center - parts.iter().map(width).sum::<f32>() / 2.0;
-        for part in parts {
-            match *part {
-                Part::Text(text) => self.text(text, x, baseline, size, color),
-                Part::Pad(glyph) => self.glyph(glyph, x, baseline, size),
-            }
-            x += width(part);
-        }
-    }
-    /// Names the keys or the buttons of whichever device the player is using.
-    fn hint(&self, keys: &str, pad: &[Part], baseline: f32, size: f32, color: Color) {
-        match self.device {
-            Device::KeyboardMouse => self.centered(keys, baseline, size, color),
-            Device::Gamepad => self.prompt(pad, WIDTH / 2.0, baseline, size, color),
-        }
+        let baseline = r.y + r.h / 2.0 + self.cap(Role::Body) / 2.0;
+        self.say(
+            id,
+            args,
+            Role::Body,
+            Slot::centered(r.x + r.w / 2.0, r.w - 32.0, baseline),
+            color,
+        );
     }
     fn logo(&self, x: f32, y: f32, cell: f32) {
         for (letter, character) in "ARKONK".chars().enumerate() {
             let color = if character == 'O' { CYAN } else { INK };
-            for (row, &bits) in glyph(character).iter().enumerate() {
+            for (row, &bits) in pixel_font::glyph(character).iter().enumerate() {
                 for col in 0..5 {
                     if bits & (1 << (4 - col)) != 0 {
                         self.rect(
@@ -382,22 +749,48 @@ impl Scene {
             }
         }
     }
+    /// A small padlock for sectors not yet open.
+    fn padlock(&self, cx: f32, cy: f32, color: Color) {
+        self.ring(V2::new(cx, cy - 4.0), 5.0, 2.0, color);
+        self.rounded(cx - 8.0, cy - 3.0, 16.0, 12.0, 2.5, color);
+    }
 }
 
 /// Xbox face-button names; Steam Deck and Steam Input present this layout.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 enum Glyph {
     A,
     B,
     X,
     Start,
 }
-#[derive(Clone, Copy)]
-enum Part {
-    Text(&'static str),
+/// What sits before a hint: a keyboard key or a gamepad button.
+#[derive(Clone, Copy, PartialEq)]
+enum Cap {
+    Key(&'static str),
     Pad(Glyph),
 }
-use Part::{Pad, Text};
+/// One hint: an optional cap, then text.
+#[derive(Clone, Copy)]
+struct Item {
+    cap: Option<Cap>,
+    id: TextId,
+    arg: Option<Arg>,
+}
+const fn hint(id: TextId) -> Item {
+    Item {
+        cap: None,
+        id,
+        arg: None,
+    }
+}
+const fn pad(glyph: Glyph, id: TextId) -> Item {
+    Item {
+        cap: Some(Cap::Pad(glyph)),
+        id,
+        arg: None,
+    }
+}
 
 #[derive(Clone, Copy, Default)]
 struct Popup {
@@ -406,12 +799,8 @@ struct Popup {
     value: u32,
 }
 
-pub struct Renderer {
-    font: PixelFont,
-    /// `None` if the driver rejected the shader; frames then keep blended alpha.
-    opaque: Option<Material>,
-    metal: bool,
-    scratch: String,
+/// What the renderer remembers between ticks: trails, flashes, popups.
+pub struct Fx {
     trails: [[V2; 12]; MAX_BALLS],
     trail_len: [usize; MAX_BALLS],
     cursor: usize,
@@ -425,18 +814,9 @@ pub struct Renderer {
     wall_flash: f32,
     pickup_flash: f32,
 }
-impl Renderer {
-    pub fn new() -> Self {
-        let metal =
-            unsafe { get_internal_gl().quad_context.info().backend == miniquad::Backend::Metal };
-        // Rounded shapes use about 2.5 indices per vertex; the default 5,000
-        // indices would split a dense frame long before its 10,000 vertices.
-        macroquad::window::gl_set_drawcall_buffer_capacity(10_000, 25_000);
+impl Default for Fx {
+    fn default() -> Self {
         Self {
-            font: PixelFont::new(),
-            opaque: opaque_material(metal),
-            metal,
-            scratch: String::with_capacity(256),
             trails: [[V2::default(); 12]; MAX_BALLS],
             trail_len: [0; MAX_BALLS],
             cursor: 0,
@@ -451,6 +831,89 @@ impl Renderer {
             pickup_flash: 0.0,
         }
     }
+}
+
+/// The type for one locale: its fonts and the atlas built from them.
+struct Type {
+    locale: Locale,
+    fonts: Fonts,
+    atlas: Atlas,
+}
+impl Type {
+    fn new(locale: Locale) -> Self {
+        // A locale this build cannot draw falls back to English. The linked
+        // atlases are unpacked by the ark-glyphs tests, so English failing
+        // too would mean a corrupt binary, with nothing left to draw with.
+        let (locale, fonts) = match ark_glyphs::fonts(locale) {
+            Ok(fonts) => (locale, fonts),
+            Err(e) => {
+                crate::diagnostics::error(format_args!(
+                    "No glyphs for {locale:?} ({e:?}); using English"
+                ));
+                (
+                    Locale::En,
+                    ark_glyphs::fonts(Locale::En).expect("the English atlas is linked and tested"),
+                )
+            }
+        };
+        let atlas =
+            Atlas::build(&fonts).expect("linked atlases inflate; the tests unpack every strike");
+        Self {
+            locale,
+            fonts,
+            atlas,
+        }
+    }
+}
+
+pub struct Renderer {
+    kind: Type,
+    texture: Option<Texture2D>,
+    /// `None` if the driver rejected the shader; frames then keep blended alpha.
+    opaque: Option<Material>,
+    metal: bool,
+    text: String,
+    fx: Fx,
+}
+impl Renderer {
+    pub fn new(locale: Locale) -> Self {
+        let metal =
+            unsafe { get_internal_gl().quad_context.info().backend == miniquad::Backend::Metal };
+        // Rounded shapes use about 2.5 indices per vertex; the default 5,000
+        // indices would split a dense frame long before its 10,000 vertices.
+        macroquad::window::gl_set_drawcall_buffer_capacity(10_000, 25_000);
+        let mut renderer = Self {
+            kind: Type::new(locale),
+            texture: None,
+            opaque: opaque_material(metal),
+            metal,
+            text: String::with_capacity(256),
+            fx: Fx::default(),
+        };
+        renderer.upload();
+        renderer
+    }
+    fn upload(&mut self) {
+        let atlas = &self.kind.atlas;
+        let texture = Texture2D::from_rgba8(atlas.width as u16, atlas.height as u16, &atlas.rgba());
+        // Glyphs are drawn 1:1 on whole pixels, and the pixel font at whole
+        // multiples, so nearest sampling is exact.
+        texture.set_filter(FilterMode::Nearest);
+        self.texture = Some(texture);
+    }
+    /// Switches language, rebuilding the atlas for its scripts.
+    pub fn set_locale(&mut self, locale: Locale) {
+        if locale != self.kind.locale {
+            self.kind = Type::new(locale);
+            self.upload();
+        }
+    }
+    pub fn locale(&self) -> Locale {
+        self.kind.locale
+    }
+    pub fn atlas_size(&self) -> (usize, usize) {
+        (self.kind.atlas.width, self.kind.atlas.height)
+    }
     pub fn backend(&self) -> &'static str {
         if self.metal { "Metal" } else { "OpenGL" }
     }
@@ -463,75 +926,66 @@ impl Renderer {
     }
 
     pub fn reset(&mut self) {
-        self.trail_len.fill(0);
-        self.brick_flash.fill(0.0);
-        self.previous_bricks.fill(0);
-        self.popups.fill(Popup::default());
-        self.previous_score = 0;
-        self.previous_sector = None;
-        self.paddle_flash = 0.0;
-        self.wall_flash = 0.0;
-        self.pickup_flash = 0.0;
+        self.fx = Fx::default();
     }
     /// Updates trails and flashes after one tick that raised `events`.
     pub fn record(&mut self, game: &Game, events: Events) {
-        if self.previous_sector != Some(game.sector()) {
-            self.reset();
-            self.previous_sector = Some(game.sector());
-            self.previous_bricks = hp_grid(game);
-            self.previous_score = game.score();
+        let fx = &mut self.fx;
+        if fx.previous_sector != Some(game.sector()) {
+            *fx = Fx::default();
+            fx.previous_sector = Some(game.sector());
+            fx.previous_bricks = hp_grid(game);
+            fx.previous_score = game.score();
         }
         for (i, ball) in game.balls().iter().enumerate() {
             if !ball.active || ball.held || game.stage() != Stage::Playing {
-                self.trail_len[i] = 0;
+                fx.trail_len[i] = 0;
                 continue;
             }
-            self.trails[i][self.cursor] = ball.pos;
-            self.trail_len[i] = (self.trail_len[i] + 1).min(12);
+            fx.trails[i][fx.cursor] = ball.pos;
+            fx.trail_len[i] = (fx.trail_len[i] + 1).min(12);
         }
-        self.cursor = (self.cursor + 1) % 12;
-        self.paddle_flash = (self.paddle_flash - DT).max(0.0);
-        self.wall_flash = (self.wall_flash - DT).max(0.0);
-        self.pickup_flash = (self.pickup_flash - DT).max(0.0);
+        fx.cursor = (fx.cursor + 1) % 12;
+        fx.paddle_flash = (fx.paddle_flash - DT).max(0.0);
+        fx.wall_flash = (fx.wall_flash - DT).max(0.0);
+        fx.pickup_flash = (fx.pickup_flash - DT).max(0.0);
         if events.paddle {
-            self.paddle_flash = 0.16;
+            fx.paddle_flash = 0.16;
         }
         if events.wall {
-            self.wall_flash = 0.12;
+            fx.wall_flash = 0.12;
         }
         if events.pickup {
-            self.pickup_flash = 0.65;
+            fx.pickup_flash = 0.65;
         }
-        for popup in &mut self.popups {
+        for popup in &mut fx.popups {
             popup.life = (popup.life - DT).max(0.0);
             popup.pos.y -= 22.0 * DT;
         }
         let mut popup_spawned = false;
-        for (cell, flash) in Cell::all().zip(&mut self.brick_flash) {
+        for (cell, flash) in FieldCell::all().zip(&mut fx.brick_flash) {
             let i = cell.index();
             *flash = (*flash - DT).max(0.0);
-            if events.brick && game.board().hp(cell) < self.previous_bricks[i] {
+            if events.brick && game.board().hp(cell) < fx.previous_bricks[i] {
                 *flash = 0.18;
-                if !popup_spawned && game.score() > self.previous_score {
+                if !popup_spawned && game.score() > fx.previous_score {
                     let r = cell_rect(cell);
-                    self.popups[self.popup_cursor] = Popup {
+                    fx.popups[fx.popup_cursor] = Popup {
                         pos: V2::new(r.x + r.w / 2.0, r.y),
                         life: 0.65,
-                        value: (game.score() - self.previous_score).saturating_sub(
-                            if events.clear {
-                                game.summary().bonus
-                            } else {
-                                0
-                            },
-                        ),
+                        value: (game.score() - fx.previous_score).saturating_sub(if events.clear {
+                            game.summary().bonus
+                        } else {
+                            0
+                        }),
                     };
-                    self.popup_cursor = (self.popup_cursor + 1) % self.popups.len();
+                    fx.popup_cursor = (fx.popup_cursor + 1) % fx.popups.len();
                     popup_spawned = true;
                 }
             }
         }
-        self.previous_bricks = hp_grid(game);
-        self.previous_score = game.score();
+        fx.previous_bricks = hp_grid(game);
+        fx.previous_score = game.score();
     }
 
     pub fn draw(
@@ -547,7 +1001,14 @@ impl Renderer {
             return;
         };
         set_camera(&view.camera(screen_width(), screen_height()));
-        self.frame(view, screen_dpi_scale(), game, ui, profile, alpha, perf);
+        self.frame(
+            view.scale * screen_dpi_scale(),
+            game,
+            ui,
+            profile,
+            alpha,
+            perf,
+        );
     }
     /// OpenGL only: renders one frame offscreen at an exact physical size, as
     /// on a 1x display, and writes it as PNG. Layouts can then be checked at
@@ -570,33 +1031,36 @@ impl Renderer {
         // Texture readback is bottom-up; render flipped so the PNG is upright.
         camera.zoom.y = -camera.zoom.y;
         set_camera(&camera);
-        self.frame(view, 1.0, game, ui, profile, 1.0, None);
+        self.frame(view.scale, game, ui, profile, 1.0, None);
         // SAFETY: main thread, between draw calls; executes the batched frame.
         unsafe { get_internal_gl() }.flush();
         target.texture.get_texture_data().export_png(path);
         set_default_camera();
     }
-    #[allow(clippy::too_many_arguments)]
     fn frame(
         &mut self,
-        view: View,
-        dpi: f32,
+        density: f32,
         game: &Game,
         ui: &Ui,
         profile: &Profile,
         alpha: f32,
         perf: Option<&Perf>,
     ) {
-        self.font.density = view.scale * dpi;
         let v = Scene {
-            font: self.font.clone(),
+            texture: self.texture.as_ref(),
+            atlas: &self.kind.atlas,
+            fonts: &self.kind.fonts,
+            locale: self.kind.locale,
+            density,
             device: ui.device,
+            buffer: RefCell::new(std::mem::take(&mut self.text)),
+            misfits: None,
         };
         // Painting the background into the scene batch, rather than with
         // `clear_background`, saves a full-framebuffer pass: Macroquad has
         // already cleared once this frame.
         v.cover(BG);
-        self.scene(&v, game, ui, profile, alpha, perf);
+        scene(&v, &self.fx, game, ui, profile, alpha, perf);
         // Translucent shapes also blend into framebuffer alpha. Restore an
         // opaque frame so the compositor never shows anything through it.
         if let Some(opaque) = &self.opaque {
@@ -604,765 +1068,1046 @@ impl Renderer {
             v.cover(WHITE);
             gl_use_default_material();
         }
+        self.text = v.buffer.into_inner();
     }
-    fn scene(
-        &mut self,
-        v: &Scene,
-        game: &Game,
-        ui: &Ui,
-        profile: &Profile,
-        alpha: f32,
-        perf: Option<&Perf>,
-    ) {
-        // The smoke test previews screens the game has not reached.
-        let (stage, summary) = ui
-            .preview
-            .map_or((game.stage(), game.summary()), |p| (p.stage, p.summary));
-        if ui.screen != Screen::Play {
-            if ui.screen == Screen::Title {
-                self.attract(v, ui, profile);
-            } else {
-                self.sectors(v, ui, profile);
-            }
-            if ui.save_error {
-                v.centered("PROGRESS COULD NOT BE SAVED", 884.0, 11.0, AMBER);
-            }
-            return;
-        }
-        self.playfield(v);
-        self.bricks(v, game);
-        self.effects(v, game);
-        self.paddle(v, game);
-        for drop in game.capsules() {
-            if drop.active {
-                v.rounded(
-                    drop.pos.x - 15.0,
-                    drop.pos.y - 10.0,
-                    30.0,
-                    20.0,
-                    10.0,
-                    power_color(drop.power),
-                );
-            }
-        }
-        self.balls(v, game, alpha);
-        // Keep font-atlas work together after the geometry batches.
-        self.hud(v, game, profile);
-        for drop in game.capsules() {
-            if drop.active {
-                v.center_at(
-                    capsule_letter(drop.power),
-                    drop.pos.x,
-                    drop.pos.y + 7.0,
-                    13.0,
-                    BG,
-                );
-            }
-        }
-        for popup in &self.popups {
-            if popup.life > 0.0 {
-                self.scratch.clear();
-                let _ = write!(self.scratch, "+{}", popup.value);
-                v.center_at(
-                    &self.scratch,
-                    popup.pos.x,
-                    popup.pos.y,
-                    11.0,
-                    opacity(INK, (popup.life * 3.0).min(1.0)),
-                );
-            }
-        }
-        if !ui.paused && stage == Stage::Playing {
-            if game.balls().iter().any(|b| b.active && b.held) {
-                v.hint(
-                    "CLICK OR SPACE TO RELEASE",
-                    &[Pad(Glyph::A), Text(" TO RELEASE")],
-                    720.0,
-                    11.0,
-                    CYAN,
-                );
-            }
-            if game.effects().notice_ticks > 0
-                && let Some(power) = game.effects().notice
-            {
-                let fade = (game.effects().notice_ticks as f32 / 60.0).min(1.0);
-                let name = text(TextId::PowerName(power));
-                v.centered(name, 687.0, 13.0, opacity(power_color(power), fade));
-            }
-        }
-        if ui.paused {
-            v.scrim();
-            v.panel(280.0, 296.0, 400.0, 340.0);
-            v.centered("PAUSED", 346.0, 22.0, INK);
-            self.menu(v, ui.choice, ["RESUME", "RETRY SECTOR", "MAIN MENU"], None);
-            v.centered("RETRY RESTARTS FROM THE CHECKPOINT", 584.0, 11.0, DIM);
-            if v.device == Device::Gamepad {
-                v.prompt(
-                    &[
-                        Pad(Glyph::A),
-                        Text(" SELECT   "),
-                        Pad(Glyph::B),
-                        Text(" RESUME   "),
-                        Pad(Glyph::X),
-                        Text(" RETRY"),
-                    ],
-                    WIDTH / 2.0,
-                    610.0,
-                    11.0,
-                    MUTED,
-                );
-            } else {
-                self.options(v, profile, 610.0);
-            }
-        } else {
-            match stage {
-                Stage::Ready => self.ready(v, game),
-                Stage::Cleared => self.cleared(v, game, summary),
-                Stage::GameOver | Stage::Victory => {
-                    v.scrim();
-                    v.panel(280.0, 290.0, 400.0, 346.0);
-                    v.centered(
-                        if stage == Stage::Victory {
-                            "JOURNEY COMPLETE"
-                        } else {
-                            "ONE MORE ORBIT?"
-                        },
-                        338.0,
-                        22.0,
-                        INK,
-                    );
-                    self.scratch.clear();
-                    grouped(&mut self.scratch, game.score());
-                    let _ = write!(
-                        self.scratch,
-                        " POINTS   {} MEDALS",
-                        profile.progress.medal_count()
-                    );
-                    v.centered(&self.scratch, 362.0, 11.0, DIM);
-                    self.menu(
-                        v,
-                        ui.choice,
-                        [
-                            "SECTOR SELECT",
-                            if stage == Stage::Victory {
-                                "NEW JOURNEY"
-                            } else {
-                                "RETRY SECTOR"
-                            },
-                            "MAIN MENU",
-                        ],
-                        None,
-                    );
-                    v.centered("YOUR PROGRESS IS SAVED", 590.0, 11.0, DIM);
-                }
-                Stage::Playing => {}
-            }
-        }
-        if ui.save_error && (ui.paused || stage != Stage::Playing) {
-            v.centered("PROGRESS COULD NOT BE SAVED", 860.0, 11.0, AMBER);
-        }
-        if let Some(perf) = perf {
-            v.panel(80.0, 440.0, 420.0, 184.0);
-            v.text("PERFORMANCE / CPU", 100.0, 470.0, 13.0, CYAN);
-            for (i, line) in perf.lines.iter().enumerate() {
-                v.text(line, 100.0, 496.0 + i as f32 * 21.0, 11.0, INK);
-            }
-        }
-    }
+}
 
-    fn playfield(&self, v: &Scene) {
-        v.rect(LEFT, TOP, RIGHT - LEFT, BOTTOM - TOP, SURFACE);
-        // Three walls; the open bottom edge is where a ball drains.
-        let edge = mix(BORDER, CYAN, (self.wall_flash * 4.0).min(0.6));
-        v.rect(LEFT, TOP, RIGHT - LEFT, 1.0, edge);
-        v.rect(LEFT, TOP, 1.0, BOTTOM - TOP, edge);
-        v.rect(RIGHT - 1.0, TOP, 1.0, BOTTOM - TOP, edge);
+fn scene(
+    v: &Scene,
+    fx: &Fx,
+    game: &Game,
+    ui: &Ui,
+    profile: &Profile,
+    alpha: f32,
+    perf: Option<&Perf>,
+) {
+    // The smoke test previews screens the game has not reached.
+    let (stage, summary) = ui
+        .preview
+        .map_or((game.stage(), game.summary()), |p| (p.stage, p.summary));
+    if ui.screen != Screen::Play {
+        if ui.screen == Screen::Title {
+            attract(v, ui, profile);
+        } else {
+            sectors(v, ui, profile);
+        }
+        return;
     }
-    fn bricks(&self, v: &Scene, game: &Game) {
-        // Quiet connections make the actual orthogonal blast routes readable.
-        for cell in Cell::all() {
-            if !game.board().is_core(cell) || game.board().hp(cell) == 0 {
-                continue;
-            }
-            let r = cell_rect(cell);
-            let [_, right, _, down] = cell.neighbors();
-            for other in [right, down].into_iter().flatten() {
-                if game.board().is_core(other) && game.board().hp(other) > 0 {
-                    let next = cell_rect(other);
-                    v.line(
-                        V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0),
-                        V2::new(next.x + next.w / 2.0, next.y + next.h / 2.0),
-                        1.0,
-                        opacity(AMBER, 0.32),
-                    );
+    playfield(v, fx);
+    bricks(v, fx, game);
+    effects(v, fx, game);
+    paddle(v, fx, game);
+    for drop in game.capsules() {
+        if drop.active {
+            v.rounded(
+                drop.pos.x - 15.0,
+                drop.pos.y - 10.0,
+                30.0,
+                20.0,
+                10.0,
+                power_color(drop.power),
+            );
+        }
+    }
+    balls(v, fx, game, alpha);
+    hud(v, game, profile);
+    let mut letter = [0; 4];
+    for drop in game.capsules() {
+        if drop.active {
+            let letter = capsule(drop.power).encode_utf8(&mut letter);
+            let y = drop.pos.y + v.cap(Role::Label) / 2.0;
+            v.put(letter, Role::Label, Slot::centered(drop.pos.x, 30.0, y), BG);
+        }
+    }
+    for popup in &fx.popups {
+        if popup.life > 0.0 {
+            let color = opacity(INK, (popup.life * 3.0).min(1.0));
+            v.format(TextId::Plus, &[Arg::Count(popup.value)], Form::Full, |t| {
+                v.put(
+                    t,
+                    Role::Label,
+                    Slot::centered(popup.pos.x, 120.0, popup.pos.y),
+                    color,
+                )
+            });
+        }
+    }
+    if !ui.paused && stage == Stage::Playing {
+        if game.balls().iter().any(|b| b.active && b.held) {
+            match v.device {
+                Device::KeyboardMouse => v.say(
+                    TextId::KeysRelease,
+                    &[],
+                    Role::Body,
+                    Slot::line(720.0),
+                    CYAN,
+                ),
+                Device::Gamepad => {
+                    let items = [pad(Glyph::A, TextId::ActionRelease)];
+                    v.pack(&items, Role::Body, |line, w| {
+                        v.hint_line(line, w, 720.0, CYAN, Role::Body)
+                    });
                 }
             }
         }
-        let pulse = 0.7 + 0.15 * (game.stage_ticks() as f32 * DT * 2.0).sin();
-        for cell in Cell::all() {
-            let i = cell.index();
-            let hp = game.board().hp(cell);
-            let r = cell_rect(cell);
-            let c = if game.board().is_core(cell) {
-                AMBER
-            } else {
-                sector_color(cell.row(), game.sector().sector().chapter)
-            };
-            let flash = self.brick_flash[i] / 0.18;
-            if hp == 0 {
-                if flash > 0.0 {
-                    v.frame(
-                        r.x - (1.0 - flash) * 5.0,
-                        r.y - (1.0 - flash) * 5.0,
-                        r.w + (1.0 - flash) * 10.0,
-                        r.h + (1.0 - flash) * 10.0,
-                        opacity(c, flash * 0.75),
-                    );
-                }
-                continue;
-            }
-            let fill = if game.board().is_core(cell) {
-                shade(AMBER, 0.24)
-            } else if hp > 1 {
-                shade(c, 0.42)
-            } else {
-                shade(c, 0.80)
-            };
-            v.rounded(r.x, r.y, r.w, r.h, 4.0, fill);
-            v.rect(r.x + 4.0, r.y, r.w - 8.0, 2.0, mix(fill, INK, 0.22));
-            if game.board().is_core(cell) {
-                let center = V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
-                for (from, to) in [
-                    (V2::new(-6.0, 0.0), V2::new(0.0, -5.0)),
-                    (V2::new(0.0, -5.0), V2::new(6.0, 0.0)),
-                    (V2::new(6.0, 0.0), V2::new(0.0, 5.0)),
-                    (V2::new(0.0, 5.0), V2::new(-6.0, 0.0)),
-                ] {
-                    v.line(center + from, center + to, 1.5, opacity(AMBER, pulse));
-                }
-                v.circle(center, 1.5, INK);
-            } else if hp > 1 {
-                for j in 0..hp {
-                    let x = r.x + r.w / 2.0 - f32::from(hp - 1) * 5.0 + f32::from(j) * 10.0;
-                    v.circle(V2::new(x, r.y + r.h / 2.0), 2.5, mix(c, INK, 0.5));
-                }
-            }
-            if flash > 0.0 {
-                v.rounded(r.x, r.y, r.w, r.h, 4.0, opacity(INK, flash * 0.8));
-            }
-        }
-    }
-    fn effects(&self, v: &Scene, game: &Game) {
-        for cell in Cell::all() {
-            let flash = game.effects().relay_flash[cell.index()];
-            if flash == 0 {
-                continue;
-            }
-            let r = cell_rect(cell);
-            let progress = 1.0 - f32::from(flash) / 36.0;
-            let center = V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
-            let color = opacity(AMBER, (1.0 - progress) * 0.75);
-            v.frame(
-                r.x - progress * 8.0,
-                r.y - progress * 5.0,
-                r.w + progress * 16.0,
-                r.h + progress * 10.0,
+        if game.effects().notice_ticks > 0
+            && let Some(power) = game.effects().notice
+        {
+            let fade = (game.effects().notice_ticks as f32 / 60.0).min(1.0);
+            let color = opacity(power_color(power), fade);
+            v.say(
+                TextId::PowerName(power),
+                &[],
+                Role::Body,
+                Slot::line(687.0),
                 color,
             );
-            for direction in [
-                V2::new(CELL_W, 0.0),
-                V2::new(-CELL_W, 0.0),
-                V2::new(0.0, CELL_H),
-                V2::new(0.0, -CELL_H),
-            ] {
-                v.line(
-                    center + direction * progress * 0.6,
-                    center + direction * progress,
-                    1.0,
-                    color,
-                );
-            }
-        }
-        for p in &game.effects().particles {
-            if p.life <= 0.0 {
-                continue;
-            }
-            let c = opacity(
-                sector_color(p.hue % 7, game.sector().sector().chapter),
-                (p.life * 3.0).min(1.0),
-            );
-            v.line(
-                p.pos - p.velocity * 0.012,
-                p.pos,
-                1.0,
-                opacity(c, c.a * 0.5),
-            );
-            v.rect(p.pos.x - 1.0, p.pos.y - 1.0, 2.0, 2.0, c);
-        }
-        if self.pickup_flash > 0.0 {
-            let progress = 1.0 - self.pickup_flash / 0.65;
-            v.ring(
-                V2::new(game.paddle().x, PADDLE_Y),
-                20.0 + progress * 90.0,
-                2.0,
-                opacity(CYAN, (1.0 - progress) * 0.6),
-            );
         }
     }
-    fn paddle(&self, v: &Scene, game: &Game) {
-        let paddle = game.paddle().x;
-        let x = paddle - game.paddle().width / 2.0;
-        let w = game.paddle().width;
-        v.rounded(x, PADDLE_Y, w, PADDLE_HEIGHT, PADDLE_HEIGHT / 2.0, INK);
-        // The center sends the ball straight up; the ends steer it.
-        v.rounded(paddle - 9.0, PADDLE_Y + 5.0, 18.0, 4.0, 2.0, CYAN);
-        if game.powers().anchor_charges > 0 || game.balls().iter().any(|b| b.active && b.held) {
-            v.rect(x + 12.0, PADDLE_Y - 3.0, w - 24.0, 1.0, CYAN);
-            for i in 0..ANCHOR_CHARGES {
-                v.circle(
-                    V2::new(paddle - 8.0 + f32::from(i) * 8.0, PADDLE_Y + 22.0),
-                    2.0,
-                    if i < game.powers().anchor_charges {
-                        CYAN
-                    } else {
-                        MUTED
-                    },
-                );
-            }
-        }
-        if game.powers().wide() {
-            v.rect(
-                x,
-                PADDLE_Y + 28.0,
-                w * (game.powers().wide_seconds / WIDE_SECONDS).min(1.0),
-                2.0,
-                power_color(Power::Wide),
-            );
-        }
-        if game.powers().slow() {
-            v.rect(
-                x,
-                PADDLE_Y + 32.0,
-                w * (game.powers().slow_seconds / SLOW_SECONDS).min(1.0),
-                2.0,
-                power_color(Power::Slow),
-            );
-        }
-        if self.paddle_flash > 0.0 {
-            v.rounded(
-                x - 2.0,
-                PADDLE_Y - 2.0,
-                w + 4.0,
-                18.0,
-                9.0,
-                opacity(CYAN, self.paddle_flash * 2.0),
-            );
-        }
-    }
-    fn balls(&self, v: &Scene, game: &Game, alpha: f32) {
-        for (i, ball) in game.balls().iter().enumerate() {
-            if !ball.active {
-                continue;
-            }
-            if ball.held {
-                let mut point = ball.pos;
-                let mut direction = ball.velocity.normalized();
-                for n in 1..=10 {
-                    point += direction * 12.0;
-                    if point.x < LEFT + RADIUS {
-                        point.x = 2.0 * (LEFT + RADIUS) - point.x;
-                        direction.x = -direction.x;
-                    }
-                    if point.x > RIGHT - RADIUS {
-                        point.x = 2.0 * (RIGHT - RADIUS) - point.x;
-                        direction.x = -direction.x;
-                    }
-                    v.circle(point, 1.5, opacity(CYAN, 0.6 - n as f32 * 0.04));
-                }
-            }
-            let color = if ball.phase_charges > 0 {
-                PALETTE[5]
-            } else {
-                CYAN
-            };
-            for n in (0..if ball.held { 0 } else { self.trail_len[i] }).rev() {
-                let index = (self.cursor + 12 - 1 - n) % 12;
-                let c = opacity(color, 0.22 * (1.0 - n as f32 / 12.0));
-                v.circle(self.trails[i][index], RADIUS * (1.0 - n as f32 / 15.0), c);
-            }
-            let pos = if ball.held {
-                ball.pos
-            } else {
-                ball.previous.lerp(ball.pos, alpha)
-            };
-            for n in 0..ball.phase_charges {
-                v.circle(
-                    V2::new(
-                        pos.x - f32::from(ball.phase_charges - 1) * 3.0 + f32::from(n) * 6.0,
-                        pos.y + 14.0,
-                    ),
-                    1.5,
-                    color,
-                );
-            }
-            v.circle(pos, RADIUS, INK);
-        }
-    }
-    fn hud(&mut self, v: &Scene, game: &Game, profile: &Profile) {
-        v.text("SCORE", LEFT, 72.0, 11.0, DIM);
-        self.scratch.clear();
-        grouped(&mut self.scratch, game.score());
-        v.text(&self.scratch, LEFT, 108.0, 22.0, INK);
-
-        self.scratch.clear();
-        let _ = write!(
-            self.scratch,
-            "{} {:02}",
-            if game.mode() == Mode::Practice {
-                "PRACTICE"
-            } else {
-                "SECTOR"
-            },
-            game.sector().index() + 1
+    let footer_error = ui.save_error && (ui.paused || stage != Stage::Playing);
+    if ui.paused {
+        v.scrim();
+        v.panel(240.0, 290.0, 480.0, 350.0);
+        v.say(
+            TextId::Paused,
+            &[],
+            Role::Display,
+            Slot::centered(WIDTH / 2.0, PANEL, 342.0),
+            INK,
         );
-        v.centered(&self.scratch, 72.0, 11.0, DIM);
-        v.centered(text(TextId::SectorName(game.sector())), 104.0, 13.0, INK);
-        for id in SectorId::all() {
-            v.rect(
-                WIDTH / 2.0 - 94.0 + id.index() as f32 * 16.0,
-                116.0,
-                12.0,
+        menu(
+            v,
+            ui.choice,
+            [TextId::ActionResume, TextId::RetrySector, TextId::MainMenu],
+            None,
+        );
+        let note = Slot::centered(WIDTH / 2.0, PANEL, 576.0);
+        v.paragraph(TextId::RetryNote, Role::Body, note, 2, DIM);
+        match v.device {
+            Device::Gamepad => {
+                let items = [
+                    pad(Glyph::A, TextId::ActionSelect),
+                    pad(Glyph::B, TextId::ActionResume),
+                    pad(Glyph::X, TextId::ActionRetry),
+                ];
+                v.footer(&[(&items, DIM)], footer_error);
+            }
+            Device::KeyboardMouse => v.footer(&[(&options(profile, v.device), DIM)], footer_error),
+        }
+    } else {
+        match stage {
+            Stage::Ready => ready(v, game),
+            Stage::Cleared => cleared(v, game, summary),
+            Stage::GameOver | Stage::Victory => {
+                v.scrim();
+                v.panel(240.0, 290.0, 480.0, 350.0);
+                let heading = if stage == Stage::Victory {
+                    TextId::JourneyComplete
+                } else {
+                    TextId::OneMoreOrbit
+                };
+                v.say(
+                    heading,
+                    &[],
+                    Role::Display,
+                    Slot::centered(WIDTH / 2.0, PANEL, 338.0),
+                    INK,
+                );
+                v.pairs(
+                    &[
+                        (TextId::StatPoints, game.score()),
+                        (TextId::StatMedals, profile.progress.medal_count()),
+                    ],
+                    368.0,
+                    PANEL,
+                );
+                let second = if stage == Stage::Victory {
+                    TextId::NewJourney
+                } else {
+                    TextId::RetrySector
+                };
+                menu(
+                    v,
+                    ui.choice,
+                    [TextId::SectorSelect, second, TextId::MainMenu],
+                    None,
+                );
+                v.say(
+                    TextId::ProgressSaved,
+                    &[],
+                    Role::Body,
+                    Slot::centered(WIDTH / 2.0, PANEL, 590.0),
+                    DIM,
+                );
+                v.footer(&[], footer_error);
+            }
+            Stage::Playing => {}
+        }
+    }
+    if let Some(perf) = perf {
+        v.panel(80.0, 430.0, 560.0, 210.0);
+        v.say(
+            TextId::PerfTitle,
+            &[],
+            Role::Body,
+            Slot::left(100.0, 520.0, 462.0),
+            CYAN,
+        );
+        // Diagnostic figures for developers, kept in English.
+        for (i, line) in perf.lines.iter().enumerate() {
+            v.draw(line, Role::Body, 100.0, 492.0 + i as f32 * 24.0, INK);
+        }
+    }
+}
+
+fn playfield(v: &Scene, fx: &Fx) {
+    v.rect(LEFT, TOP, RIGHT - LEFT, BOTTOM - TOP, SURFACE);
+    // Three walls; the open bottom edge is where a ball drains.
+    let edge = mix(BORDER, CYAN, (fx.wall_flash * 4.0).min(0.6));
+    v.rect(LEFT, TOP, RIGHT - LEFT, 1.0, edge);
+    v.rect(LEFT, TOP, 1.0, BOTTOM - TOP, edge);
+    v.rect(RIGHT - 1.0, TOP, 1.0, BOTTOM - TOP, edge);
+}
+fn bricks(v: &Scene, fx: &Fx, game: &Game) {
+    // Quiet connections make the actual orthogonal blast routes readable.
+    for cell in FieldCell::all() {
+        if !game.board().is_core(cell) || game.board().hp(cell) == 0 {
+            continue;
+        }
+        let r = cell_rect(cell);
+        let [_, right, _, down] = cell.neighbors();
+        for other in [right, down].into_iter().flatten() {
+            if game.board().is_core(other) && game.board().hp(other) > 0 {
+                let next = cell_rect(other);
+                v.line(
+                    V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0),
+                    V2::new(next.x + next.w / 2.0, next.y + next.h / 2.0),
+                    1.0,
+                    opacity(AMBER, 0.32),
+                );
+            }
+        }
+    }
+    let pulse = 0.7 + 0.15 * (game.stage_ticks() as f32 * DT * 2.0).sin();
+    for cell in FieldCell::all() {
+        let i = cell.index();
+        let hp = game.board().hp(cell);
+        let r = cell_rect(cell);
+        let c = if game.board().is_core(cell) {
+            AMBER
+        } else {
+            sector_color(cell.row(), game.sector().sector().chapter)
+        };
+        let flash = fx.brick_flash[i] / 0.18;
+        if hp == 0 {
+            if flash > 0.0 {
+                v.frame(
+                    r.x - (1.0 - flash) * 5.0,
+                    r.y - (1.0 - flash) * 5.0,
+                    r.w + (1.0 - flash) * 10.0,
+                    r.h + (1.0 - flash) * 10.0,
+                    opacity(c, flash * 0.75),
+                );
+            }
+            continue;
+        }
+        let fill = if game.board().is_core(cell) {
+            shade(AMBER, 0.24)
+        } else if hp > 1 {
+            shade(c, 0.42)
+        } else {
+            shade(c, 0.80)
+        };
+        v.rounded(r.x, r.y, r.w, r.h, 4.0, fill);
+        v.rect(r.x + 4.0, r.y, r.w - 8.0, 2.0, mix(fill, INK, 0.22));
+        if game.board().is_core(cell) {
+            let center = V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
+            for (from, to) in [
+                (V2::new(-6.0, 0.0), V2::new(0.0, -5.0)),
+                (V2::new(0.0, -5.0), V2::new(6.0, 0.0)),
+                (V2::new(6.0, 0.0), V2::new(0.0, 5.0)),
+                (V2::new(0.0, 5.0), V2::new(-6.0, 0.0)),
+            ] {
+                v.line(center + from, center + to, 1.5, opacity(AMBER, pulse));
+            }
+            v.circle(center, 1.5, INK);
+        } else if hp > 1 {
+            for j in 0..hp {
+                let x = r.x + r.w / 2.0 - f32::from(hp - 1) * 5.0 + f32::from(j) * 10.0;
+                v.circle(V2::new(x, r.y + r.h / 2.0), 2.5, mix(c, INK, 0.5));
+            }
+        }
+        if flash > 0.0 {
+            v.rounded(r.x, r.y, r.w, r.h, 4.0, opacity(INK, flash * 0.8));
+        }
+    }
+}
+fn effects(v: &Scene, fx: &Fx, game: &Game) {
+    for cell in FieldCell::all() {
+        let flash = game.effects().relay_flash[cell.index()];
+        if flash == 0 {
+            continue;
+        }
+        let r = cell_rect(cell);
+        let progress = 1.0 - f32::from(flash) / 36.0;
+        let center = V2::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
+        let color = opacity(AMBER, (1.0 - progress) * 0.75);
+        v.frame(
+            r.x - progress * 8.0,
+            r.y - progress * 5.0,
+            r.w + progress * 16.0,
+            r.h + progress * 10.0,
+            color,
+        );
+        for direction in [
+            V2::new(CELL_W, 0.0),
+            V2::new(-CELL_W, 0.0),
+            V2::new(0.0, CELL_H),
+            V2::new(0.0, -CELL_H),
+        ] {
+            v.line(
+                center + direction * progress * 0.6,
+                center + direction * progress,
+                1.0,
+                color,
+            );
+        }
+    }
+    for p in &game.effects().particles {
+        if p.life <= 0.0 {
+            continue;
+        }
+        let c = opacity(
+            sector_color(p.hue % 7, game.sector().sector().chapter),
+            (p.life * 3.0).min(1.0),
+        );
+        v.line(
+            p.pos - p.velocity * 0.012,
+            p.pos,
+            1.0,
+            opacity(c, c.a * 0.5),
+        );
+        v.rect(p.pos.x - 1.0, p.pos.y - 1.0, 2.0, 2.0, c);
+    }
+    if fx.pickup_flash > 0.0 {
+        let progress = 1.0 - fx.pickup_flash / 0.65;
+        v.ring(
+            V2::new(game.paddle().x, PADDLE_Y),
+            20.0 + progress * 90.0,
+            2.0,
+            opacity(CYAN, (1.0 - progress) * 0.6),
+        );
+    }
+}
+fn paddle(v: &Scene, fx: &Fx, game: &Game) {
+    let paddle = game.paddle().x;
+    let x = paddle - game.paddle().width / 2.0;
+    let w = game.paddle().width;
+    v.rounded(x, PADDLE_Y, w, PADDLE_HEIGHT, PADDLE_HEIGHT / 2.0, INK);
+    // The center sends the ball straight up; the ends steer it.
+    v.rounded(paddle - 9.0, PADDLE_Y + 5.0, 18.0, 4.0, 2.0, CYAN);
+    if game.powers().anchor_charges > 0 || game.balls().iter().any(|b| b.active && b.held) {
+        v.rect(x + 12.0, PADDLE_Y - 3.0, w - 24.0, 1.0, CYAN);
+        for i in 0..ANCHOR_CHARGES {
+            v.circle(
+                V2::new(paddle - 8.0 + f32::from(i) * 8.0, PADDLE_Y + 22.0),
                 2.0,
-                if id == game.sector() {
+                if i < game.powers().anchor_charges {
                     CYAN
-                } else if profile.progress.record(id).medals != Medals::NONE {
-                    DIM
                 } else {
                     MUTED
                 },
             );
         }
-
-        v.right("LIVES", RIGHT, 72.0, 11.0, DIM);
-        let shown = game.lives().max(3);
-        for i in 0..shown {
+    }
+    if game.powers().wide() {
+        v.rect(
+            x,
+            PADDLE_Y + 28.0,
+            w * (game.powers().wide_seconds / WIDE_SECONDS).min(1.0),
+            2.0,
+            power_color(Power::Wide),
+        );
+    }
+    if game.powers().slow() {
+        v.rect(
+            x,
+            PADDLE_Y + 32.0,
+            w * (game.powers().slow_seconds / SLOW_SECONDS).min(1.0),
+            2.0,
+            power_color(Power::Slow),
+        );
+    }
+    if fx.paddle_flash > 0.0 {
+        v.rounded(
+            x - 2.0,
+            PADDLE_Y - 2.0,
+            w + 4.0,
+            18.0,
+            9.0,
+            opacity(CYAN, fx.paddle_flash * 2.0),
+        );
+    }
+}
+fn balls(v: &Scene, fx: &Fx, game: &Game, alpha: f32) {
+    for (i, ball) in game.balls().iter().enumerate() {
+        if !ball.active {
+            continue;
+        }
+        if ball.held {
+            let mut point = ball.pos;
+            let mut direction = ball.velocity.normalized();
+            for n in 1..=10 {
+                point += direction * 12.0;
+                if point.x < LEFT + RADIUS {
+                    point.x = 2.0 * (LEFT + RADIUS) - point.x;
+                    direction.x = -direction.x;
+                }
+                if point.x > RIGHT - RADIUS {
+                    point.x = 2.0 * (RIGHT - RADIUS) - point.x;
+                    direction.x = -direction.x;
+                }
+                v.circle(point, 1.5, opacity(CYAN, 0.6 - n as f32 * 0.04));
+            }
+        }
+        let color = if ball.phase_charges > 0 {
+            PALETTE[5]
+        } else {
+            CYAN
+        };
+        for n in (0..if ball.held { 0 } else { fx.trail_len[i] }).rev() {
+            let index = (fx.cursor + 12 - 1 - n) % 12;
+            let c = opacity(color, 0.22 * (1.0 - n as f32 / 12.0));
+            v.circle(fx.trails[i][index], RADIUS * (1.0 - n as f32 / 15.0), c);
+        }
+        let pos = if ball.held {
+            ball.pos
+        } else {
+            ball.previous.lerp(ball.pos, alpha)
+        };
+        for n in 0..ball.phase_charges {
             v.circle(
-                V2::new(RIGHT - 5.0 - f32::from(shown - 1 - i) * 16.0, 97.0),
-                5.0,
-                if i < game.lives() { INK } else { MUTED },
+                V2::new(
+                    pos.x - f32::from(ball.phase_charges - 1) * 3.0 + f32::from(n) * 6.0,
+                    pos.y + 14.0,
+                ),
+                1.5,
+                color,
             );
         }
+        v.circle(pos, RADIUS, INK);
     }
-    fn ready(&mut self, v: &Scene, game: &Game) {
-        let id = game.sector();
-        let chapter = id.sector().chapter;
-        self.scratch.clear();
-        let _ = write!(
-            self.scratch,
-            "{}   SECTOR {:02}",
-            text(TextId::ChapterName(chapter)),
-            id.index() + 1
+}
+/// Score left, sector centre, lives right. Labels are small tracked
+/// capitals; figures are tabular, so the score never shifts as it grows.
+fn hud(v: &Scene, game: &Game, profile: &Profile) {
+    let side = WIDTH / 2.0 - 160.0 - LEFT;
+    v.say(
+        TextId::Score,
+        &[],
+        Role::Label,
+        Slot::left(LEFT, side, 70.0),
+        DIM,
+    );
+    let score = Figures::count(v.locale, game.score());
+    v.put(
+        score.as_str(),
+        Role::Display,
+        Slot::left(LEFT, side, 108.0),
+        INK,
+    );
+
+    let eyebrow = if game.mode() == Mode::Practice {
+        TextId::PracticeNumber
+    } else {
+        TextId::SectorNumber
+    };
+    v.say(
+        eyebrow,
+        &[Arg::Sector(game.sector())],
+        Role::Label,
+        Slot::centered(WIDTH / 2.0, 300.0, 70.0),
+        DIM,
+    );
+    v.say(
+        TextId::SectorName(game.sector()),
+        &[],
+        Role::Body,
+        Slot::centered(WIDTH / 2.0, 300.0, 100.0),
+        INK,
+    );
+    for id in SectorId::all() {
+        v.rect(
+            WIDTH / 2.0 - 94.0 + id.index() as f32 * 16.0,
+            116.0,
+            12.0,
+            2.0,
+            if id == game.sector() {
+                CYAN
+            } else if profile.progress.record(id).medals != Medals::NONE {
+                DIM
+            } else {
+                MUTED
+            },
         );
-        v.centered(&self.scratch, 548.0, 11.0, sector_color(0, chapter));
-        v.centered(text(TextId::SectorName(id)), 584.0, 22.0, INK);
-        v.centered(text(TextId::SectorTip(id)), 614.0, 11.0, DIM);
-        v.hint(
-            "CLICK OR SPACE TO SERVE",
-            &[Pad(Glyph::A), Text(" TO SERVE")],
-            664.0,
-            13.0,
+    }
+
+    v.say(
+        TextId::Lives,
+        &[],
+        Role::Label,
+        Slot::right(RIGHT, side, 70.0),
+        DIM,
+    );
+    let shown = game.lives().max(3);
+    for i in 0..shown {
+        v.circle(
+            V2::new(RIGHT - 5.0 - f32::from(shown - 1 - i) * 16.0, 97.0),
+            5.0,
+            if i < game.lives() { INK } else { MUTED },
+        );
+    }
+}
+fn ready(v: &Scene, game: &Game) {
+    let id = game.sector();
+    let chapter = id.sector().chapter;
+    let eyebrow = [Arg::Text(TextId::ChapterName(chapter)), Arg::Sector(id)];
+    v.say(
+        TextId::ReadyEyebrow,
+        &eyebrow,
+        Role::Label,
+        Slot::line(540.0),
+        sector_color(0, chapter),
+    );
+    v.say(
+        TextId::SectorName(id),
+        &[],
+        Role::Display,
+        Slot::line(586.0),
+        INK,
+    );
+    let tip = Slot::centered(WIDTH / 2.0, 720.0, 622.0);
+    let lines = v.paragraph(TextId::SectorTip(id), Role::Body, tip, 2, DIM);
+    let y = 622.0 + lines as f32 * LINE + 22.0;
+    match v.device {
+        Device::KeyboardMouse => v.say(TextId::KeysServe, &[], Role::Body, Slot::line(y), CYAN),
+        Device::Gamepad => {
+            let items = [pad(Glyph::A, TextId::ActionServe)];
+            v.pack(&items, Role::Body, |line, w| {
+                v.hint_line(line, w, y, CYAN, Role::Body)
+            });
+        }
+    }
+    let start = game.balls()[0].pos;
+    let direction = game.launch_velocity().normalized();
+    for i in 1..=5 {
+        v.circle(
+            start + direction * (14.0 * i as f32),
+            1.5,
+            opacity(CYAN, 0.45 - i as f32 * 0.06),
+        );
+    }
+}
+/// The sound, volume and display shortcuts. They are keyboard keys; a pad
+/// player still sees the levels.
+fn options(profile: &Profile, device: Device) -> [Item; 3] {
+    let sound = if profile.settings.muted {
+        TextId::SoundOff
+    } else {
+        TextId::SoundOn
+    };
+    let volume = Some(Arg::Count(u32::from(profile.settings.volume)));
+    let key = |k| match device {
+        Device::KeyboardMouse => Some(Cap::Key(k)),
+        Device::Gamepad => None,
+    };
+    [
+        Item {
+            cap: key("M"),
+            id: sound,
+            arg: None,
+        },
+        Item {
+            cap: key("[ ]"),
+            id: TextId::Volume,
+            arg: volume,
+        },
+        Item {
+            cap: key("F"),
+            id: TextId::Fullscreen,
+            arg: None,
+        },
+    ]
+}
+fn menu(v: &Scene, selected: usize, labels: [TextId; 3], disabled: Option<usize>) {
+    for (i, label) in labels.into_iter().enumerate() {
+        v.button(
+            ui::menu_rect(i),
+            label,
+            &[],
+            i == selected,
+            disabled != Some(i),
+        );
+    }
+}
+fn attract(v: &Scene, ui: &Ui, profile: &Profile) {
+    v.logo(270.0, 170.0, 12.0);
+    v.say(TextId::Tagline, &[], Role::Body, Slot::line(300.0), DIM);
+    menu(
+        v,
+        ui.choice,
+        [
+            TextId::ContinueJourney,
+            TextId::NewJourney,
+            TextId::SectorSelect,
+        ],
+        profile.progress.checkpoint().is_none().then_some(0),
+    );
+    match profile.progress.checkpoint() {
+        Some(c) => {
+            let args = [
+                Arg::Sector(c.sector),
+                Arg::Text(TextId::SectorName(c.sector)),
+            ];
+            v.say(TextId::SavedAt, &args, Role::Body, Slot::line(590.0), DIM);
+        }
+        None => v.say(
+            TextId::JourneyIntro,
+            &[],
+            Role::Body,
+            Slot::line(590.0),
+            DIM,
+        ),
+    }
+    for (i, label) in [TextId::StatSectors, TextId::StatMedals, TextId::StatBest]
+        .into_iter()
+        .enumerate()
+    {
+        // Wide enough for the largest possible best score at body size.
+        let x = WIDTH / 2.0 + (i as f32 - 1.0) * 180.0;
+        v.say(
+            label,
+            &[],
+            Role::Label,
+            Slot::centered(x, 170.0, 668.0),
+            DIM,
+        );
+        let value = Slot::centered(x, 170.0, 698.0);
+        match i {
+            0 => {
+                let args = [
+                    Arg::Count(profile.progress.unlocked_count() as u32),
+                    Arg::Count(SECTOR_COUNT as u32),
+                ];
+                v.say(TextId::Fraction, &args, Role::Body, value, INK);
+            }
+            1 => {
+                let args = [
+                    Arg::Count(profile.progress.medal_count()),
+                    Arg::Count(SECTOR_COUNT as u32 * 3),
+                ];
+                v.say(TextId::Fraction, &args, Role::Body, value, INK);
+            }
+            _ => {
+                let best = Figures::count(v.locale, profile.progress.best_score());
+                v.put(best.as_str(), Role::Body, value, INK);
+            }
+        }
+    }
+    let hints = match v.device {
+        Device::KeyboardMouse => [
+            hint(TextId::KeysMove),
+            hint(TextId::KeysServe),
+            hint(TextId::KeysPause),
+        ],
+        Device::Gamepad => [
+            hint(TextId::PadMove),
+            pad(Glyph::A, TextId::ActionServe),
+            Item {
+                cap: Some(Cap::Pad(Glyph::Start)),
+                id: TextId::ActionPause,
+                arg: None,
+            },
+        ],
+    };
+    let options = options(profile, v.device);
+    v.footer(&[(&hints, DIM), (&options, MUTED)], ui.save_error);
+}
+fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
+    let back = ui::back_rect();
+    v.rounded(back.x, back.y, back.w, back.h, 8.0, RAISED);
+    let baseline = back.y + back.h / 2.0 + v.cap(Role::Body) / 2.0;
+    match v.device {
+        Device::KeyboardMouse => {
+            let cy = back.y + back.h / 2.0;
+            v.line(
+                V2::new(back.x + 20.0, cy - 5.0),
+                V2::new(back.x + 15.0, cy),
+                1.5,
+                DIM,
+            );
+            v.line(
+                V2::new(back.x + 15.0, cy),
+                V2::new(back.x + 20.0, cy + 5.0),
+                1.5,
+                DIM,
+            );
+            let slot = Slot::left(back.x + 28.0, back.w - 38.0, baseline);
+            v.say(TextId::ActionBack, &[], Role::Body, slot, DIM);
+        }
+        Device::Gamepad => {
+            v.cap_glyph(Cap::Pad(Glyph::B), back.x + 10.0, baseline, Role::Body);
+            let slot = Slot::left(back.x + 40.0, back.w - 50.0, baseline);
+            v.say(TextId::ActionBack, &[], Role::Body, slot, DIM);
+        }
+    }
+    v.say(
+        TextId::SectorsHeading,
+        &[],
+        Role::Display,
+        Slot::centered(WIDTH / 2.0, 480.0, 80.0),
+        INK,
+    );
+    v.say(
+        TextId::PracticeNote,
+        &[],
+        Role::Body,
+        Slot::line(114.0),
+        DIM,
+    );
+    for chapter in Chapter::ALL {
+        let r = ui::sector_rect(chapter.first_sector().index());
+        let slot = Slot::left(r.x + 2.0, r.w, r.y - 14.0);
+        v.say(
+            TextId::ChapterName(chapter),
+            &[],
+            Role::Label,
+            slot,
+            sector_color(0, chapter),
+        );
+    }
+    for id in SectorId::all() {
+        let (i, level) = (id.index(), id.sector());
+        let r = ui::sector_rect(i);
+        let unlocked = i < profile.progress.unlocked_count();
+        let selected = id == ui.sector;
+        if selected {
+            v.rounded(
+                r.x - 1.5,
+                r.y - 1.5,
+                r.w + 3.0,
+                r.h + 3.0,
+                9.5,
+                if unlocked { CYAN } else { MUTED },
+            );
+        }
+        v.rounded(
+            r.x,
+            r.y,
+            r.w,
+            r.h,
+            8.0,
+            if selected { RAISED } else { SURFACE },
+        );
+        // The card's place in its chapter column and the "Play sector 03"
+        // button already carry the number; the name gets the full width.
+        let name = Slot::left(r.x + 14.0, r.w - 28.0, r.y + 27.0);
+        v.say(
+            TextId::SectorName(id),
+            &[],
+            Role::Body,
+            name,
+            if unlocked { INK } else { MUTED },
+        );
+        for cell in FieldCell::all() {
+            if level.layout.hp[cell.index()] > 0 {
+                v.rect(
+                    r.x + 14.0 + cell.col() as f32 * 9.0,
+                    r.y + 40.0 + cell.row() as f32 * 7.0,
+                    7.0,
+                    4.0,
+                    if !unlocked {
+                        opacity(MUTED, 0.45)
+                    } else if level.layout.cores.contains(cell) {
+                        AMBER
+                    } else {
+                        shade(sector_color(cell.row(), level.chapter), 0.8)
+                    },
+                );
+            }
+        }
+        if unlocked {
+            let record = profile.progress.record(id);
+            for (j, medal) in MEDAL_ORDER.into_iter().enumerate() {
+                v.circle(
+                    V2::new(r.x + 164.0 + j as f32 * 16.0, r.y + 54.0),
+                    4.0,
+                    if record.medals.contains(medal) {
+                        AMBER
+                    } else {
+                        MUTED
+                    },
+                );
+            }
+            let time = Slot::left(r.x + 156.0, r.w - 166.0, r.y + 86.0);
+            if record.best_ticks > 0 {
+                let t = Figures::of(|f| write!(f, "{}", Clock(record.best_ticks)));
+                v.put(t.as_str(), Role::Body, time, INK);
+            } else {
+                v.say(TextId::NoTime, &[], Role::Body, time, MUTED);
+            }
+        } else {
+            v.padlock(r.x + 180.0, r.y + 64.0, MUTED);
+        }
+    }
+
+    let level = ui.sector.sector();
+    let record = profile.progress.record(ui.sector);
+    let name = Item {
+        cap: None,
+        id: TextId::SectorName(ui.sector),
+        arg: None,
+    };
+    let swift = Item {
+        cap: None,
+        id: TextId::SwiftTarget,
+        arg: Some(Arg::Clock(level.par_seconds)),
+    };
+    let best = Item {
+        cap: None,
+        id: TextId::BestTime,
+        arg: Some(Arg::Clock(record.best_ticks / TICK_HZ)),
+    };
+    let detail: &[Item] = if record.best_ticks > 0 {
+        &[name, swift, best]
+    } else {
+        &[name, swift]
+    };
+    let legend = [
+        (TextId::MedalClear, TextId::MedalClearHow),
+        (TextId::MedalClean, TextId::MedalCleanHow),
+        (TextId::MedalSwift, TextId::MedalSwiftHow),
+    ];
+    let mut y = 676.0;
+    let lines = v.pack(detail, Role::Body, |line, w| {
+        v.hint_line(line, w, y, INK, Role::Body);
+        y += LINE;
+    });
+    let mut legend_lines = 0;
+    let widths = legend.map(|(medal, how)| {
+        v.width_of(medal, &[], Role::Label) + 8.0 + v.width_of(how, &[], Role::Body)
+    });
+    let mut start = 0;
+    while start < legend.len() {
+        let mut width = widths[start];
+        let mut end = start + 1;
+        while end < legend.len() && width + GAP + widths[end] <= FULL {
+            width += GAP + widths[end];
+            end += 1;
+        }
+        let mut x = WIDTH / 2.0 - width / 2.0;
+        for (k, &(medal, how)) in legend[start..end].iter().enumerate() {
+            let label = v.width_of(medal, &[], Role::Label);
+            v.say(medal, &[], Role::Label, Slot::left(x, label, y), AMBER);
+            let text = widths[start + k] - label - 8.0;
+            v.say(
+                how,
+                &[],
+                Role::Body,
+                Slot::left(x + label + 8.0, text, y),
+                DIM,
+            );
+            x += widths[start + k] + GAP;
+        }
+        y += LINE;
+        legend_lines += 1;
+        start = end;
+    }
+    if lines + legend_lines > 4
+        && let Some(log) = v.misfits
+    {
+        log.borrow_mut().push(Misfit {
+            text: "sector details".into(),
+            need: (lines + legend_lines) as f32,
+            room: 4.0,
+            missing: None,
+        });
+    }
+    let open = ui.sector.index() < profile.progress.unlocked_count();
+    if open {
+        v.button(
+            ui::play_rect(),
+            TextId::PlaySector,
+            &[Arg::Sector(ui.sector)],
+            true,
+            true,
+        );
+    } else {
+        v.button(
+            ui::play_rect(),
+            TextId::ClearPreviousFirst,
+            &[],
+            true,
+            false,
+        );
+    }
+    let hints = match v.device {
+        Device::KeyboardMouse => [
+            hint(TextId::KeysBrowse),
+            hint(TextId::KeysPlay),
+            hint(TextId::KeysBack),
+        ],
+        Device::Gamepad => [
+            hint(TextId::PadBrowse),
+            pad(Glyph::A, TextId::ActionPlay),
+            pad(Glyph::B, TextId::ActionBack),
+        ],
+    };
+    v.footer(&[(&hints, MUTED)], ui.save_error);
+}
+/// Distance between the sector-clear columns, and the widest a medal chip
+/// grows: three chips at most 136 wide leave at least 14 between them.
+const CLEAR_COLUMN: f32 = 150.0;
+const CHIP_MAX: f32 = 136.0;
+fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
+    v.scrim();
+    v.panel(240.0, 290.0, 480.0, 350.0);
+    v.say(
+        TextId::SectorClear,
+        &[],
+        Role::Display,
+        Slot::centered(WIDTH / 2.0, PANEL, 342.0),
+        INK,
+    );
+    // Without the extra-life line the stats and medals drop into its space,
+    // so the button never sits under an empty gap.
+    let shift = if summary.life_earned { 0.0 } else { 14.0 };
+    for (i, label) in [TextId::StatTime, TextId::StatBonus, TextId::StatBestChain]
+        .into_iter()
+        .enumerate()
+    {
+        let x = WIDTH / 2.0 + (i as f32 - 1.0) * CLEAR_COLUMN;
+        v.say(
+            label,
+            &[],
+            Role::Label,
+            Slot::centered(x, CHIP_MAX, 386.0 + shift),
+            DIM,
+        );
+        let value = Slot::centered(x, CHIP_MAX, 414.0 + shift);
+        match i {
+            0 => {
+                let t = Figures::of(|f| write!(f, "{}", Clock(summary.ticks)));
+                v.put(t.as_str(), Role::Body, value, INK);
+            }
+            1 => v.say(
+                TextId::Plus,
+                &[Arg::Count(summary.bonus)],
+                Role::Body,
+                value,
+                INK,
+            ),
+            _ => {
+                let combo = Figures::count(v.locale, summary.best_combo);
+                v.put(combo.as_str(), Role::Body, value, INK);
+            }
+        }
+    }
+    for (i, label) in [TextId::MedalClear, TextId::MedalClean, TextId::MedalSwift]
+        .into_iter()
+        .enumerate()
+    {
+        let x = WIDTH / 2.0 + (i as f32 - 1.0) * CLEAR_COLUMN;
+        let earned = summary.medals.contains(MEDAL_ORDER[i]);
+        let w = (v.width_of(label, &[], Role::Label) + 32.0).min(CHIP_MAX);
+        v.rounded(
+            x - w / 2.0,
+            436.0 + shift,
+            w,
+            28.0,
+            14.0,
+            opacity(if earned { AMBER } else { MUTED }, 0.16),
+        );
+        let y = 450.0 + shift + v.cap(Role::Label) / 2.0;
+        v.say(
+            label,
+            &[],
+            Role::Label,
+            Slot::centered(x, CHIP_MAX - 12.0, y),
+            if earned { AMBER } else { MUTED },
+        );
+    }
+    if summary.life_earned {
+        v.say(
+            TextId::ExtraLife,
+            &[],
+            Role::Body,
+            Slot::centered(WIDTH / 2.0, PANEL, 494.0),
             CYAN,
         );
-        let start = game.balls()[0].pos;
-        let direction = game.launch_velocity().normalized();
-        for i in 1..=5 {
-            v.circle(
-                start + direction * (14.0 * i as f32),
-                1.5,
-                opacity(CYAN, 0.45 - i as f32 * 0.06),
-            );
+    }
+    let next = if game.mode() == Mode::Practice {
+        TextId::BackToSectors
+    } else {
+        TextId::NextSector
+    };
+    v.button(ui::next_rect(), next, &[], true, true);
+    match v.device {
+        Device::KeyboardMouse => v.say(
+            TextId::KeysContinue,
+            &[],
+            Role::Caption,
+            Slot::centered(WIDTH / 2.0, PANEL, 602.0),
+            MUTED,
+        ),
+        Device::Gamepad => {
+            let items = [pad(Glyph::A, TextId::ActionContinue)];
+            v.pack(&items, Role::Caption, |line, w| {
+                v.hint_line(line, w, 602.0, MUTED, Role::Caption)
+            });
         }
     }
-    fn options(&mut self, v: &Scene, profile: &Profile, y: f32) {
-        self.scratch.clear();
-        let sound = if profile.settings.muted { "OFF" } else { "ON" };
-        // The shortcuts are keyboard-only; a pad player still sees the levels.
-        let _ = match v.device {
-            Device::KeyboardMouse => write!(
-                self.scratch,
-                "M SOUND {sound}   [ ] VOLUME {}   F FULLSCREEN",
-                profile.settings.volume
-            ),
-            Device::Gamepad => write!(
-                self.scratch,
-                "SOUND {sound}   VOLUME {}",
-                profile.settings.volume
-            ),
+}
+
+/// A short run of figures formatted on the stack, so drawing scores and
+/// times allocates nothing.
+struct Figures {
+    bytes: [u8; 48],
+    len: usize,
+}
+impl Figures {
+    fn of(write: impl FnOnce(&mut Self) -> std::fmt::Result) -> Self {
+        let mut out = Self {
+            bytes: [0; 48],
+            len: 0,
         };
-        v.centered(&self.scratch, y, 11.0, MUTED);
+        // Overflow only truncates; 48 bytes hold any u32 in any locale.
+        let _ = write(&mut out);
+        out
     }
-    fn menu(&self, v: &Scene, selected: usize, labels: [&str; 3], disabled: Option<usize>) {
-        for (i, label) in labels.iter().enumerate() {
-            v.button(ui::menu_rect(i), label, i == selected, disabled != Some(i));
-        }
+    fn count(locale: Locale, n: u32) -> Self {
+        Self::of(|f| ark_text::grouped(f, locale, n))
     }
-    fn attract(&mut self, v: &Scene, ui: &Ui, profile: &Profile) {
-        v.logo(270.0, 170.0, 12.0);
-        v.centered("BREAK THE COSMOS", 300.0, 11.0, DIM);
-        self.menu(
-            v,
-            ui.choice,
-            ["CONTINUE JOURNEY", "NEW JOURNEY", "SECTOR SELECT"],
-            profile.progress.checkpoint().is_none().then_some(0),
-        );
-        self.scratch.clear();
-        if let Some(c) = profile.progress.checkpoint() {
-            let _ = write!(
-                self.scratch,
-                "SAVED AT SECTOR {:02} / {}",
-                c.sector.index() + 1,
-                text(TextId::SectorName(c.sector))
-            );
-        } else {
-            self.scratch
-                .push_str("TWELVE SECTORS ACROSS THREE CHAPTERS");
-        }
-        v.centered(&self.scratch, 590.0, 11.0, DIM);
+    fn as_str(&self) -> &str {
+        std::str::from_utf8(&self.bytes[..self.len]).unwrap_or_default()
+    }
+}
+impl Write for Figures {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        let end = self.len + s.len();
+        let room = self.bytes.get_mut(self.len..end).ok_or(std::fmt::Error)?;
+        room.copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
+    }
+}
 
-        for (i, label) in ["SECTORS", "MEDALS", "BEST"].iter().enumerate() {
-            let x = WIDTH / 2.0 + (i as f32 - 1.0) * 140.0;
-            self.scratch.clear();
-            match i {
-                0 => {
-                    let _ = write!(
-                        self.scratch,
-                        "{} / {SECTOR_COUNT}",
-                        profile.progress.unlocked_count()
-                    );
-                }
-                1 => {
-                    let _ = write!(
-                        self.scratch,
-                        "{} / {}",
-                        profile.progress.medal_count(),
-                        SECTOR_COUNT * 3
-                    );
-                }
-                _ => grouped(&mut self.scratch, profile.progress.best_score()),
-            }
-            v.center_at(label, x, 676.0, 11.0, DIM);
-            v.center_at(&self.scratch, x, 702.0, 13.0, INK);
-        }
-
-        v.hint(
-            "MOUSE OR ARROWS TO MOVE   SPACE OR CLICK TO SERVE   ESC TO PAUSE",
-            &[
-                Text("STICK OR D-PAD TO MOVE   "),
-                Pad(Glyph::A),
-                Text(" SERVE   "),
-                Pad(Glyph::Start),
-                Text(" PAUSE"),
-            ],
-            832.0,
-            11.0,
-            DIM,
-        );
-        self.options(v, profile, 858.0);
-    }
-    fn sectors(&mut self, v: &Scene, ui: &Ui, profile: &Profile) {
-        let back = ui::back_rect();
-        v.rounded(back.x, back.y, back.w, back.h, 8.0, RAISED);
-        let (center, baseline) = (back.x + back.w / 2.0, back.y + back.h / 2.0 + 4.0);
-        match v.device {
-            Device::KeyboardMouse => v.center_at("< BACK", center, baseline, 11.0, DIM),
-            Device::Gamepad => {
-                v.prompt(&[Pad(Glyph::B), Text(" BACK")], center, baseline, 11.0, DIM)
-            }
-        }
-        v.centered("SECTORS", 74.0, 22.0, INK);
-        v.centered("PRACTICE RUNS NEVER CHANGE YOUR JOURNEY", 104.0, 11.0, DIM);
-        for chapter in Chapter::ALL {
-            let r = ui::sector_rect(chapter.first_sector().index());
-            let title = text(TextId::ChapterName(chapter));
-            v.text(title, r.x + 2.0, r.y - 16.0, 11.0, sector_color(0, chapter));
-        }
-        for id in SectorId::all() {
-            let (i, level) = (id.index(), id.sector());
-            let r = ui::sector_rect(i);
-            let unlocked = i < profile.progress.unlocked_count();
-            let selected = id == ui.sector;
-            if selected {
-                v.rounded(
-                    r.x - 1.5,
-                    r.y - 1.5,
-                    r.w + 3.0,
-                    r.h + 3.0,
-                    9.5,
-                    if unlocked { CYAN } else { MUTED },
-                );
-            }
-            v.rounded(
-                r.x,
-                r.y,
-                r.w,
-                r.h,
-                8.0,
-                if selected { RAISED } else { SURFACE },
-            );
-            self.scratch.clear();
-            let _ = write!(self.scratch, "{:02}", i + 1);
-            v.text(&self.scratch, r.x + 14.0, r.y + 24.0, 11.0, DIM);
-            v.text(
-                text(TextId::SectorName(id)),
-                r.x + 34.0,
-                r.y + 24.0,
-                11.0,
-                if unlocked { INK } else { MUTED },
-            );
-            for cell in Cell::all() {
-                if level.layout.hp[cell.index()] > 0 {
-                    v.rect(
-                        r.x + 14.0 + cell.col() as f32 * 9.0,
-                        r.y + 38.0 + cell.row() as f32 * 7.0,
-                        7.0,
-                        4.0,
-                        if !unlocked {
-                            opacity(MUTED, 0.45)
-                        } else if level.layout.cores.contains(cell) {
-                            AMBER
-                        } else {
-                            shade(sector_color(cell.row(), level.chapter), 0.8)
-                        },
-                    );
-                }
-            }
-            if unlocked {
-                let record = profile.progress.record(id);
-                for (j, medal) in MEDAL_ORDER.into_iter().enumerate() {
-                    v.circle(
-                        V2::new(r.x + 160.0 + j as f32 * 16.0, r.y + 52.0),
-                        4.0,
-                        if record.medals.contains(medal) {
-                            AMBER
-                        } else {
-                            MUTED
-                        },
-                    );
-                }
-                self.scratch.clear();
-                if record.best_ticks > 0 {
-                    clock(&mut self.scratch, record.best_ticks);
-                } else {
-                    self.scratch.push_str("--:--");
-                }
-                v.text(
-                    &self.scratch,
-                    r.x + 156.0,
-                    r.y + 82.0,
-                    11.0,
-                    if record.best_ticks > 0 { INK } else { MUTED },
-                );
-            } else {
-                v.text("LOCKED", r.x + 156.0, r.y + 70.0, 11.0, MUTED);
-            }
-        }
-
-        let level = ui.sector.sector();
-        let record = profile.progress.record(ui.sector);
-        self.scratch.clear();
-        let _ = write!(
-            self.scratch,
-            "{:02} {}   SWIFT UNDER {} SECONDS",
-            ui.sector.index() + 1,
-            text(TextId::SectorName(ui.sector)),
-            level.par_seconds
-        );
-        if record.best_ticks > 0 {
-            self.scratch.push_str("   BEST ");
-            clock(&mut self.scratch, record.best_ticks);
-        }
-        v.centered(&self.scratch, 702.0, 11.0, INK);
-        v.centered(
-            "MEDALS   CLEAR: FINISH   CLEAN: NO LIVES LOST   SWIFT: BEAT THE TARGET",
-            730.0,
-            11.0,
-            DIM,
-        );
-        let open = ui.sector.index() < profile.progress.unlocked_count();
-        self.scratch.clear();
-        if open {
-            let _ = write!(self.scratch, "PLAY SECTOR {:02}", ui.sector.index() + 1);
-        } else {
-            self.scratch.push_str("CLEAR THE PREVIOUS SECTOR");
-        }
-        v.button(ui::play_rect(), &self.scratch, true, open);
-        v.hint(
-            "ARROWS TO BROWSE   ENTER TO PLAY   ESC TO GO BACK",
-            &[
-                Text("D-PAD TO BROWSE   "),
-                Pad(Glyph::A),
-                Text(" PLAY   "),
-                Pad(Glyph::B),
-                Text(" BACK"),
-            ],
-            858.0,
-            11.0,
-            MUTED,
-        );
-    }
-    fn cleared(&mut self, v: &Scene, game: &Game, summary: SectorSummary) {
-        v.scrim();
-        v.panel(280.0, 296.0, 400.0, 340.0);
-        v.centered("SECTOR CLEAR", 346.0, 22.0, INK);
-        for (i, label) in ["TIME", "BONUS", "BEST CHAIN"].iter().enumerate() {
-            let x = WIDTH / 2.0 + (i as f32 - 1.0) * 110.0;
-            self.scratch.clear();
-            match i {
-                0 => clock(&mut self.scratch, summary.ticks),
-                1 => {
-                    self.scratch.push('+');
-                    grouped(&mut self.scratch, summary.bonus);
-                }
-                _ => {
-                    let _ = write!(self.scratch, "{}", summary.best_combo);
-                }
-            }
-            v.center_at(label, x, 388.0, 11.0, DIM);
-            v.center_at(&self.scratch, x, 412.0, 13.0, INK);
-        }
-        for (i, label) in ["CLEAR", "CLEAN", "SWIFT"].iter().enumerate() {
-            let x = WIDTH / 2.0 + (i as f32 - 1.0) * 110.0;
-            let earned = summary.medals.contains(MEDAL_ORDER[i]);
-            v.rounded(
-                x - 46.0,
-                438.0,
-                92.0,
-                26.0,
-                13.0,
-                opacity(if earned { AMBER } else { MUTED }, 0.16),
-            );
-            v.center_at(label, x, 455.0, 11.0, if earned { AMBER } else { MUTED });
-        }
-        if summary.life_earned {
-            v.centered("CHAPTER COMPLETE / EXTRA LIFE", 498.0, 11.0, CYAN);
-        }
-        v.button(
-            ui::next_rect(),
-            if game.mode() == Mode::Practice {
-                "BACK TO SECTORS"
-            } else {
-                "NEXT SECTOR"
-            },
-            true,
-            true,
-        );
-        v.hint(
-            "ENTER OR CLICK",
-            &[Text("PRESS "), Pad(Glyph::A)],
-            600.0,
-            11.0,
-            MUTED,
-        );
+/// A duration in ticks as `mm:ss`; figures read the same in every locale.
+struct Clock(u32);
+impl std::fmt::Display for Clock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let seconds = self.0 / TICK_HZ;
+        write!(f, "{:02}:{:02}", seconds / 60, seconds % 60)
     }
 }
 
@@ -1432,7 +2177,7 @@ const MEDAL_ORDER: [Medals; 3] = [Medals::CLEAR, Medals::CLEAN, Medals::SWIFT];
 /// Hit points per cell, to compare across ticks.
 fn hp_grid(game: &Game) -> [u8; CELLS] {
     let mut hp = [0; CELLS];
-    for cell in Cell::all() {
+    for cell in FieldCell::all() {
         hp[cell.index()] = game.board().hp(cell);
     }
     hp
@@ -1447,17 +2192,6 @@ fn sector_color(row: usize, chapter: Chapter) -> Color {
         Chapter::Afterlight => DUSK[row % 7],
     }]
 }
-/// The letter on a capsule: fixed iconography, like a Tetris piece's
-/// letter, so string tables never replace it.
-fn capsule_letter(power: Power) -> &'static str {
-    match power {
-        Power::Wide => "W",
-        Power::Slow => "S",
-        Power::Multi => "M",
-        Power::Anchor => "A",
-        Power::Phase => "P",
-    }
-}
 fn power_color(power: Power) -> Color {
     match power {
         Power::Wide => PALETTE[3],
@@ -1469,59 +2203,4 @@ fn power_color(power: Power) -> Color {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn empty_or_invalid_windows_have_no_view() {
-        for (w, h, dpi) in [
-            (0.0, 0.0, 2.0),
-            (1280.0, 0.0, 1.0),
-            (f32::NAN, 800.0, 1.0),
-            (1280.0, 800.0, 0.0),
-            (f32::INFINITY, f32::INFINITY, 1.0),
-        ] {
-            assert_eq!(View::fit(w, h, dpi), None, "{w}x{h} @{dpi}");
-        }
-    }
-    #[test]
-    fn scene_fits_every_target_display_and_maps_the_pointer_back() {
-        // Steam Deck, 1080p, 1440p, ultrawide, 4:3, and the minimum window.
-        for (w, h) in [
-            (1280.0, 800.0),
-            (1920.0, 1080.0),
-            (2560.0, 1440.0),
-            (3440.0, 1440.0),
-            (1024.0, 768.0),
-            (480.0, 450.0),
-        ] {
-            for dpi in [1.0, 2.0] {
-                let (w, h) = (w / dpi, h / dpi);
-                let v = View::fit(w, h, dpi).unwrap();
-                let (right, bottom) = (v.x + WIDTH * v.scale, v.y + HEIGHT * v.scale);
-                let pixel = 1.0 / dpi;
-                assert!(v.x >= 0.0 && v.y >= 0.0, "{w}x{h}: scene clipped");
-                assert!(right <= w + pixel && bottom <= h + pixel, "{w}x{h}");
-                // One axis fills the window; letterbox bars are even.
-                assert!(v.x.min(v.y) <= pixel / 2.0);
-                assert!((v.x - (w - right)).abs() <= pixel && (v.y - (h - bottom)).abs() <= pixel);
-                let top_left = v.to_scene(v.x, v.y);
-                let far = v.to_scene(right, bottom);
-                assert!(top_left.x.abs() < 1e-3 && top_left.y.abs() < 1e-3);
-                assert!((far.x - WIDTH).abs() < 1e-2 && (far.y - HEIGHT).abs() < 1e-2);
-            }
-        }
-    }
-    #[test]
-    fn scores_group_thousands() {
-        for (value, text) in [
-            (0, "0"),
-            (999, "999"),
-            (1000, "1,000"),
-            (1234567, "1,234,567"),
-        ] {
-            let mut out = String::from("+");
-            grouped(&mut out, value);
-            assert_eq!(out, format!("+{text}"));
-        }
-    }
-}
+mod tests;

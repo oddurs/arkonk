@@ -24,7 +24,7 @@ impl Profile {
     pub fn decode(file: &[u8]) -> Option<Self> {
         Some(Self {
             progress: Progress::decode(file)?,
-            settings: Settings::decode(entries(file)?),
+            settings: Settings::decode(entries(file)?, file),
         })
     }
 
@@ -233,12 +233,25 @@ mod tests {
     }
 
     #[test]
+    fn a_save_from_before_languages_loads_and_rewrites_unchanged() {
+        let file = "ARKONK 1\nbest 24600\nunlocked 3\nsettings 1 4\ndisplay 1\n\
+                    record 0 7 15400\nrecord 1 3 0\nrecord 2 0 0\nrecord 3 0 0\n\
+                    record 4 0 0\nrecord 5 0 0\nrecord 6 0 0\nrecord 7 0 0\n\
+                    record 8 0 0\nrecord 9 0 0\nrecord 10 0 0\nrecord 11 0 0\n\
+                    checkpoint 2 3100 3 9000\n";
+        let p = profile(file);
+        assert_eq!(p.settings.locale, None);
+        assert_eq!(p.encode(), file);
+    }
+
+    #[test]
     fn progress_and_settings_round_trip() {
         let mut p = profile("ARKONK 1\nbest 24600\nunlocked 7\nrecord 5 7 15400\n");
         p.settings = Settings {
             muted: true,
             volume: 3,
             fullscreen: true,
+            locale: Some(ark_text::Locale::Ja),
         };
         p.progress
             .begin(&Game::start(SectorId::new(6).unwrap(), Mode::Journey));

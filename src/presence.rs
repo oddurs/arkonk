@@ -1,6 +1,5 @@
 //! What friends see in their Steam list. Tokens must match the localization file
 //! uploaded to Steam, `docs/steam/rich_presence.vdf`.
-use crate::text::{TextId, text};
 use ark::{Game, Mode, sectors::SectorId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,19 +25,13 @@ impl Presence {
         }
     }
     /// The `%sector%` and `%name%` substitutions, e.g. `("03", "Slipstream")`.
+    /// The uploaded presence strings are English only, so the name is too.
     pub fn sector(self) -> Option<(String, String)> {
         let (Self::Journey(sector) | Self::Practice(sector)) = self else {
             return None;
         };
-        let name = text(TextId::SectorName(sector))
-            .split_whitespace()
-            .map(|word| {
-                let (first, rest) = word.split_at(1);
-                first.to_owned() + &rest.to_lowercase()
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
-        Some((format!("{:02}", sector.index() + 1), name))
+        let name = ark_text::template(ark_text::Locale::En, ark_text::TextId::SectorName(sector));
+        Some((format!("{:02}", sector.index() + 1), name.into()))
     }
 }
 
