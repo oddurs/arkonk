@@ -78,7 +78,9 @@ impl Fonts {
     /// Calls `unit` with each cluster of `text` in visual order: Arabic
     /// shaped and reordered, Thai marks kept with their consonant.
     fn units(&self, text: &str, mut unit: impl FnMut(&[char])) {
-        if self.script != Script::Arabic {
+        // A line with no Arabic letter (a score, a time, `+2,000`) has
+        // nothing to run right to left, so it keeps its own order.
+        if self.script != Script::Arabic || !text.chars().any(script::is_rtl) {
             script::thai_clusters(text, |c| {
                 if c != [BREAK] {
                     unit(c);

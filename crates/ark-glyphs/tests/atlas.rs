@@ -249,6 +249,13 @@ fn arabic_is_shaped_and_laid_out_right_to_left() {
     assert!(chars.ends_with(" Esc"), "{chars}");
     // Arabic is never tracked: spacing would break the joins.
     assert_eq!(ar.tracking(0.06, 18), 0.0);
+    // Figures alone keep their order: a count out of a total, a bonus, a
+    // chain. These once came out as `36 /`, `2,000+` and `0×`.
+    for figure in [" / 36", "+2,000", "×0", "01:40"] {
+        let mut drawn = String::new();
+        ar.layout(figure, spec::Weight::Medium, 18, 0.0, |p| drawn.push(p.c));
+        assert_eq!(drawn, figure);
+    }
 }
 
 #[cfg(feature = "scripts")]
