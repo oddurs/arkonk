@@ -1,0 +1,15 @@
+#!/bin/sh
+# Run once after cloning: wires the tracked git hooks and checks the toolchain.
+set -eu
+cd "$(dirname "$0")/.."
+
+git config core.hooksPath .githooks
+echo "hooks: core.hooksPath = .githooks"
+# Lets the hooks and scripts/agent name the default branch without a network call.
+git remote set-head origin --auto >/dev/null
+
+if [ "$(uname -s)" = Linux ]; then
+    echo "Linux needs: libasound2-dev libx11-dev libxi-dev libgl1-mesa-dev libudev-dev"
+fi
+
+exec scripts/agent doctor

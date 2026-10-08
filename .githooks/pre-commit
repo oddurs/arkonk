@@ -1,0 +1,4 @@
+#!/bin/sh
+# Only the fast check runs here; lint and the suite run before every push.
+set -eu
+exec "$(git rev-parse --show-toplevel)/scripts/task" fmt:check

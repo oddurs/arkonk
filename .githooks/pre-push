@@ -1,0 +1,21 @@
+#!/bin/sh
+# The default branch moves only through merged pull requests, and nothing
+# leaves this machine without passing the same check CI runs.
+set -eu
+
+remote=$1
+zero=0000000000000000000000000000000000000000
+default=$(git symbolic-ref --quiet --short "refs/remotes/$remote/HEAD" 2>/dev/null || echo "$remote/main")
+default=${default#"$remote"/}
+
+check=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if [ "$remote_ref" = "refs/heads/$default" ] && [ "$remote_sha" != "$zero" ]; then
+        echo "pre-push: $default advances only through a merged pull request" >&2
+        exit 1
+    fi
+    # Deleting a remote branch pushes nothing to check.
+    [ "$local_sha" = "$zero" ] || check=1
+done
+
+[ "$check" = 0 ] || exec "$(git rev-parse --show-toplevel)/scripts/task" check
