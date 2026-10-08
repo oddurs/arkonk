@@ -7,8 +7,12 @@ use crate::{
     ui::{Controls, Screen, Ui},
 };
 use ark::{
-    Game, Input, Medals, Mode, Particle, Power, Stage,
-    field::{BALL_RADIUS as RADIUS, BOTTOM, Cell, CellSet, GRID_X, GRID_Y, PADDLE_Y, cell_rect},
+    Events, Game, Input, Medals, Mode, Particle, Power, Stage,
+    clock::TICK_HZ,
+    field::{
+        BALL_RADIUS as RADIUS, BOTTOM, COLS, Cell, CellSet, GRID_X, GRID_Y, PADDLE_Y, ROWS,
+        cell_rect,
+    },
     geom::V2,
     sectors::SectorId,
     tuning::{ADVANCE_DELAY_TICKS, MAX_BALLS, MAX_CAPSULES},
@@ -331,4 +335,199 @@ pub fn layout(frame: u32, ui: &mut Ui) -> Option<((u32, u32), String)> {
     ][(frame % 3) as usize];
     ui.screen = screen;
     Some(((w, h), format!("target/layout-{name}{suffix}.png")))
+}
+
+/// One capture of the pieces after the layouts: the layout class it is
+/// named for and the screen size that gets it, the look, and the staged
+/// moment of play it shows.
+pub struct Shot {
+    pub class: &'static str,
+    pub size: (u32, u32),
+    pub variant: &'static str,
+    pub screen: &'static str,
+}
+const fn shot(class: &'static str, variant: &'static str, screen: &'static str) -> Shot {
+    let size = match class.as_bytes()[0] {
+        // A 960 × 900 window at 2x, as on a Mac.
+        b'r' => (1920, 1800),
+        b's' => (480, 450),
+        _ => (240, 240),
+    };
+    Shot {
+        class,
+        size,
+        variant,
+        screen,
+    }
+}
+/// Every kind of piece in every look: the three chapters' glass, the
+/// busiest sector with every capsule and both drains, Anchor holding, a
+/// relay chain going off, and hits, a break and a wall bounce.
+pub const SHOTS: [Shot; 15] = [
+    shot("regular", "standard", "play"),
+    shot("regular", "standard", "anchor"),
+    shot("regular", "standard", "relay"),
+    shot("regular", "standard", "hits"),
+    shot("regular", "standard", "daybreak"),
+    shot("regular", "standard", "bluehour"),
+    shot("regular", "standard", "afterlight"),
+    shot("regular", "reduced", "play"),
+    shot("regular", "reduced", "relay"),
+    shot("regular", "contrast", "play"),
+    shot("regular", "contrast", "relay"),
+    shot("small", "standard", "play"),
+    shot("small", "standard", "anchor"),
+    shot("compact", "standard", "play"),
+    shot("compact", "standard", "anchor"),
+];
+
+/// Steps `game` `ticks` times without input, handing each tick to `record`.
+fn run(game: &mut Game, ticks: u32, record: &mut impl FnMut(&Game, Events)) {
+    for _ in 0..ticks {
+        let events = game.step(Input::default());
+        record(game, events);
+    }
+}
+/// Steps until `done`, at most `ticks` times.
+fn run_until(
+    game: &mut Game,
+    ticks: u32,
+    record: &mut impl FnMut(&Game, Events),
+    mut done: impl FnMut(&Game, Events) -> bool,
+) {
+    for _ in 0..ticks {
+        let events = game.step(Input::default());
+        record(game, events);
+        if done(game, events) {
+            return;
+        }
+    }
+}
+/// `sector` in play, its ball just served.
+fn serve(sector: usize, record: &mut impl FnMut(&Game, Events)) -> Game {
+    let mut game = Game::start(SectorId::clamped(sector), Mode::Practice);
+    let events = game.step(Input {
+        launch: true,
+        ..Input::default()
+    });
+    record(&game, events);
+    game
+}
+/// A live brick of `hp` with nothing under it, lowest first.
+fn exposed(game: &Game, hp: u8) -> Option<Cell> {
+    Cell::all().rev().find(|&c| {
+        let below = Cell::new(c.index() + COLS).filter(|_| c.row() + 1 < ROWS);
+        game.board().hp(c) == hp
+            && !game.board().is_core(c)
+            && below.is_none_or(|b| game.board().hp(b) == 0)
+    })
+}
+/// Catches a ball on the paddle with Anchor.
+fn hold(game: &mut Game, record: &mut impl FnMut(&Game, Events)) {
+    let pos = V2::new(game.paddle().x + 25.0, PADDLE_Y - RADIUS - 0.5);
+    let mut sandbox = game.sandbox();
+    sandbox.grant(Power::Anchor);
+    sandbox.place_ball(0, pos, V2::new(0.0, 400.0));
+    run_until(game, 20, record, |g, _| g.balls()[0].held);
+}
+
+/// The moment of play `screen` shows, reached by stepping the simulation
+/// so trails, flashes and timers are real; every tick goes to `record`.
+pub fn stage(screen: &str, mut record: impl FnMut(&Game, Events)) -> Game {
+    let record = &mut record;
+    match screen {
+        "anchor" => {
+            let mut game = serve(1, record);
+            hold(&mut game, record);
+            game.sandbox().grant(Power::Wide);
+            run(&mut game, 30, record);
+            game
+        }
+        "relay" => {
+            let mut game = serve(5, record);
+            let core = Cell::all().find(|&c| game.board().is_core(c));
+            if let Some(core) = core {
+                let r = cell_rect(core);
+                let mut sandbox = game.sandbox();
+                sandbox.grant(Power::Phase);
+                sandbox.place_ball(
+                    0,
+                    V2::new(r.x - RADIUS - 1.0, r.y + r.h / 2.0),
+                    V2::new(500.0, 0.0),
+                );
+            }
+            run_until(&mut game, 120, record, |_, e| e.relay);
+            run(&mut game, 12, record);
+            game
+        }
+        "hits" => {
+            let mut game = serve(6, record);
+            let below = |c: Cell| {
+                let r = cell_rect(c);
+                V2::new(r.x + r.w / 2.0, r.y + r.h + RADIUS + 2.0)
+            };
+            let up = V2::new(0.0, -500.0);
+            let (armoured, plain) = (exposed(&game, 2), exposed(&game, 1));
+            let mut sandbox = game.sandbox();
+            if let Some(c) = armoured {
+                sandbox.place_ball(0, below(c), up);
+            }
+            if let Some(c) = plain {
+                sandbox.place_ball(1, below(c), up);
+            }
+            sandbox.place_ball(
+                2,
+                V2::new(ark::field::LEFT + RADIUS + 2.0, 600.0),
+                V2::new(-400.0, -120.0),
+            );
+            run(&mut game, 14, record);
+            game
+        }
+        "daybreak" | "bluehour" | "afterlight" => {
+            let sector = match screen {
+                "daybreak" => 0,
+                "bluehour" => 4,
+                _ => 8,
+            };
+            let mut game = serve(sector, record);
+            let mut sandbox = game.sandbox();
+            sandbox.fill_board(1, CellSet::EMPTY);
+            // The bottom row shows armour and cores in the chapter's light.
+            for col in 0..COLS {
+                if let Some(cell) = Cell::new((ROWS - 1) * COLS + col) {
+                    let (hp, core) = match col {
+                        0..=2 => (2, false),
+                        3..=5 => (3, false),
+                        6..=8 => (1, true),
+                        _ => (1, false),
+                    };
+                    sandbox.set_brick(cell, hp, core);
+                }
+            }
+            run(&mut game, 10, record);
+            game
+        }
+        // The busiest authored sector with three balls, one phased, every
+        // capsule falling, both drains with Slow running out, and Anchor
+        // charges in the seam.
+        _ => {
+            let mut game = serve(9, record);
+            hold(&mut game, record);
+            game.sandbox().grant(Power::Slow);
+            // Slow runs on while the ball is held, into its last 2 s.
+            run(&mut game, TICK_HZ * 21 / 2, record);
+            let mut sandbox = game.sandbox();
+            sandbox.grant(Power::Wide);
+            sandbox.place_ball(0, V2::new(380.0, 560.0), V2::new(260.0, -380.0));
+            sandbox.place_ball(1, V2::new(600.0, 620.0), V2::new(-300.0, -330.0));
+            sandbox.grant(Power::Phase);
+            sandbox.place_ball(2, V2::new(250.0, 660.0), V2::new(-200.0, 420.0));
+            for (i, power) in Power::ALL.into_iter().enumerate() {
+                let pos = V2::new(170.0 + i as f32 * 150.0, 470.0 + (i % 2) as f32 * 70.0);
+                sandbox.spawn_capsule(i, pos, power);
+            }
+            run(&mut game, 20, record);
+            game
+        }
+    }
 }
