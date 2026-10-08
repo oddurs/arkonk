@@ -574,3 +574,100 @@ fn every_drawn_row_is_one_hit_area() {
         }
     }
 }
+
+/// A Small screen's pager glyphs keep their pixel floor, which grows them
+/// past the design's size on the narrowest frames: the row must still sit
+/// inside the field and a gap above the first card.
+#[test]
+fn the_small_pager_stays_in_the_field_above_the_cards() {
+    let fonts = ark_glyphs::fonts(Locale::En).unwrap();
+    let atlas = Atlas::build(&fonts).unwrap();
+    let ui = Ui {
+        screen: Screen::Sectors,
+        ..Ui::default()
+    };
+    let small: Vec<_> = views()
+        .into_iter()
+        .filter(|s| s.view.class == Class::Small)
+        .collect();
+    assert!(!small.is_empty());
+    for at in &small {
+        let v = Scene::new(
+            None,
+            (&atlas, &fonts, Locale::En),
+            &at.view,
+            &ui,
+            String::new(),
+            None,
+        );
+        let (mid, chip) = screens::pager(&v);
+        let first = screens::card_rect(&v, SectorId::FIRST);
+        assert!(
+            mid - chip / 2.0 >= TOP,
+            "{}: pager above the field",
+            at.name
+        );
+        assert!(
+            mid + chip / 2.0 + S8 <= first.y + 1e-3,
+            "{}: pager crowds the first card",
+            at.name
+        );
+    }
+}
+
+/// A locked card's padlock keeps a group's gap from every word around it,
+/// in the longest strings and on every Regular and Small screen.
+#[test]
+fn padlocks_keep_clear_of_text() {
+    for locale in [Locale::En, Locale::Pseudo] {
+        let fonts = ark_glyphs::fonts(locale).unwrap();
+        let atlas = Atlas::build(&fonts).unwrap();
+        for sector in [4, 7] {
+            let ui = Ui {
+                screen: Screen::Sectors,
+                sector: SectorId::clamped(sector),
+                ..Ui::default()
+            };
+            for at in views().iter().filter(|s| s.view.class != Class::Compact) {
+                let log = RefCell::new(Log::default());
+                let v = Scene::new(
+                    None,
+                    (&atlas, &fonts, locale),
+                    &at.view,
+                    &ui,
+                    String::new(),
+                    Some(&log),
+                );
+                let game = Game::new();
+                scene(
+                    &v,
+                    &Fx::default(),
+                    &game,
+                    &ui,
+                    &Profile::default(),
+                    1.0,
+                    None,
+                );
+                let placed = log.into_inner().placed;
+                let locks: Vec<_> = placed.iter().filter(|p| p.text == PADLOCK).collect();
+                assert!(!locks.is_empty(), "{}: no locked card drawn", at.name);
+                for lock in locks {
+                    let near = Rect::new(
+                        lock.rect.x - S8,
+                        lock.rect.y - S8,
+                        lock.rect.w + 2.0 * S8,
+                        lock.rect.h + 2.0 * S8,
+                    );
+                    for p in placed.iter().filter(|p| p.text != PADLOCK) {
+                        assert!(
+                            p.layer != lock.layer || !overlap(near, p.rect, 0.0),
+                            "{locale:?} {}: {:?} crowds a padlock",
+                            at.name,
+                            p.text
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

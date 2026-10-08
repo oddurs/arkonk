@@ -287,6 +287,10 @@ pub struct Log {
     pub problems: Vec<String>,
     pub placed: Vec<Placed>,
 }
+/// What the layout log calls a padlock.
+#[cfg_attr(not(test), allow(dead_code))]
+const PADLOCK: &str = "padlock";
+
 /// A line of text as drawn: its ink, from the capitals' top to the
 /// descenders, the sheet layer it belongs to, and the box it must keep
 /// inside.
@@ -1085,10 +1089,20 @@ impl<'a> Scene<'a> {
             }
         }
     }
-    /// A small padlock for sectors not yet open.
+    /// A small padlock for sectors not yet open. The layout tests see it
+    /// as a word, so text that crowds or covers it fails them.
     fn padlock(&self, cx: f32, cy: f32, color: Color) {
         self.ring(V2::new(cx, cy - 4.0), 5.0, 2.0, color);
         self.rounded(cx - 8.0, cy - 3.0, 16.0, 12.0, 2.5, color);
+        if let Some(log) = self.log {
+            let (layer, within) = self.within.get();
+            log.borrow_mut().placed.push(Placed {
+                text: PADLOCK.into(),
+                rect: Rect::new(cx - 8.0, cy - 10.0, 16.0, 19.0),
+                layer,
+                within,
+            });
+        }
     }
 }
 

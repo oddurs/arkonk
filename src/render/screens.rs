@@ -79,7 +79,9 @@ pub(super) fn card_rect(v: &Scene, id: SectorId) -> Rect {
         let r = SMALL_CARD;
         let h = v.at_least(r.h, 32.0);
         let gap = v.at_least(4.0, 2.0);
-        return Rect::new(r.x, r.y + row as f32 * (h + gap), r.w, h);
+        let (mid, chip) = pager(v);
+        let top = mid + chip / 2.0 + S8;
+        return Rect::new(r.x, top + row as f32 * (h + gap), r.w, h);
     }
     Rect::new(
         80.0 + chapter as f32 * 272.0,
@@ -88,13 +90,22 @@ pub(super) fn card_rect(v: &Scene, id: SectorId) -> Rect {
         88.0,
     )
 }
-/// The first card of a Small screen's chapter column.
+/// A Small screen's chapter column; its cards start under the pager.
 const SMALL_CARD: Rect = Rect {
     x: WIDTH / 2.0 - 200.0,
-    y: 172.0,
+    y: TOP,
     w: 400.0,
     h: 64.0,
 };
+
+/// The middle of a Small screen's pager row and its glyphs' size. The
+/// glyphs keep their 18-pixel floor, which on the smallest Small frame
+/// is twice the design's 22 units, so the row is laid out from the
+/// field's top rather than from the label's baseline.
+pub(super) fn pager(v: &Scene) -> (f32, f32) {
+    let chip = chips::size(v, false);
+    (TOP + S8 + chip / 2.0, chip)
+}
 
 /// The sector map: chapter columns of cards, and the selected sector's
 /// detail docked under them with its Play action. A Small screen pages
@@ -112,11 +123,11 @@ pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
         if small && chapter != page {
             continue;
         }
-        let at = v.baseline(Role::Label, 152.0);
         let colour = sector_color(0, chapter);
         if small {
-            chapter_pager(v, chapter, at);
+            chapter_pager(v, chapter);
         } else {
+            let at = v.baseline(Role::Label, 152.0);
             let x = 84.0 + chapter.first_sector().index() as f32 / 4.0 * 272.0;
             v.say(
                 TextId::ChapterName(chapter),
@@ -148,10 +159,10 @@ pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
 
 /// A Small screen's chapter heading, between the glyphs that page to the
 /// chapters either side.
-fn chapter_pager(v: &Scene, chapter: Chapter, at: f32) {
-    let size = chips::size(v, false);
+fn chapter_pager(v: &Scene, chapter: Chapter) {
+    let (mid, size) = pager(v);
     let r = SMALL_CARD;
-    let mid = at - v.cap(Role::Label) / 2.0;
+    let at = mid + v.cap(Role::Label) / 2.0;
     chips::chip(v, Prompt::Left, (r.x, mid), size, chips::Lit::Neutral);
     let right = chips::width(v, Prompt::Right, size);
     chips::chip(
@@ -205,7 +216,10 @@ fn card(v: &Scene, id: SectorId, selected: bool, profile: &Profile) {
     let short = v.class == Class::Small;
     let name = v.baseline(style, r.y + if short { 8.0 } else { 14.0 });
     let board = 12.0 * 9.0;
-    let w = if short { w - board - S16 } else { w };
+    // A short card's padlock sits beside the board: under the name there
+    // is room for a medal pip, not for a padlock.
+    let lock = if short && !open { LOCK_W + S12 } else { 0.0 };
+    let w = if short { w - board - S16 - lock } else { w };
     v.say(
         TextId::SectorName(id),
         &[],
@@ -258,10 +272,14 @@ fn card(v: &Scene, id: SectorId, selected: bool, profile: &Profile) {
             );
             sheet::medal_pip(v, pip, record.medals.contains(medal));
         }
+    } else if short {
+        v.padlock(bx - S12 - LOCK_W / 2.0, r.y + r.h / 2.0, MUTED);
     } else {
-        v.padlock(right - 8.0, bottom - 8.0, MUTED);
+        v.padlock(right - LOCK_W / 2.0, bottom - 8.0, MUTED);
     }
 }
+/// A padlock's width.
+const LOCK_W: f32 = 16.0;
 
 /// The detail sheet's place, the right column's width, and its padding.
 const DETAIL: Rect = Rect {
