@@ -87,12 +87,6 @@ text_ids! {
     UnlockHint,
 
     // Play.
-    Score,
-    Lives,
-    /// `{0}` sector number.
-    SectorNumber,
-    /// `{0}` sector number.
-    PracticeNumber,
     /// `{0}` points.
     Plus,
     /// `{0}` chapter name, `{1}` sector number.
@@ -153,8 +147,7 @@ impl TextId {
         match self {
             ContinueDetail => 3,
             Fraction | ReadyEyebrow => 2,
-            Volume | SwiftWithin | PlaySector | UnlockHint | SectorNumber | PracticeNumber
-            | Plus => 1,
+            Volume | SwiftWithin | PlaySector | UnlockHint | Plus => 1,
             _ => 0,
         }
     }
@@ -162,9 +155,10 @@ impl TextId {
     pub const fn role(self) -> Role {
         use TextId::*;
         match self {
-            StatSectors | StatMedals | StatBest | MedalClear | MedalClean | MedalSwift | Score
-            | Lives | SectorNumber | PracticeNumber | ReadyEyebrow | StatPoints | StatTime
-            | StatBonus | StatBestChain | ChapterName(_) => Role::Label,
+            StatSectors | StatMedals | StatBest | MedalClear | MedalClean | MedalSwift
+            | ReadyEyebrow | StatPoints | StatTime | StatBonus | StatBestChain | ChapterName(_) => {
+                Role::Label
+            }
             SectorsHeading | Paused | JourneyComplete | OneMoreOrbit | SectorClear
             | SectorName(_) => Role::Display,
             KeysMove | KeysServe | KeysPause | KeysRelease | KeysBrowse | KeysPlay | KeysBack

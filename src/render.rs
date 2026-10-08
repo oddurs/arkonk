@@ -31,15 +31,19 @@ use std::{
 pub const WIDTH: f32 = 960.0;
 pub const HEIGHT: f32 = 900.0;
 
-const BG: Color = Color::new(0.027, 0.033, 0.055, 1.0);
+/// The night around the instrument; everything outside the arch.
+const NIGHT: Color = hex(0x07080e);
+const PEARL_RIM: Color = hex(0xcdd8e8);
 const SURFACE: Color = Color::new(0.050, 0.060, 0.092, 1.0);
 const RAISED: Color = Color::new(0.078, 0.091, 0.135, 1.0);
 const BORDER: Color = Color::new(0.135, 0.155, 0.210, 1.0);
-const INK: Color = Color::new(0.93, 0.95, 0.98, 1.0);
-const DIM: Color = Color::new(0.53, 0.58, 0.67, 1.0);
-const MUTED: Color = Color::new(0.29, 0.33, 0.41, 1.0);
-const CYAN: Color = Color::new(0.33, 0.87, 0.96, 1.0);
-const AMBER: Color = Color::new(1.0, 0.76, 0.30, 1.0);
+const INK: Color = hex(0xedf2fa);
+const DIM: Color = hex(0x8794ab);
+/// Only for what is unavailable.
+const MUTED: Color = hex(0x4a5469);
+const CYAN: Color = hex(0x54def5);
+/// Achievements only.
+const AMBER: Color = hex(0xffc24d);
 const RED: Color = Color::new(1.0, 0.25, 0.33, 1.0);
 const PALETTE: [Color; 7] = [
     RED,
@@ -107,8 +111,84 @@ fn mix(a: Color, b: Color, t: f32) -> Color {
         a.r + (b.r - a.r) * t,
         a.g + (b.g - a.g) * t,
         a.b + (b.b - a.b) * t,
-        a.a,
+        a.a + (b.a - a.a) * t,
     )
+}
+/// A colour from its `0xRRGGBB` code, as the design tokens are written.
+const fn hex(rgb: u32) -> Color {
+    Color::new(
+        ((rgb >> 16) & 0xFF) as f32 / 255.0,
+        ((rgb >> 8) & 0xFF) as f32 / 255.0,
+        (rgb & 0xFF) as f32 / 255.0,
+        1.0,
+    )
+}
+
+/// A vertical colour ramp: `top` at the top edge to `bottom` at the
+/// bottom, through `mid` at a fraction of the height when there is one.
+#[derive(Clone, Copy)]
+struct Fill {
+    top: Color,
+    mid: Option<(f32, Color)>,
+    bottom: Color,
+}
+impl Fill {
+    const fn flat(c: Color) -> Self {
+        Self::ramp(c, c)
+    }
+    const fn ramp(top: Color, bottom: Color) -> Self {
+        Self {
+            top,
+            mid: None,
+            bottom,
+        }
+    }
+    fn at(&self, t: f32) -> Color {
+        let t = t.clamp(0.0, 1.0);
+        match self.mid {
+            Some((m, c)) if t < m => mix(self.top, c, t / m),
+            Some((m, c)) => mix(c, self.bottom, (t - m) / (1.0 - m)),
+            None => mix(self.top, self.bottom, t),
+        }
+    }
+}
+
+/// The edge of a rectangle with rounded corners, clockwise from the
+/// top-left corner. Every path has the same number of points, so two of
+/// them pair up into an outline or a halo.
+#[derive(Clone, Copy)]
+struct Path {
+    rect: Rect,
+    /// Top-left, top-right, bottom-right, bottom-left.
+    radii: [f32; 4],
+}
+impl Path {
+    const STEPS: usize = 6;
+    const LEN: usize = 4 * (Self::STEPS + 1);
+    fn new(rect: Rect, radii: [f32; 4]) -> Self {
+        let most = (rect.w.min(rect.h) / 2.0).max(0.0);
+        Self {
+            rect,
+            radii: radii.map(|r| r.clamp(0.0, most)),
+        }
+    }
+    fn points(&self) -> impl Iterator<Item = Vec2> {
+        let Rect { x, y, w, h } = self.rect;
+        let [a, b, c, d] = self.radii;
+        [
+            (x + a, y + a, a, 2.0),
+            (x + w - b, y + b, b, 3.0),
+            (x + w - c, y + h - c, c, 0.0),
+            (x + d, y + h - d, d, 1.0),
+        ]
+        .into_iter()
+        .flat_map(|(cx, cy, r, start)| {
+            (0..=Self::STEPS).map(move |i| {
+                let a = (start + i as f32 / Self::STEPS as f32) * FRAC_PI_2;
+                vec2(cx, cy) + Vec2::from_angle(a) * r
+            })
+        })
+    }
 }
 
 /// Where the fixed scene sits in the window: uniform scale, centered.
@@ -356,38 +436,111 @@ impl Scene<'_> {
         self.rounded(x - 1.0, y - 1.0, w + 2.0, h + 2.0, 13.0, BORDER);
         self.rounded(x, y, w, h, 12.0, SURFACE);
     }
+
+    // Pixel snapping. Interface shapes land on whole physical pixels, and
+    // nothing thin ever rounds away.
+
+    /// `v` scene units, moved to the nearest physical pixel.
+    fn snap(&self, v: f32) -> f32 {
+        (v * self.density).round() / self.density
+    }
+    /// A thickness of `units`, in whole physical pixels and at least one.
+    fn thick(&self, units: f32) -> f32 {
+        (units * self.density).round().max(1.0) / self.density
+    }
+    fn snap_rect(&self, r: Rect) -> Rect {
+        let (x, y) = (self.snap(r.x), self.snap(r.y));
+        Rect::new(x, y, self.snap(r.x + r.w) - x, self.snap(r.y + r.h) - y)
+    }
+
+    /// A vertical colour ramp across a quad.
+    fn ramp(&self, r: Rect, top: Color, bottom: Color) {
+        let vertices = [
+            self.vertex(vec2(r.x, r.y), top),
+            self.vertex(vec2(r.x + r.w, r.y), top),
+            self.vertex(vec2(r.x + r.w, r.y + r.h), bottom),
+            self.vertex(vec2(r.x, r.y + r.h), bottom),
+        ];
+        self.mesh(&vertices, &[0, 1, 2, 0, 2, 3]);
+    }
+    /// `r` with each corner rounded by its own radius (top-left, top-right,
+    /// bottom-right, bottom-left), filled with `fill`. One fan from the
+    /// centre: a rounded rectangle is convex, so no triangle overlaps
+    /// another and translucent fills stay even.
+    fn shape(&self, r: Rect, radii: [f32; 4], fill: Fill) {
+        let path = Path::new(r, radii);
+        let colour = |p: Vec2| fill.at((p.y - r.y) / r.h);
+        let centre = r.center();
+        let zero = self.vertex(centre, colour(centre));
+        let mut vertices = [zero; 1 + Path::LEN];
+        let mut indices = [0_u16; 3 * Path::LEN];
+        for (i, p) in path.points().enumerate() {
+            vertices[i + 1] = self.vertex(p, colour(p));
+            let next = (i + 1) % Path::LEN + 1;
+            indices[i * 3..i * 3 + 3].copy_from_slice(&[0, i as u16 + 1, next as u16]);
+        }
+        self.mesh(&vertices, &indices);
+    }
+    /// The area between two rounded paths of the same corners, with a
+    /// colour for each: an outline when both are opaque, a soft halo when
+    /// the outer one is transparent.
+    fn between(&self, outer: Path, inner: Path, outer_fill: Fill, inner_fill: Fill) {
+        let at = |path: &Path, fill: Fill, p: Vec2| fill.at((p.y - path.rect.y) / path.rect.h);
+        let zero = self.vertex(Vec2::ZERO, outer_fill.top);
+        let mut vertices = [zero; 2 * Path::LEN];
+        let mut indices = [0_u16; 6 * Path::LEN];
+        for (i, (a, b)) in outer.points().zip(inner.points()).enumerate() {
+            vertices[i * 2] = self.vertex(a, at(&outer, outer_fill, a));
+            vertices[i * 2 + 1] = self.vertex(b, at(&inner, inner_fill, b));
+            let (k, next) = ((i * 2) as u16, ((i + 1) % Path::LEN * 2) as u16);
+            indices[i * 6..i * 6 + 6].copy_from_slice(&[k, k + 1, next, next, k + 1, next + 1]);
+        }
+        self.mesh(&vertices, &indices);
+    }
     /// The edge of `bounds` rounded by `r`, `t` thick, drawn inside it.
     fn outline(&self, bounds: Rect, r: f32, t: f32, color: Color) {
-        const STEPS: usize = 6;
-        let Rect { x, y, w, h } = bounds;
-        let r = r.min(w / 2.0).min(h / 2.0).max(t);
-        self.rect(x + r, y, w - 2.0 * r, t, color);
-        self.rect(x + r, y + h - t, w - 2.0 * r, t, color);
-        self.rect(x, y + r, t, h - 2.0 * r, color);
-        self.rect(x + w - t, y + r, t, h - 2.0 * r, color);
-        let zero = self.vertex(Vec2::ZERO, color);
-        let mut vertices = [zero; 4 * (STEPS + 1) * 2];
-        let mut indices = [0_u16; 4 * STEPS * 6];
-        for (corner, (cx, cy, start)) in [
-            (x + r, y + r, 2.0),
-            (x + w - r, y + r, 3.0),
-            (x + w - r, y + h - r, 0.0),
-            (x + r, y + h - r, 1.0),
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let center = vec2(cx, cy);
-            let first = corner * (STEPS + 1) * 2;
-            for i in 0..=STEPS {
-                let direction = Vec2::from_angle((start + i as f32 / STEPS as f32) * FRAC_PI_2);
-                vertices[first + i * 2] = self.vertex(center + direction * r, color);
-                vertices[first + i * 2 + 1] = self.vertex(center + direction * (r - t), color);
-                if i < STEPS {
-                    let k = (first + i * 2) as u16;
-                    let at = (corner * STEPS + i) * 6;
-                    indices[at..at + 6].copy_from_slice(&[k, k + 1, k + 2, k + 2, k + 1, k + 3]);
-                }
+        let inner = Rect::new(
+            bounds.x + t,
+            bounds.y + t,
+            bounds.w - 2.0 * t,
+            bounds.h - 2.0 * t,
+        );
+        self.between(
+            Path::new(bounds, [r; 4]),
+            Path::new(inner, [(r - t).max(0.0); 4]),
+            Fill::flat(color),
+            Fill::flat(color),
+        );
+    }
+    /// A soft light or shadow around `bounds`: `color` at its edge, fading
+    /// to nothing `spread` further out. Vertex colours, so no blur pass.
+    fn halo(&self, bounds: Rect, r: f32, spread: f32, color: Color) {
+        let outer = Rect::new(
+            bounds.x - spread,
+            bounds.y - spread,
+            bounds.w + 2.0 * spread,
+            bounds.h + 2.0 * spread,
+        );
+        self.between(
+            Path::new(outer, [r + spread; 4]),
+            Path::new(bounds, [r; 4]),
+            Fill::flat(opacity(color, 0.0)),
+            Fill::flat(color),
+        );
+    }
+    /// A pearl lit from above: white at a hub above its centre, cooler at
+    /// its rim. The lives in the band are pearls.
+    fn pearl(&self, p: V2, r: f32, alpha: f32) {
+        const SIDES: usize = 20;
+        let hub = vec2(p.x, p.y - 0.4 * r);
+        let mut vertices = [self.vertex(hub, opacity(WHITE, alpha)); SIDES + 2];
+        let mut indices = [0_u16; SIDES * 3];
+        let rim = opacity(PEARL_RIM, alpha);
+        for i in 0..=SIDES {
+            let a = i as f32 / SIDES as f32 * TAU;
+            vertices[i + 1] = self.vertex(vec2(p.x, p.y) + vec2(a.cos(), a.sin()) * r, rim);
+            if i < SIDES {
+                indices[i * 3..i * 3 + 3].copy_from_slice(&[0, i as u16 + 1, i as u16 + 2]);
             }
         }
         self.mesh(&vertices, &indices);
@@ -403,7 +556,7 @@ impl Scene<'_> {
         );
     }
     fn scrim(&self) {
-        self.cover(opacity(BG, 0.78));
+        self.cover(opacity(NIGHT, 0.78));
     }
     fn line(&self, a: V2, b: V2, thickness: f32, color: Color) {
         let (a, b) = (vec2(a.x, a.y), vec2(b.x, b.y));
@@ -574,7 +727,12 @@ impl Scene<'_> {
         let mut letter = [0; 4];
         let letter = capsule(power).encode_utf8(&mut letter);
         let y = cy + self.cap(Role::Label) / 2.0;
-        self.put(letter, Role::Label, Slot::centered(x + w / 2.0, w, y), BG);
+        self.put(
+            letter,
+            Role::Label,
+            Slot::centered(x + w / 2.0, w, y),
+            NIGHT,
+        );
     }
     /// Draws `text` aligned in `slot`; text wider than the slot is drawn
     /// anyway and reported to the layout tests.
@@ -693,7 +851,7 @@ impl Scene<'_> {
             Cap::Pad(Glyph::Start) => {
                 self.rounded(x, cy - 10.0, w, 20.0, 10.0, DIM);
                 for dy in [-4.0, 0.0, 4.0] {
-                    self.rect(x + 9.0, cy + dy - 0.75, 12.0, 1.5, BG);
+                    self.rect(x + 9.0, cy + dy - 0.75, 12.0, 1.5, NIGHT);
                 }
             }
             Cap::Pad(glyph) => {
@@ -704,7 +862,7 @@ impl Scene<'_> {
                 };
                 self.circle(V2::new(x + w / 2.0, cy), w / 2.0, fill);
                 let y = cy + self.cap(Role::Label) / 2.0;
-                self.put(label, Role::Label, Slot::centered(x + w / 2.0, w, y), BG);
+                self.put(label, Role::Label, Slot::centered(x + w / 2.0, w, y), NIGHT);
             }
         }
     }
@@ -961,6 +1119,8 @@ pub struct Fx {
     popup_cursor: usize,
     previous_score: u32,
     previous_sector: Option<SectorId>,
+    /// Lives when this sector began; the band rings each one lost since.
+    entry_lives: u8,
     paddle_flash: f32,
     wall_flash: f32,
     pickup_flash: f32,
@@ -977,6 +1137,7 @@ impl Default for Fx {
             popup_cursor: 0,
             previous_score: 0,
             previous_sector: None,
+            entry_lives: 0,
             paddle_flash: 0.0,
             wall_flash: 0.0,
             pickup_flash: 0.0,
@@ -1087,6 +1248,7 @@ impl Renderer {
             fx.previous_sector = Some(game.sector());
             fx.previous_bricks = hp_grid(game);
             fx.previous_score = game.score();
+            fx.entry_lives = game.lives();
         }
         for (i, ball) in game.balls().iter().enumerate() {
             if !ball.active || ball.held || game.stage() != Stage::Playing {
@@ -1210,7 +1372,7 @@ impl Renderer {
         // Painting the background into the scene batch, rather than with
         // `clear_background`, saves a full-framebuffer pass: Macroquad has
         // already cleared once this frame.
-        v.cover(BG);
+        v.cover(NIGHT);
         scene(&v, &self.fx, game, ui, profile, alpha, perf);
         // Translucent shapes also blend into framebuffer alpha. Restore an
         // opaque frame so the compositor never shows anything through it.
@@ -1236,6 +1398,7 @@ fn scene(
     let (stage, summary) = ui
         .preview
         .map_or((game.stage(), game.summary()), |p| (p.stage, p.summary));
+    frame::arch(v, fx.wall_flash);
     if ui.screen != Screen::Play {
         if ui.screen == Screen::Title {
             attract(v, ui, profile);
@@ -1244,7 +1407,6 @@ fn scene(
         }
         return;
     }
-    playfield(v, fx);
     bricks(v, fx, game);
     effects(v, fx, game);
     paddle(v, fx, game);
@@ -1261,13 +1423,18 @@ fn scene(
         }
     }
     balls(v, fx, game, alpha);
-    hud(v, game, profile);
+    frame::band_play(v, fx, game, profile);
     let mut letter = [0; 4];
     for drop in game.capsules() {
         if drop.active {
             let letter = capsule(drop.power).encode_utf8(&mut letter);
             let y = drop.pos.y + v.cap(Role::Label) / 2.0;
-            v.put(letter, Role::Label, Slot::centered(drop.pos.x, 30.0, y), BG);
+            v.put(
+                letter,
+                Role::Label,
+                Slot::centered(drop.pos.x, 30.0, y),
+                NIGHT,
+            );
         }
     }
     for popup in &fx.popups {
@@ -1357,14 +1524,6 @@ fn scene(
     }
 }
 
-fn playfield(v: &Scene, fx: &Fx) {
-    v.rect(LEFT, TOP, RIGHT - LEFT, BOTTOM - TOP, SURFACE);
-    // Three walls; the open bottom edge is where a ball drains.
-    let edge = mix(BORDER, CYAN, (fx.wall_flash * 4.0).min(0.6));
-    v.rect(LEFT, TOP, RIGHT - LEFT, 1.0, edge);
-    v.rect(LEFT, TOP, 1.0, BOTTOM - TOP, edge);
-    v.rect(RIGHT - 1.0, TOP, 1.0, BOTTOM - TOP, edge);
-}
 fn bricks(v: &Scene, fx: &Fx, game: &Game) {
     // Quiet connections make the actual orthogonal blast routes readable.
     for cell in FieldCell::all() {
@@ -1593,72 +1752,6 @@ fn balls(v: &Scene, fx: &Fx, game: &Game, alpha: f32) {
             );
         }
         v.circle(pos, RADIUS, INK);
-    }
-}
-/// The HUD's two baselines: labels, then values a pair's gap under the
-/// score's capitals. Score, sector name and lives all sit on the second.
-const HUD_LABEL: f32 = 70.0;
-const HUD_VALUE: f32 = HUD_LABEL + PAIR + cap_height(Role::Display);
-/// Score left, sector centre, lives right. Labels are small tracked
-/// capitals; figures are tabular, so the score never shifts as it grows.
-fn hud(v: &Scene, game: &Game, profile: &Profile) {
-    let side = WIDTH / 2.0 - 160.0 - LEFT;
-    let label = |slot: Slot| Slot {
-        y: HUD_LABEL,
-        ..slot
-    };
-    let value = |slot: Slot| Slot {
-        y: HUD_VALUE,
-        ..slot
-    };
-    let (left, centre, right) = (
-        Slot::left(LEFT, side, 0.0),
-        Slot::centered(WIDTH / 2.0, 300.0, 0.0),
-        Slot::right(RIGHT, side, 0.0),
-    );
-    v.say(TextId::Score, &[], Role::Label, label(left), DIM);
-    let score = Figures::count(v.locale, game.score());
-    v.put(score.as_str(), Role::Display, value(left), INK);
-
-    let eyebrow = if game.mode() == Mode::Practice {
-        TextId::PracticeNumber
-    } else {
-        TextId::SectorNumber
-    };
-    let sector = [Arg::Sector(game.sector())];
-    v.say(eyebrow, &sector, Role::Label, label(centre), DIM);
-    let name = TextId::SectorName(game.sector());
-    v.say(name, &[], Role::Body, value(centre), INK);
-    // The journey at a glance: here in the focus colour, cleared sectors
-    // as supporting text, the rest muted.
-    for id in SectorId::all() {
-        v.rect(
-            WIDTH / 2.0 - 94.0 + id.index() as f32 * 16.0,
-            HUD_VALUE + S12,
-            12.0,
-            2.0,
-            if id == game.sector() {
-                CYAN
-            } else if profile.progress.record(id).medals != Medals::NONE {
-                DIM
-            } else {
-                MUTED
-            },
-        );
-    }
-
-    v.say(TextId::Lives, &[], Role::Label, label(right), DIM);
-    // The dots rest on the value baseline, like the figures beside them.
-    let shown = game.lives().max(3);
-    for i in 0..shown {
-        v.circle(
-            V2::new(
-                RIGHT - 5.0 - f32::from(shown - 1 - i) * 16.0,
-                HUD_VALUE - 5.0,
-            ),
-            5.0,
-            if i < game.lives() { INK } else { MUTED },
-        );
     }
 }
 /// The pause card: where play stopped, the menu, what Retry does, and the
@@ -2382,5 +2475,6 @@ fn power_color(power: Power) -> Color {
     }
 }
 
+mod frame;
 #[cfg(test)]
 mod tests;
