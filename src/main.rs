@@ -382,7 +382,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         match ui.screen {
             Screen::Title => {
                 let menu = ui::title_menu(profile.progress.checkpoint().is_some());
-                let hovered = menu.hover(pointer);
+                let hovered = renderer.hits().row_at(menu, pointer);
                 ui.choice = menu.step(ui.choice, up, down);
                 if (moved || click)
                     && let Some(row) = hovered
@@ -413,7 +413,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                             ui.screen = Screen::Sectors;
                             ui.sector = SectorId::clamped(profile.progress.unlocked_count() - 1);
                         }
-                        Action::Resume | Action::Retry | Action::MainMenu => {}
+                        Action::Resume | Action::Retry | Action::MainMenu | Action::Next => {}
                     }
                 }
             }
@@ -476,15 +476,18 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     } else {
                         ui::result_menu(game.stage() == Stage::Victory)
                     };
-                    let hovered = menu.hover(pointer);
+                    let hovered = renderer.hits().row_at(menu, pointer);
                     ui.choice = menu.step(ui.choice, up, down);
                     if (moved || click)
                         && let Some(row) = hovered
                     {
                         ui.choice = row;
                     }
-                    // R and X retry wherever the menu offers Retry.
-                    let action = if restart {
+                    // R and X retry wherever the menu offers Retry; the
+                    // pause sheet's back glyph resumes.
+                    let action = if click && ui.paused && renderer.hits().back_at(pointer) {
+                        Some(Action::Resume)
+                    } else if restart {
                         menu.actions
                             .contains(&Action::Retry)
                             .then_some(Action::Retry)
@@ -531,10 +534,11 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                             home(&mut ui);
                             changed = true;
                         }
-                        Some(Action::Continue) | None => {}
+                        Some(Action::Continue | Action::Next) | None => {}
                     }
                 } else if !changed && game.stage() == Stage::Cleared {
-                    let next = confirm || (click && ui::next_rect().contains(pointer));
+                    let on_next = renderer.hits().row_at(ui::cleared_menu(), pointer);
+                    let next = confirm || (click && on_next.is_some());
                     if next && game.stage_ticks() >= ADVANCE_DELAY_TICKS {
                         if game.mode() == Mode::Practice {
                             ui.screen = Screen::Sectors;
@@ -642,6 +646,10 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             cursor_visible = show_cursor;
         }
         perf.refresh(now, game.diagnostics().budget_exhausted);
+        // Captures and the stress runs draw sheets already in place.
+        if !smoke || flow {
+            ui.track_sheet(game.stage(), frame_seconds as f32);
+        }
         let draw_start = get_time();
         let actual_screen = ui.screen;
         let actual_pause = ui.paused;

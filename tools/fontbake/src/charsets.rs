@@ -72,9 +72,10 @@ pub struct Sets {
 }
 
 /// Figures and punctuation the game formats into labels, values and
-/// scores in any locale: digits, every locale's group separator, signs.
+/// scores in any locale: digits, every locale's group separator, signs,
+/// and the times sign of a chain.
 fn figures() -> BTreeSet<char> {
-    let mut out: BTreeSet<char> = "0123456789+-/:·, ".chars().collect();
+    let mut out: BTreeSet<char> = "0123456789+-/:·×, ".chars().collect();
     for locale in Locale::ALL {
         let mut s = String::new();
         ark_text::grouped(&mut s, locale, 1_234_567).expect("a String accepts any text");

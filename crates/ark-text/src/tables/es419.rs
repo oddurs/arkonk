@@ -8,7 +8,6 @@ pub(super) fn text(id: TextId) -> &'static str {
     match id {
         KeysMove => "Mouse o flechas para moverte",
         KeysPlay => "Enter para jugar",
-        KeysContinue => "Enter o clic para continuar",
         PadMove => "Stick o pad direccional para moverte",
         PadBrowse => "Pad direccional para recorrer",
         _ => es::text(id),

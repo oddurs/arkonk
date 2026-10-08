@@ -77,12 +77,15 @@ fn veteran(sector: usize) -> Profile {
     Profile::decode(file.as_bytes()).unwrap()
 }
 
+/// The widest results a sector can produce: an hour's clock, every bonus,
+/// and a chain longer than any board can hold.
 fn summary(life_earned: bool) -> SectorSummary {
+    use ark::tuning::{CLEAR_BONUS, MEDAL_BONUS};
     SectorSummary {
         ticks: 59 * 60 * 240,
         medals: Medals::ALL,
-        bonus: 2_000_000,
-        best_combo: 99_999,
+        bonus: CLEAR_BONUS + 2 * MEDAL_BONUS,
+        best_combo: 999,
         life_earned,
     }
 }
@@ -279,6 +282,8 @@ fn check(
                     device,
                     buffer: RefCell::new(String::new()),
                     misfits: Some(&log),
+                    hits: RefCell::default(),
+                    motion: Shared::new((1.0, 0.0)),
                 };
                 let ui = Ui {
                     device,

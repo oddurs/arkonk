@@ -4,7 +4,7 @@ use crate::{
     perf::Perf,
     pixel_font,
     storage::Profile,
-    ui::{self, Action, Menu, Screen, Ui},
+    ui::{self, Action, Hits, Menu, Screen, Ui},
 };
 use ark::{
     Events, Game, Medals, Mode, Power, SectorSummary, Stage,
@@ -22,7 +22,7 @@ use ark_text::{Arg, Form, Locale, Role, TextId, capsule, icon_power};
 use macroquad::models::Vertex;
 use macroquad::prelude::*;
 use std::{
-    cell::RefCell,
+    cell::{Cell as Shared, RefCell},
     f32::consts::{FRAC_PI_2, TAU},
     fmt::Write,
 };
@@ -105,6 +105,9 @@ impl Style {
             ..self
         }
     }
+    fn sized(self, size: f32) -> Self {
+        Self { size, ..self }
+    }
     fn weight(self) -> Weight {
         if self.strong {
             spec::strong(self.role)
@@ -129,10 +132,6 @@ const FOOTER: f32 = 872.0;
 /// Baseline-to-baseline distance between footer rows: captions are smaller
 /// than body text, so the rows need more air to read as separate lines.
 const FOOTER_LINE: f32 = 30.0;
-/// Text width inside the pause and results panels: their buttons' width.
-const PANEL: f32 = ui::MENU_WIDTH;
-/// The width of the pause and results panels, padding included.
-const PANEL_W: f32 = PANEL + 2.0 * PAD;
 
 fn opacity(c: Color, alpha: f32) -> Color {
     Color::new(c.r, c.g, c.b, alpha)
@@ -174,6 +173,14 @@ impl Fill {
         Self {
             top,
             mid: None,
+            bottom,
+        }
+    }
+    /// A lit edge: light at the top, the colour itself at `at`, dark below.
+    const fn lit(top: Color, at: f32, mid: Color, bottom: Color) -> Self {
+        Self {
+            top,
+            mid: Some((at, mid)),
             bottom,
         }
     }
@@ -356,6 +363,11 @@ struct Scene<'a> {
     device: Device,
     buffer: RefCell<String>,
     misfits: Option<&'a RefCell<Vec<Misfit>>>,
+    /// What this frame drew that the pointer can hit.
+    hits: RefCell<Hits>,
+    /// Opacity and downward offset for what is being drawn: a sheet fades
+    /// and rises into place. Alpha and translation only.
+    motion: Shared<(f32, f32)>,
 }
 
 impl Scene<'_> {
@@ -373,7 +385,15 @@ impl Scene<'_> {
     }
     fn vertex(&self, p: Vec2, color: Color) -> Vertex {
         let uv = self.uv(Atlas::WHITE.0, Atlas::WHITE.1);
-        Vertex::new(p.x, p.y, 0.0, uv.x, uv.y, color)
+        let (alpha, lift) = self.motion.get();
+        let color = Color {
+            a: color.a * alpha,
+            ..color
+        };
+        Vertex::new(p.x, p.y + lift, 0.0, uv.x, uv.y, color)
+    }
+    fn set_motion(&self, alpha: f32, lift: f32) {
+        self.motion.set((alpha, lift));
     }
     fn quad(&self, corners: [Vec2; 4], color: Color) {
         self.mesh(&corners.map(|p| self.vertex(p, color)), &[0, 1, 2, 0, 2, 3]);
@@ -406,7 +426,12 @@ impl Scene<'_> {
             (vec2(x + w, y + h), vec2(u1.x, u1.y)),
             (vec2(x, y + h), vec2(u0.x, u1.y)),
         ];
-        let vertices = corners.map(|(p, uv)| Vertex::new(p.x, p.y, 0.0, uv.x, uv.y, color));
+        let (alpha, lift) = self.motion.get();
+        let color = Color {
+            a: color.a * alpha,
+            ..color
+        };
+        let vertices = corners.map(|(p, uv)| Vertex::new(p.x, p.y + lift, 0.0, uv.x, uv.y, color));
         self.mesh(&vertices, &[0, 1, 2, 0, 2, 3]);
     }
     /// Non-overlapping pieces, so translucent fills stay even at the corners.
@@ -588,9 +613,6 @@ impl Scene<'_> {
             9.0 * HEIGHT,
             color,
         );
-    }
-    fn scrim(&self) {
-        self.cover(opacity(NIGHT, 0.78));
     }
     fn line(&self, a: V2, b: V2, thickness: f32, color: Color) {
         let (a, b) = (vec2(a.x, a.y), vec2(b.x, b.y));
@@ -902,8 +924,7 @@ impl Scene<'_> {
             Cap::Pad(glyph) => {
                 let (label, fill) = match glyph {
                     Glyph::A => ("A", PALETTE[3]),
-                    Glyph::B => ("B", RED),
-                    _ => ("X", Color::new(0.30, 0.56, 1.0, 1.0)),
+                    _ => ("B", RED),
                 };
                 self.circle(V2::new(x + w / 2.0, cy), w / 2.0, fill);
                 let y = cy + self.cap(Role::Label) / 2.0;
@@ -991,37 +1012,6 @@ impl Scene<'_> {
                 self.hint_line(line, width, y, DIM, Role::Caption);
                 y += FOOTER_LINE;
             });
-        }
-    }
-    /// A row of label–value pairs, centred: `POINTS 12,400   MEDALS 7`.
-    fn pairs(&self, pairs: &[(TextId, u32)], baseline: f32, room: f32) {
-        let pair_width = |&(label, n): &(TextId, u32)| {
-            let value = Figures::count(self.locale, n);
-            self.width_of(label, &[], Role::Label) + PAIR + self.measure(value.as_str(), Role::Body)
-        };
-        let width = pairs.iter().map(pair_width).sum::<f32>() + GROUP * (pairs.len() as f32 - 1.0);
-        if width > room
-            && let Some(log) = self.misfits
-        {
-            log.borrow_mut().push(Misfit {
-                text: "label and value pairs".into(),
-                need: width,
-                room,
-                missing: None,
-            });
-        }
-        let mut x = WIDTH / 2.0 - width / 2.0;
-        for &(label, n) in pairs {
-            let w = self.width_of(label, &[], Role::Label);
-            self.say(label, &[], Role::Label, Slot::left(x, w, baseline), DIM);
-            x += w + PAIR;
-            let value = Figures::count(self.locale, n);
-            x += self.put(
-                value.as_str(),
-                Role::Body,
-                Slot::left(x, room, baseline),
-                INK,
-            ) + GROUP;
         }
     }
     /// The screen's primary action is filled; every other action is plain
@@ -1121,7 +1111,6 @@ fn pixel_lines<'t>(
 enum Glyph {
     A,
     B,
-    X,
     Start,
 }
 /// What sits before a hint: a keyboard key or a gamepad button.
@@ -1237,6 +1226,7 @@ pub struct Renderer {
     metal: bool,
     text: String,
     fx: Fx,
+    hits: Hits,
 }
 impl Renderer {
     pub fn new(locale: Locale) -> Self {
@@ -1252,6 +1242,7 @@ impl Renderer {
             metal,
             text: String::with_capacity(256),
             fx: Fx::default(),
+            hits: Hits::default(),
         };
         renderer.upload();
         renderer
@@ -1288,6 +1279,10 @@ impl Renderer {
         }
     }
 
+    /// What the last frame drew that the pointer can hit.
+    pub fn hits(&self) -> &Hits {
+        &self.hits
+    }
     pub fn reset(&mut self) {
         self.fx = Fx::default();
     }
@@ -1395,7 +1390,10 @@ impl Renderer {
         // Texture readback is bottom-up; render flipped so the PNG is upright.
         camera.zoom.y = -camera.zoom.y;
         set_camera(&camera);
+        let hits = self.hits;
         self.frame(view.scale, game, ui, profile, 1.0, None);
+        // An offscreen capture is not what the player sees.
+        self.hits = hits;
         // SAFETY: main thread, between draw calls; executes the batched frame.
         unsafe { get_internal_gl() }.flush();
         target.texture.get_texture_data().export_png(path);
@@ -1419,6 +1417,8 @@ impl Renderer {
             device: ui.device,
             buffer: RefCell::new(std::mem::take(&mut self.text)),
             misfits: None,
+            hits: RefCell::default(),
+            motion: Shared::new((1.0, 0.0)),
         };
         // Painting the background into the scene batch, rather than with
         // `clear_background`, saves a full-framebuffer pass: Macroquad has
@@ -1432,6 +1432,7 @@ impl Renderer {
             v.cover(WHITE);
             gl_use_default_material();
         }
+        self.hits = v.hits.into_inner();
         self.text = v.buffer.into_inner();
     }
 }
@@ -1535,25 +1536,19 @@ fn scene(
     }
     let footer_error = ui.save_error && (ui.paused || stage != Stage::Playing);
     if ui.paused {
-        v.scrim();
-        pause(v, game, ui.choice, profile);
-        match v.device {
-            Device::Gamepad => {
-                let items = [
-                    pad(Glyph::A, TextId::ActionSelect),
-                    pad(Glyph::B, TextId::ActionResume),
-                    pad(Glyph::X, TextId::ActionRetry),
-                ];
-                v.footer(&[&items], footer_error);
-            }
-            Device::KeyboardMouse => v.footer(&[], footer_error),
-        }
+        sheet::dim(v, ui.sheet_open);
+        sheet::pause(v, ui, game);
+        v.footer(&[], footer_error);
     } else {
         match stage {
             Stage::Ready => ready(v, game),
-            Stage::Cleared => cleared(v, game, summary),
+            Stage::Cleared => {
+                sheet::dim(v, ui.sheet_open);
+                sheet::cleared(v, ui, game, summary);
+            }
             Stage::GameOver | Stage::Victory => {
-                results(v, game, profile, stage == Stage::Victory, ui.choice);
+                sheet::dim(v, ui.sheet_open);
+                sheet::results(v, ui, game, stage == Stage::Victory);
                 v.footer(&[], footer_error);
             }
             Stage::Playing => {}
@@ -1805,46 +1800,6 @@ fn balls(v: &Scene, fx: &Fx, game: &Game, alpha: f32) {
         v.circle(pos, RADIUS, INK);
     }
 }
-/// The pause card: where play stopped, the menu, what Retry does, and the
-/// settings keys at its foot. Everything stacks from the menu's top, which
-/// `ui` owns because the hit areas depend on it.
-fn pause(v: &Scene, game: &Game, focus: usize, profile: &Profile) {
-    let menu_at = ui::pause_menu();
-    let title = menu_at.top - GROUP;
-    let eyebrow = title - cap_height(Role::Title) - S12;
-    let top = eyebrow - cap_height(Role::Label) - PAD;
-    let text = PANEL;
-    let note = menu_at.bottom() + S16 + cap_height(Role::Caption);
-    let notes = v
-        .lines((TextId::RetryNote, &[]), Role::Caption, text)
-        .max(1);
-    // The settings keys are the panel's foot, set off by a rule. Key caps
-    // stand taller than the captions beside them by `reach` each side.
-    let options = options(profile, v.device);
-    let rule = note + (notes - 1) as f32 * leading(Role::Caption) + S24;
-    let reach = 12.0 - cap_height(Role::Caption) / 2.0;
-    let keys = rule + S16 + reach + cap_height(Role::Caption);
-    let rows = v.pack(&options, Role::Caption, text, |_, _| {});
-    let bottom = keys + (rows - 1) as f32 * FOOTER_LINE + reach + S16;
-    let left = WIDTH / 2.0 - PANEL_W / 2.0;
-    v.panel(left, top, PANEL_W, bottom - top);
-    v.rect(left, rule, PANEL_W, 1.0, BORDER);
-
-    let id = game.sector();
-    let chapter = id.sector().chapter;
-    let args = [Arg::Text(TextId::ChapterName(chapter)), Arg::Sector(id)];
-    let slot = |y| Slot::centered(WIDTH / 2.0, text, y);
-    let hue = sector_color(0, chapter);
-    v.say(TextId::ReadyEyebrow, &args, Role::Label, slot(eyebrow), hue);
-    v.say(TextId::Paused, &[], Role::Title, slot(title), INK);
-    menu(v, &menu_at, focus, None);
-    v.paragraph((TextId::RetryNote, &[]), Role::Caption, slot(note), 2, DIM);
-    let mut y = keys;
-    v.pack(&options, Role::Caption, text, |line, width| {
-        v.hint_line(line, width, y, DIM, Role::Caption);
-        y += FOOTER_LINE;
-    });
-}
 /// The eyebrow's baseline on the ready card; the rest stacks under it.
 const READY_TOP: f32 = 540.0;
 fn ready(v: &Scene, game: &Game) {
@@ -1919,26 +1874,16 @@ fn options(profile: &Profile, device: Device) -> [Item; 3] {
         },
     ]
 }
-/// The label of a menu action.
-fn action_label(action: Action) -> TextId {
-    match action {
-        Action::Continue => TextId::ContinueJourney,
-        Action::NewJourney => TextId::NewJourney,
-        Action::Sectors => TextId::SectorSelect,
-        Action::Resume => TextId::ActionResume,
-        Action::Retry => TextId::RetrySector,
-        Action::MainMenu => TextId::MainMenu,
-    }
-}
-/// Draws `menu` with `focus` on one row. `detail` is the Continue row's
-/// second line.
+/// Draws the title's `menu` with `focus` on one row, and records its rows
+/// for the pointer. `detail` is the Continue row's second line.
 fn menu(v: &Scene, menu: &Menu, focus: usize, detail: Option<(TextId, &[Arg])>) {
+    v.hits.borrow_mut().menu = Some(*menu);
     for (i, &action) in menu.actions.iter().enumerate() {
         let detail = detail.filter(|_| action == Action::Continue);
-        v.button(
-            menu.rect(i),
-            action_label(action),
-            &[],
+        sheet::row(
+            v,
+            menu.column(ui::TITLE_TOP, i),
+            (sheet::label(action, false), &[]),
             (i == 0, i == focus),
             detail,
         );
@@ -1969,9 +1914,10 @@ fn attract(v: &Scene, ui: &Ui, profile: &Profile) {
 
     // Progress: three label-value pairs spanning the menu's width. The
     // outer columns are wider: the best score is the longest figure.
-    let label = title.bottom() + SECTION + cap_height(Role::Label);
+    let last = title.column(ui::TITLE_TOP, title.actions.len() - 1);
+    let label = last.bottom() + SECTION + cap_height(Role::Label);
     let value = label + PAIR + cap_height(Role::Body);
-    let span = title.rect(0);
+    let span = title.column(ui::TITLE_TOP, 0);
     let (outer, middle) = (span.w * 0.36, span.w * 0.28);
     for (i, name) in [TextId::StatSectors, TextId::StatMedals, TextId::StatBest]
         .into_iter()
@@ -2269,40 +2215,6 @@ fn sector_detail(v: &Scene, id: SectorId, profile: &Profile) {
         );
     }
 }
-/// After the last life or the last sector: the outcome, what the run
-/// earned, and the menu with the way back in first. Stacked from the menu,
-/// whose place the hit areas fix.
-fn results(v: &Scene, game: &Game, profile: &Profile, victory: bool, focus: usize) {
-    v.scrim();
-    let menu_at = ui::result_menu(victory);
-    let pairs = menu_at.top - GROUP;
-    let title = pairs - cap_height(Role::Body) - S16;
-    let top = title - cap_height(Role::Title) - PAD;
-    let note = menu_at.bottom() + S16 + cap_height(Role::Caption);
-    let bottom = note + PAD;
-    v.panel(WIDTH / 2.0 - PANEL_W / 2.0, top, PANEL_W, bottom - top);
-    let line = |y| Slot::centered(WIDTH / 2.0, PANEL, y);
-    let heading = if victory {
-        TextId::JourneyComplete
-    } else {
-        TextId::OneMoreOrbit
-    };
-    v.say(heading, &[], Role::Title, line(title), INK);
-    v.pairs(
-        &[
-            (TextId::StatPoints, game.score()),
-            (TextId::StatMedals, profile.progress.medal_count()),
-        ],
-        pairs,
-        PANEL,
-    );
-    menu(v, &menu_at, focus, None);
-    v.say(TextId::ProgressSaved, &[], Role::Caption, line(note), DIM);
-}
-/// Distance between the sector-clear columns, and the widest a medal chip
-/// grows: three chips at most 152 wide leave at least 8 between them.
-const CLEAR_COLUMN: f32 = 160.0;
-const CHIP_MAX: f32 = 152.0;
 /// A medal as a pill, `w` wide from `x`: amber when earned, muted when not.
 fn medal_chip(v: &Scene, medal: TextId, (x, top, w): (f32, f32, f32), earned: bool) {
     let tone = if earned { AMBER } else { MUTED };
@@ -2316,83 +2228,6 @@ fn medal_chip(v: &Scene, medal: TextId, (x, top, w): (f32, f32, f32), earned: bo
         tone,
     );
 }
-/// The sector-clear card, stacked up from its one button, whose place the
-/// hit area fixes: the extra-life line, when there is one, grows the card
-/// upward instead of leaving a gap.
-fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
-    v.scrim();
-    let button = ui::next_rect();
-    let life = summary.life_earned.then_some(button.y - GROUP);
-    let chips = life.map_or(button.y, |y| y - cap_height(Role::Body)) - GROUP - S24;
-    let value = chips - GROUP;
-    let label = value - cap_height(Role::Body) - PAIR;
-    let title = label - cap_height(Role::Label) - GROUP;
-    let top = title - cap_height(Role::Title) - PAD;
-    let hint = button.y + button.h + S16 + cap_height(Role::Caption);
-    let bottom = hint + PAD;
-    v.panel(WIDTH / 2.0 - PANEL_W / 2.0, top, PANEL_W, bottom - top);
-    let line = |y| Slot::centered(WIDTH / 2.0, PANEL, y);
-    v.say(TextId::SectorClear, &[], Role::Title, line(title), INK);
-    for (i, name) in [TextId::StatTime, TextId::StatBonus, TextId::StatBestChain]
-        .into_iter()
-        .enumerate()
-    {
-        let x = WIDTH / 2.0 + (i as f32 - 1.0) * CLEAR_COLUMN;
-        v.say(
-            name,
-            &[],
-            Role::Label,
-            Slot::centered(x, CHIP_MAX, label),
-            DIM,
-        );
-        let at = Slot::centered(x, CHIP_MAX, value);
-        match i {
-            0 => {
-                let t = Figures::of(|f| write!(f, "{}", Clock(summary.ticks)));
-                v.put(t.as_str(), Role::Body, at, INK);
-            }
-            1 => v.say(
-                TextId::Plus,
-                &[Arg::Count(summary.bonus)],
-                Role::Body,
-                at,
-                INK,
-            ),
-            _ => {
-                let combo = Figures::count(v.locale, summary.best_combo);
-                v.put(combo.as_str(), Role::Body, at, INK);
-            }
-        }
-    }
-    for (i, medal) in [TextId::MedalClear, TextId::MedalClean, TextId::MedalSwift]
-        .into_iter()
-        .enumerate()
-    {
-        let x = WIDTH / 2.0 + (i as f32 - 1.0) * CLEAR_COLUMN;
-        let w = (v.width_of(medal, &[], Role::Label) + 2.0 * S16).min(CHIP_MAX);
-        let earned = summary.medals.contains(MEDAL_ORDER[i]);
-        medal_chip(v, medal, (x - w / 2.0, chips, w), earned);
-    }
-    if let Some(y) = life {
-        v.say(TextId::ExtraLife, &[], Role::Body, line(y), AMBER);
-    }
-    let next = if game.mode() == Mode::Practice {
-        TextId::BackToSectors
-    } else {
-        TextId::NextSector
-    };
-    v.button(button, next, &[], (true, true), None);
-    match v.device {
-        Device::KeyboardMouse => v.say(TextId::KeysContinue, &[], Role::Caption, line(hint), DIM),
-        Device::Gamepad => {
-            let items = [pad(Glyph::A, TextId::ActionContinue)];
-            v.pack(&items, Role::Caption, PANEL, |row, w| {
-                v.hint_line(row, w, hint, DIM, Role::Caption)
-            });
-        }
-    }
-}
-
 /// A short run of figures formatted on the stack, so drawing scores and
 /// times allocates nothing.
 struct Figures {
@@ -2527,5 +2362,6 @@ fn power_color(power: Power) -> Color {
 }
 
 mod frame;
+mod sheet;
 #[cfg(test)]
 mod tests;

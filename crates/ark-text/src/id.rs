@@ -50,7 +50,6 @@ text_ids! {
     KeysBrowse,
     KeysPlay,
     KeysBack,
-    KeysContinue,
     // Gamepad hints: a button glyph, then one of these.
     PadMove,
     PadBrowse,
@@ -59,10 +58,8 @@ text_ids! {
     ActionRelease,
     ActionSelect,
     ActionResume,
-    ActionRetry,
     ActionPlay,
     ActionBack,
-    ActionContinue,
 
     // Settings shortcuts.
     SoundOn,
@@ -96,21 +93,26 @@ text_ids! {
     Paused,
     RetrySector,
     MainMenu,
-    RetryNote,
     JourneyComplete,
     OneMoreOrbit,
     StatPoints,
-    ProgressSaved,
     SectorClear,
     StatTime,
     StatBonus,
-    StatBestChain,
+    StatChain,
     ExtraLife,
     NextSector,
     BackToSectors,
 
     SaveFailed,
     PerfTitle,
+
+    // Help for the focused action, one caption line under a sheet's list.
+    HelpResume,
+    HelpRetry,
+    HelpMainMenu,
+    HelpSectors,
+    HelpNewJourney,
 
 }
 
@@ -161,16 +163,16 @@ impl TextId {
         use TextId::*;
         match self {
             StatSectors | StatMedals | StatBest | MedalClear | MedalClean | MedalSwift
-            | ReadyEyebrow | StatPoints | StatTime | StatBonus | StatBestChain | ChapterName(_) => {
+            | ReadyEyebrow | StatPoints | StatTime | StatBonus | StatChain | ChapterName(_) => {
                 Role::Label
             }
             SectorsHeading | Paused | JourneyComplete | OneMoreOrbit | SectorClear => Role::Title,
             SectorName(_) => Role::Display,
             KeysMove | KeysServe | KeysPause | KeysRelease | KeysBrowse | KeysPlay | KeysBack
-            | KeysContinue | PadMove | PadBrowse | ActionServe | ActionPause | ActionRelease
-            | ActionSelect | ActionResume | ActionRetry | ActionPlay | ActionBack
-            | ActionContinue | SoundOn | SoundOff | Volume | Fullscreen | SaveFailed
-            | ContinueDetail | PracticeNote | RetryNote | ProgressSaved => Role::Caption,
+            | PadMove | PadBrowse | ActionServe | ActionPause | ActionRelease | ActionSelect
+            | ActionPlay | ActionBack | SoundOn | SoundOff | Volume | Fullscreen | SaveFailed
+            | ContinueDetail | PracticeNote | HelpResume | HelpRetry | HelpMainMenu
+            | HelpSectors | HelpNewJourney | ExtraLife => Role::Caption,
             _ => Role::Body,
         }
     }

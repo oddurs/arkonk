@@ -1,5 +1,7 @@
 use crate::{input::Device, render::WIDTH};
 use ark::{SectorSummary, Stage, sectors::SectorId};
+/// The most rows any menu has.
+const MAX_ROWS: usize = 8;
 use macroquad::prelude::{Rect, Vec2};
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
@@ -20,6 +22,79 @@ pub struct Ui {
     /// A stage to draw instead of the game's own, so the smoke test can
     /// capture screens that play would take minutes to reach.
     pub preview: Option<Preview>,
+    /// The sheet on screen, and for how many seconds it has been open: it
+    /// fades and rises in over its first moments.
+    pub sheet: Option<Sheet>,
+    pub sheet_open: f32,
+}
+
+/// A modal card over the field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sheet {
+    Pause,
+    Cleared,
+    GameOver,
+    Victory,
+}
+impl Ui {
+    /// The sheet this state shows over `stage`, if any.
+    pub fn sheet_for(&self, stage: Stage) -> Option<Sheet> {
+        if self.screen != Screen::Play {
+            return None;
+        }
+        if self.paused {
+            return Some(Sheet::Pause);
+        }
+        match stage {
+            Stage::Cleared => Some(Sheet::Cleared),
+            Stage::GameOver => Some(Sheet::GameOver),
+            Stage::Victory => Some(Sheet::Victory),
+            Stage::Ready | Stage::Playing => None,
+        }
+    }
+    /// Keeps the open sheet's age; a different sheet starts from zero.
+    pub fn track_sheet(&mut self, stage: Stage, seconds: f32) {
+        let sheet = self.sheet_for(stage);
+        if sheet == self.sheet {
+            self.sheet_open += seconds;
+        } else {
+            self.sheet = sheet;
+            self.sheet_open = 0.0;
+        }
+    }
+}
+
+/// Where the last frame drew what the pointer can hit, so a click lands
+/// on what the player saw, wherever the fit chain put it.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Hits {
+    /// The menu `rows` belong to.
+    pub menu: Option<Menu>,
+    rows: [Rect; MAX_ROWS],
+    count: usize,
+    /// A sheet's back glyph.
+    pub back: Option<Rect>,
+}
+impl Hits {
+    pub fn push(&mut self, row: Rect) {
+        if let Some(slot) = self.rows.get_mut(self.count) {
+            *slot = row;
+            self.count += 1;
+        }
+    }
+    pub fn rows(&self) -> &[Rect] {
+        &self.rows[..self.count]
+    }
+    /// The row of `menu` under `p`, when `menu` is the one drawn.
+    pub fn row_at(&self, menu: Menu, p: Vec2) -> Option<usize> {
+        if self.menu != Some(menu) {
+            return None;
+        }
+        self.rows().iter().position(|r| r.contains(p))
+    }
+    pub fn back_at(&self, p: Vec2) -> bool {
+        self.back.is_some_and(|r| r.contains(p))
+    }
 }
 
 /// A stage, and the results card to show with it, drawn in place of the
@@ -39,6 +114,9 @@ impl Default for Ui {
             save_error: false,
             device: Device::KeyboardMouse,
             preview: None,
+            sheet: None,
+            // Tests and captures draw sheets already in place.
+            sheet_open: f32::INFINITY,
         }
     }
 }
@@ -51,24 +129,26 @@ pub enum Action {
     Resume,
     Retry,
     MainMenu,
+    /// On to the next sector, or back to the sectors after practice.
+    Next,
 }
 
-/// A column of buttons. The first row is the screen's primary action and
+/// A list of actions. The first row is the screen's primary action and
 /// takes the focus when the menu opens. A menu lists only what can be done
 /// now, so rows, hit areas and focus steps all come from `actions`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Menu {
     pub actions: &'static [Action],
-    /// Top of the first row, in scene units.
-    pub top: f32,
 }
 
-/// Menu buttons: their width, the height of a one-line row, and the space
-/// between rows. The Continue row is taller: it carries a caption line.
+/// The title's menu column: its width, the height of a one-line row and
+/// of the Continue row with its caption, and the space between rows.
 pub const MENU_WIDTH: f32 = 432.0;
 pub const ROW: f32 = 48.0;
 pub const TALL_ROW: f32 = 64.0;
 pub const ROW_GAP: f32 = 8.0;
+/// The top of the title menu's first row.
+pub const TITLE_TOP: f32 = 352.0;
 
 impl Menu {
     fn height(&self, row: usize) -> f32 {
@@ -78,22 +158,15 @@ impl Menu {
             ROW
         }
     }
-    pub fn rect(&self, row: usize) -> Rect {
-        let y = self.top + (0..row).map(|r| self.height(r) + ROW_GAP).sum::<f32>();
+    /// A row of the menu laid out as a centred column from `top`.
+    pub fn column(&self, top: f32, row: usize) -> Rect {
+        let y = top + (0..row).map(|r| self.height(r) + ROW_GAP).sum::<f32>();
         Rect::new(
             WIDTH / 2.0 - MENU_WIDTH / 2.0,
             y,
             MENU_WIDTH,
             self.height(row),
         )
-    }
-    /// Where the last row ends.
-    pub fn bottom(&self) -> f32 {
-        let last = self.rect(self.actions.len() - 1);
-        last.y + last.h
-    }
-    pub fn hover(&self, mouse: Vec2) -> Option<usize> {
-        (0..self.actions.len()).find(|&i| self.rect(i).contains(mouse))
     }
     /// Moves the focus one row, wrapping at either end.
     pub fn step(&self, choice: usize, up: bool, down: bool) -> usize {
@@ -120,14 +193,12 @@ pub fn title_menu(saved: bool) -> Menu {
         } else {
             &[NewJourney, Sectors]
         },
-        top: 352.0,
     }
 }
 pub fn pause_menu() -> Menu {
     use Action::*;
     Menu {
         actions: &[Resume, Retry, MainMenu],
-        top: 384.0,
     }
 }
 /// After the last life or the last sector.
@@ -139,12 +210,13 @@ pub fn result_menu(victory: bool) -> Menu {
         } else {
             &[Retry, Sectors, MainMenu]
         },
-        top: 416.0,
     }
 }
 /// The single action on the sector-clear card.
-pub fn next_rect() -> Rect {
-    Rect::new(WIDTH / 2.0 - MENU_WIDTH / 2.0, 528.0, MENU_WIDTH, ROW)
+pub fn cleared_menu() -> Menu {
+    Menu {
+        actions: &[Action::Next],
+    }
 }
 pub fn back_rect() -> Rect {
     Rect::new(56.0, 46.0, 150.0, 36.0)
@@ -237,25 +309,46 @@ mod tests {
         assert_eq!(two.step(2, false, false), 1);
     }
     #[test]
-    fn every_row_is_hit_at_its_centre_and_rows_never_overlap() {
-        for menu in [
-            title_menu(false),
-            title_menu(true),
-            pause_menu(),
-            result_menu(true),
-        ] {
-            for row in 0..menu.actions.len() {
-                let r = menu.rect(row);
-                assert_eq!(menu.hover(r.center()), Some(row));
-                if row > 0 {
-                    let above = menu.rect(row - 1);
-                    assert_eq!(r.y - (above.y + above.h), ROW_GAP);
-                }
-            }
-            let below = menu.rect(menu.actions.len() - 1);
-            assert_eq!(menu.hover(Vec2::new(480.0, below.y + below.h + 1.0)), None);
+    fn rows_are_hit_only_for_the_menu_drawn() {
+        let mut hits = Hits {
+            menu: Some(pause_menu()),
+            ..Hits::default()
+        };
+        let menu = pause_menu();
+        for row in 0..menu.actions.len() {
+            hits.push(menu.column(100.0, row));
         }
-        assert_eq!(title_menu(true).rect(0).h, TALL_ROW);
+        for row in 0..menu.actions.len() {
+            let r = menu.column(100.0, row);
+            assert_eq!(hits.row_at(menu, r.center()), Some(row));
+        }
+        let below = menu.column(100.0, menu.actions.len() - 1);
+        assert_eq!(
+            hits.row_at(menu, Vec2::new(480.0, below.bottom() + 1.0)),
+            None
+        );
+        // A stale frame's rows never answer for another menu.
+        assert_eq!(
+            hits.row_at(title_menu(false), menu.column(100.0, 0).center()),
+            None
+        );
+    }
+    #[test]
+    fn a_new_sheet_opens_from_the_start() {
+        let mut ui = Ui {
+            screen: Screen::Play,
+            ..Ui::default()
+        };
+        ui.track_sheet(Stage::Playing, 0.5);
+        assert_eq!(ui.sheet, None);
+        ui.paused = true;
+        ui.track_sheet(Stage::Playing, 0.5);
+        assert_eq!((ui.sheet, ui.sheet_open), (Some(Sheet::Pause), 0.0));
+        ui.track_sheet(Stage::Playing, 0.1);
+        assert_eq!(ui.sheet_open, 0.1);
+        ui.paused = false;
+        ui.track_sheet(Stage::GameOver, 0.1);
+        assert_eq!((ui.sheet, ui.sheet_open), (Some(Sheet::GameOver), 0.0));
     }
     #[test]
     fn play_sits_in_the_detail_panel_below_the_grid() {
