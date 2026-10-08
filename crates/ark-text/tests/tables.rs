@@ -30,13 +30,18 @@ fn every_translation_has_the_sources_slots() {
         let numbered = source.iter().filter(|s| s.parse::<usize>().is_ok()).count();
         assert_eq!(numbered, id.arity(), "{id:?} in English");
         for locale in real_locales() {
-            for (form, text) in [
-                ("full", Some(template(locale, id))),
-                ("short", short_template(locale, id)),
-            ] {
-                let Some(text) = text else { continue };
-                assert!(!text.trim().is_empty(), "{locale:?} {id:?} {form} is blank");
-                assert_eq!(slots(text), source, "{locale:?} {id:?} {form}");
+            let full = template(locale, id);
+            assert!(!full.trim().is_empty(), "{locale:?} {id:?} is blank");
+            assert_eq!(slots(full), source, "{locale:?} {id:?}");
+            // A short form may leave a slot out to save room; it never adds one.
+            if let Some(short) = short_template(locale, id) {
+                assert!(!short.trim().is_empty(), "{locale:?} {id:?} short is blank");
+                let mut left = source.clone();
+                for slot in slots(short) {
+                    let at = left.iter().position(|&s| s == slot);
+                    let at = at.unwrap_or_else(|| panic!("{locale:?} {id:?} short adds {slot}"));
+                    left.remove(at);
+                }
             }
         }
     }
@@ -127,13 +132,18 @@ fn arguments_follow_each_languages_word_order() {
         format(Locale::Ja, TextId::PlaySector, &[Arg::Sector(sector)]),
         "セクター 03 をプレイ"
     );
+    let saved = [
+        Arg::Sector(sector),
+        Arg::Text(TextId::SectorName(sector)),
+        Arg::Count(2450),
+    ];
     assert_eq!(
-        format(
-            Locale::En,
-            TextId::SavedAt,
-            &[Arg::Sector(sector), Arg::Text(TextId::SectorName(sector))]
-        ),
-        "Saved at sector 03 · Slipstream"
+        format(Locale::En, TextId::ContinueDetail, &saved),
+        "Sector 03 · Slipstream · 2,450"
+    );
+    assert_eq!(
+        format(Locale::Ja, TextId::ContinueDetail, &saved),
+        "セクター 03・スリップストリーム・2,450"
     );
     assert_eq!(
         format(Locale::Fr, TextId::BestTime, &[Arg::Clock(83)]),

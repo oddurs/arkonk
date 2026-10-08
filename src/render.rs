@@ -54,11 +54,23 @@ const PALETTE: [Color; 7] = [
 /// The spacing scale, in scene units. Layouts step by these and nothing in
 /// between, so related things always sit visibly closer than unrelated ones.
 const S8: f32 = 8.0;
+const S16: f32 = 16.0;
 const S24: f32 = 24.0;
+const S48: f32 = 48.0;
 /// A label and its value, or a name and its detail.
 const PAIR: f32 = S8;
 /// Between the groups of one section, such as items of a hint row.
 const GROUP: f32 = S24;
+/// Between the sections of a screen.
+const SECTION: f32 = S48;
+
+/// The height of a role's capitals in scene units, as laid out. Gaps on
+/// the spacing scale run from one line's baseline to the next line's
+/// capitals, so a line's baseline is the one above plus gap plus this.
+fn cap_height(role: Role) -> f32 {
+    // Noto Sans capitals are 714 units of its 1000-unit em.
+    spec::style(role).0 * 0.714
+}
 
 /// Side margin for full-width text, and the widest a centred line may be.
 const MARGIN: f32 = 64.0;
@@ -711,12 +723,13 @@ impl Scene<'_> {
             x += w + GROUP;
         }
     }
-    /// Rows of hints stacked up from the bottom of the screen. A save
-    /// failure, when there is one, sits on top.
-    fn footer(&self, rows: &[(&[Item], Color)], save_error: bool) {
+    /// Rows of hints stacked up from the bottom of the screen, in the
+    /// caption tier. A save failure, when there is one, sits on top in ink:
+    /// it is the one footer line that is news.
+    fn footer(&self, rows: &[&[Item]], save_error: bool) {
         let count: usize = rows
             .iter()
-            .map(|(items, _)| self.pack(items, Role::Caption, |_, _| {}))
+            .map(|items| self.pack(items, Role::Caption, |_, _| {}))
             .sum::<usize>()
             + usize::from(save_error);
         if count > 4
@@ -731,12 +744,12 @@ impl Scene<'_> {
         }
         let mut y = FOOTER - (count.saturating_sub(1)) as f32 * FOOTER_LINE;
         if save_error {
-            self.say(TextId::SaveFailed, &[], Role::Caption, Slot::line(y), AMBER);
+            self.say(TextId::SaveFailed, &[], Role::Caption, Slot::line(y), INK);
             y += FOOTER_LINE;
         }
-        for &(items, color) in rows {
+        for &items in rows {
             self.pack(items, Role::Caption, |line, width| {
-                self.hint_line(line, width, y, color, Role::Caption);
+                self.hint_line(line, width, y, DIM, Role::Caption);
                 y += FOOTER_LINE;
             });
         }
@@ -774,21 +787,36 @@ impl Scene<'_> {
     }
     /// The screen's primary action is filled; every other action is plain
     /// text. The focused one, primary or not, gets a cyan edge and label.
-    fn button(&self, r: Rect, id: TextId, args: &[Arg], primary: bool, focused: bool) {
+    /// A `detail` caption sits under the label, inside the button.
+    fn button(
+        &self,
+        r: Rect,
+        id: TextId,
+        args: &[Arg],
+        (primary, focused): (bool, bool),
+        detail: Option<(TextId, &[Arg])>,
+    ) {
         if primary {
             self.rounded(r.x, r.y, r.w, r.h, 10.0, opacity(CYAN, 0.13));
         }
         if focused {
             self.outline(r, 10.0, 1.5, opacity(CYAN, 0.7));
         }
-        let baseline = r.y + r.h / 2.0 + self.cap(Role::Body) / 2.0;
-        self.say(
-            id,
-            args,
-            Role::Body,
-            Slot::centered(r.x + r.w / 2.0, r.w - 32.0, baseline),
-            if focused { CYAN } else { INK },
-        );
+        let color = if focused { CYAN } else { INK };
+        let line = |y| Slot::centered(r.x + r.w / 2.0, r.w - 2.0 * S16, y);
+        match detail {
+            None => {
+                let baseline = r.y + r.h / 2.0 + self.cap(Role::Body) / 2.0;
+                self.say(id, args, Role::Body, line(baseline), color);
+            }
+            Some((detail, detail_args)) => {
+                let block = cap_height(Role::Body) + PAIR + cap_height(Role::Caption);
+                let name = r.y + (r.h - block) / 2.0 + cap_height(Role::Body);
+                self.say(id, args, Role::Body, line(name), color);
+                let below = name + PAIR + cap_height(Role::Caption);
+                self.say(detail, detail_args, Role::Caption, line(below), DIM);
+            }
+        }
     }
     fn logo(&self, x: f32, y: f32, cell: f32) {
         for (letter, character) in "ARKONK".chars().enumerate() {
@@ -1234,7 +1262,7 @@ fn scene(
             Slot::centered(WIDTH / 2.0, PANEL, 342.0),
             INK,
         );
-        menu(v, &ui::pause_menu(), ui.choice);
+        menu(v, &ui::pause_menu(), ui.choice, None);
         let note = Slot::centered(WIDTH / 2.0, PANEL, 576.0);
         v.paragraph(TextId::RetryNote, Role::Body, note, 2, DIM);
         match v.device {
@@ -1244,9 +1272,9 @@ fn scene(
                     pad(Glyph::B, TextId::ActionResume),
                     pad(Glyph::X, TextId::ActionRetry),
                 ];
-                v.footer(&[(&items, DIM)], footer_error);
+                v.footer(&[&items], footer_error);
             }
-            Device::KeyboardMouse => v.footer(&[(&options(profile, v.device), DIM)], footer_error),
+            Device::KeyboardMouse => v.footer(&[&options(profile, v.device)], footer_error),
         }
     } else {
         match stage {
@@ -1275,7 +1303,12 @@ fn scene(
                     368.0,
                     PANEL,
                 );
-                menu(v, &ui::result_menu(stage == Stage::Victory), ui.choice);
+                menu(
+                    v,
+                    &ui::result_menu(stage == Stage::Victory),
+                    ui.choice,
+                    None,
+                );
                 v.say(
                     TextId::ProgressSaved,
                     &[],
@@ -1694,64 +1727,74 @@ fn action_label(action: Action) -> TextId {
         Action::MainMenu => TextId::MainMenu,
     }
 }
-fn menu(v: &Scene, menu: &Menu, focus: usize) {
+/// Draws `menu` with `focus` on one row. `detail` is the Continue row's
+/// second line.
+fn menu(v: &Scene, menu: &Menu, focus: usize, detail: Option<(TextId, &[Arg])>) {
     for (i, &action) in menu.actions.iter().enumerate() {
-        v.button(menu.rect(i), action_label(action), &[], i == 0, i == focus);
+        let detail = detail.filter(|_| action == Action::Continue);
+        v.button(
+            menu.rect(i),
+            action_label(action),
+            &[],
+            (i == 0, i == focus),
+            detail,
+        );
     }
 }
+
+/// The logo's top edge and cell size; the title stacks down from it.
+const LOGO_TOP: f32 = 184.0;
+const LOGO_CELL: f32 = 12.0;
 fn attract(v: &Scene, ui: &Ui, profile: &Profile) {
-    v.logo(270.0, 170.0, 12.0);
-    v.say(TextId::Tagline, &[], Role::Body, Slot::line(300.0), DIM);
-    let saved = profile.progress.checkpoint().is_some();
-    menu(v, &ui::title_menu(saved), ui.choice);
-    match profile.progress.checkpoint() {
-        Some(c) => {
-            let args = [
-                Arg::Sector(c.sector),
-                Arg::Text(TextId::SectorName(c.sector)),
-            ];
-            v.say(TextId::SavedAt, &args, Role::Body, Slot::line(590.0), DIM);
-        }
-        None => v.say(
-            TextId::JourneyIntro,
-            &[],
-            Role::Body,
-            Slot::line(590.0),
-            DIM,
-        ),
-    }
-    for (i, label) in [TextId::StatSectors, TextId::StatMedals, TextId::StatBest]
+    v.logo(270.0, LOGO_TOP, LOGO_CELL);
+    let tagline = LOGO_TOP + 7.0 * LOGO_CELL + GROUP + cap_height(Role::Body);
+    v.say(TextId::Tagline, &[], Role::Body, Slot::line(tagline), DIM);
+    let saved = profile.progress.checkpoint();
+    let title = ui::title_menu(saved.is_some());
+    // Where the journey stands belongs on the button that resumes it.
+    let detail = saved.map(|c| {
+        [
+            Arg::Sector(c.sector),
+            Arg::Text(TextId::SectorName(c.sector)),
+            Arg::Count(c.score),
+        ]
+    });
+    let detail = detail
+        .as_ref()
+        .map(|args| (TextId::ContinueDetail, &args[..]));
+    menu(v, &title, ui.choice, detail);
+
+    // Progress: three label-value pairs spanning the menu's width. The
+    // outer columns are wider: the best score is the longest figure.
+    let label = title.bottom() + SECTION + cap_height(Role::Label);
+    let value = label + PAIR + cap_height(Role::Body);
+    let span = title.rect(0);
+    let (outer, middle) = (span.w * 0.36, span.w * 0.28);
+    for (i, name) in [TextId::StatSectors, TextId::StatMedals, TextId::StatBest]
         .into_iter()
         .enumerate()
     {
-        // Wide enough for the largest possible best score at body size.
-        let x = WIDTH / 2.0 + (i as f32 - 1.0) * 180.0;
-        v.say(
-            label,
-            &[],
-            Role::Label,
-            Slot::centered(x, 170.0, 668.0),
-            DIM,
-        );
-        let value = Slot::centered(x, 170.0, 698.0);
+        let slot = |y| match i {
+            0 => Slot::left(span.x, outer, y),
+            1 => Slot::centered(WIDTH / 2.0, middle, y),
+            _ => Slot::right(span.x + span.w, outer, y),
+        };
+        v.say(name, &[], Role::Label, slot(label), DIM);
+        let total = |n: u32| [Arg::Count(n), Arg::Count(SECTOR_COUNT as u32 * n)];
         match i {
             0 => {
-                let args = [
-                    Arg::Count(profile.progress.unlocked_count() as u32),
-                    Arg::Count(SECTOR_COUNT as u32),
-                ];
-                v.say(TextId::Fraction, &args, Role::Body, value, INK);
+                let mut args = total(1);
+                args[0] = Arg::Count(profile.progress.unlocked_count() as u32);
+                v.say(TextId::Fraction, &args, Role::Body, slot(value), INK);
             }
             1 => {
-                let args = [
-                    Arg::Count(profile.progress.medal_count()),
-                    Arg::Count(SECTOR_COUNT as u32 * 3),
-                ];
-                v.say(TextId::Fraction, &args, Role::Body, value, INK);
+                let mut args = total(3);
+                args[0] = Arg::Count(profile.progress.medal_count());
+                v.say(TextId::Fraction, &args, Role::Body, slot(value), INK);
             }
             _ => {
                 let best = Figures::count(v.locale, profile.progress.best_score());
-                v.put(best.as_str(), Role::Body, value, INK);
+                v.put(best.as_str(), Role::Body, slot(value), INK);
             }
         }
     }
@@ -1772,7 +1815,7 @@ fn attract(v: &Scene, ui: &Ui, profile: &Profile) {
         ],
     };
     let options = options(profile, v.device);
-    v.footer(&[(&hints, DIM), (&options, MUTED)], ui.save_error);
+    v.footer(&[&hints, &options], ui.save_error);
 }
 fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
     let back = ui::back_rect();
@@ -1980,8 +2023,8 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
             play,
             TextId::PlaySector,
             &[Arg::Sector(ui.sector)],
-            true,
-            true,
+            (true, true),
+            None,
         );
     } else {
         let baseline = play.y + play.h / 2.0 + v.cap(Role::Body) / 2.0;
@@ -2000,7 +2043,7 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
             pad(Glyph::B, TextId::ActionBack),
         ],
     };
-    v.footer(&[(&hints, MUTED)], ui.save_error);
+    v.footer(&[&hints], ui.save_error);
 }
 /// Distance between the sector-clear columns, and the widest a medal chip
 /// grows: three chips at most 136 wide leave at least 14 between them.
@@ -2088,7 +2131,7 @@ fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
     } else {
         TextId::NextSector
     };
-    v.button(ui::next_rect(), next, &[], true, true);
+    v.button(ui::next_rect(), next, &[], (true, true), None);
     match v.device {
         Device::KeyboardMouse => v.say(
             TextId::KeysContinue,

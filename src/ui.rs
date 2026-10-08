@@ -65,7 +65,7 @@ pub struct Menu {
 
 /// Menu buttons: their width, the height of a one-line row, and the space
 /// between rows. The Continue row is taller: it carries a caption line.
-pub const MENU_WIDTH: f32 = 400.0;
+pub const MENU_WIDTH: f32 = 432.0;
 pub const ROW: f32 = 48.0;
 pub const TALL_ROW: f32 = 64.0;
 pub const ROW_GAP: f32 = 8.0;
@@ -86,6 +86,11 @@ impl Menu {
             MENU_WIDTH,
             self.height(row),
         )
+    }
+    /// Where the last row ends.
+    pub fn bottom(&self) -> f32 {
+        let last = self.rect(self.actions.len() - 1);
+        last.y + last.h
     }
     pub fn hover(&self, mouse: Vec2) -> Option<usize> {
         (0..self.actions.len()).find(|&i| self.rect(i).contains(mouse))
@@ -115,7 +120,7 @@ pub fn title_menu(saved: bool) -> Menu {
         } else {
             &[NewJourney, Sectors]
         },
-        top: 380.0,
+        top: 352.0,
     }
 }
 pub fn pause_menu() -> Menu {

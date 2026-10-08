@@ -12,8 +12,7 @@ pub(super) fn text(id: TextId) -> &'static str {
         ContinueJourney => "继续旅程",
         NewJourney => "新的旅程",
         SectorSelect => "选择星区",
-        SavedAt => "存档位置：星区 {0} · {1}",
-        JourneyIntro => "三个篇章，十二个星区",
+        ContinueDetail => "星区 {0} · {1} · {2}",
         StatSectors => "星区",
         StatMedals => "奖章",
         StatBest => "最高分",
@@ -96,6 +95,7 @@ pub(super) fn text(id: TextId) -> &'static str {
 
 pub(super) fn short(id: TextId) -> Option<&'static str> {
     match id {
+        ContinueDetail => Some("{1} · {2}"),
         ContinueJourney => Some("继续"),
         ClearPreviousFirst => Some("未解锁"),
         _ => None,

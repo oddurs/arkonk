@@ -12,8 +12,7 @@ pub(super) fn text(id: TextId) -> &'static str {
         ContinueJourney => "旅を続ける",
         NewJourney => "新しい旅",
         SectorSelect => "セクター選択",
-        SavedAt => "セーブ地点：セクター {0}・{1}",
-        JourneyIntro => "3つの章、12のセクター",
+        ContinueDetail => "セクター {0}・{1}・{2}",
         StatSectors => "セクター",
         StatMedals => "メダル",
         StatBest => "ベスト",
@@ -96,6 +95,7 @@ pub(super) fn text(id: TextId) -> &'static str {
 
 pub(super) fn short(id: TextId) -> Option<&'static str> {
     match id {
+        ContinueDetail => Some("{1}・{2}"),
         ContinueJourney => Some("続ける"),
         ClearPreviousFirst => Some("ロック中"),
         _ => None,

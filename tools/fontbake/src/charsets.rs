@@ -83,7 +83,10 @@ fn strings(locale: Locale) -> Result<Vec<(Role, String)>, String> {
                     mark as u32
                 ));
             }
-            out.push((id.role(), s));
+            out.push((id.role(), s.clone()));
+            if let Some(role) = id.quoted_as() {
+                out.push((role, s));
+            }
         }
     }
     Ok(out)

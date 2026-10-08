@@ -33,9 +33,9 @@ text_ids! {
     ContinueJourney,
     NewJourney,
     SectorSelect,
-    /// `{0}` sector number, `{1}` sector name.
-    SavedAt,
-    JourneyIntro,
+    /// The second line of the Continue button: `{0}` the saved sector's
+    /// number, `{1}` its name, `{2}` the score saved with it.
+    ContinueDetail,
     StatSectors,
     StatMedals,
     StatBest,
@@ -155,7 +155,8 @@ impl TextId {
     pub const fn arity(self) -> usize {
         use TextId::*;
         match self {
-            SavedAt | Fraction | ReadyEyebrow => 2,
+            ContinueDetail => 3,
+            Fraction | ReadyEyebrow => 2,
             Volume | SwiftTarget | BestTime | PlaySector | SectorNumber | PracticeNumber | Plus => {
                 1
             }
@@ -174,10 +175,20 @@ impl TextId {
             KeysMove | KeysServe | KeysPause | KeysRelease | KeysBrowse | KeysPlay | KeysBack
             | KeysContinue | PadMove | PadBrowse | ActionServe | ActionPause | ActionRelease
             | ActionSelect | ActionResume | ActionRetry | ActionPlay | ActionBack
-            | ActionContinue | SoundOn | SoundOff | Volume | Fullscreen | SaveFailed => {
-                Role::Caption
-            }
+            | ActionContinue | SoundOn | SoundOff | Volume | Fullscreen | SaveFailed
+            | ContinueDetail => Role::Caption,
             _ => Role::Body,
+        }
+    }
+
+    /// The role of another string that quotes this one through an
+    /// [`crate::Arg::Text`] slot, when that differs from [`Self::role`]:
+    /// the Continue button's caption names the saved sector. The atlases
+    /// bake the quoted characters at that role's sizes too.
+    pub const fn quoted_as(self) -> Option<Role> {
+        match self {
+            TextId::SectorName(_) => Some(Role::Caption),
+            _ => None,
         }
     }
 }

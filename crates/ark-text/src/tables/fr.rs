@@ -12,8 +12,7 @@ pub(super) fn text(id: TextId) -> &'static str {
         ContinueJourney => "Poursuivre le voyage",
         NewJourney => "Nouveau voyage",
         SectorSelect => "Choix du secteur",
-        SavedAt => "Sauvegardé au secteur {0} · {1}",
-        JourneyIntro => "Douze secteurs en trois chapitres",
+        ContinueDetail => "Secteur {0} · {1} · {2}",
         StatSectors => "SECTEURS",
         StatMedals => "MÉDAILLES",
         StatBest => "RECORD",
@@ -96,6 +95,7 @@ pub(super) fn text(id: TextId) -> &'static str {
 
 pub(super) fn short(id: TextId) -> Option<&'static str> {
     match id {
+        ContinueDetail => Some("{1} · {2}"),
         ContinueJourney => Some("Continuer"),
         ClearPreviousFirst => Some("Verrouillé"),
         _ => None,

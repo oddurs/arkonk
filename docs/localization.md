@@ -86,6 +86,12 @@ fixed-length arrays for the same reason. `es-419` deliberately falls back to
   minimum grouping digits of 2). Times are `mm:ss` everywhere.
 - **Short forms.** `short` in a table gives a narrower wording, used only
   when the full one does not fit (for example `Continue journey` → `Continue`).
+  A short form may leave a slot out (the Continue button's caption drops the
+  sector number and keeps the name); it never adds one.
+- **Quoted strings.** A slot filled with another string (`Arg::Text`) sets
+  that string in the quoting string's role. Sector names are quoted in a
+  caption, so `TextId::quoted_as` tells the baker to bake them at caption
+  sizes too; a new quotation in a new role needs an entry there.
 - **Precomposed text only.** Strings must be NFC with no combining marks: the
   atlases hold whole glyphs and do no mark positioning. The baker refuses
   anything else.
