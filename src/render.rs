@@ -4,7 +4,7 @@ use crate::{
     perf::Perf,
     pixel_font,
     storage::Profile,
-    ui::{self, Action, Hits, Menu, Screen, Ui},
+    ui::{self, Action, Hits, Menu, Pressed, Prompt, Screen, Ui},
 };
 use ark::{
     Events, Game, Medals, Mode, Power, SectorSummary, Stage,
@@ -88,6 +88,8 @@ struct Style {
     role: Role,
     strong: bool,
     size: f32,
+    /// Letter spacing in em; the role's own unless set otherwise.
+    tracking: f32,
 }
 impl From<Role> for Style {
     fn from(role: Role) -> Self {
@@ -95,6 +97,7 @@ impl From<Role> for Style {
             role,
             strong: false,
             size: spec::style(role).0,
+            tracking: spec::style(role).2,
         }
     }
 }
@@ -107,6 +110,13 @@ impl Style {
     }
     fn sized(self, size: f32) -> Self {
         Self { size, ..self }
+    }
+    /// Set solid, as a key's label is.
+    fn untracked(self) -> Self {
+        Self {
+            tracking: 0.0,
+            ..self
+        }
     }
     fn weight(self) -> Weight {
         if self.strong {
@@ -361,6 +371,10 @@ struct Scene<'a> {
     /// Physical pixels per scene unit.
     density: f32,
     device: Device,
+    /// The mouse, not the keyboard, has been driving the paddle.
+    mouse: bool,
+    /// Glyphs whose input just fired.
+    pressed: Pressed,
     buffer: RefCell<String>,
     misfits: Option<&'a RefCell<Vec<Misfit>>>,
     /// What this frame drew that the pointer can hit.
@@ -702,7 +716,7 @@ impl Scene<'_> {
         let style = style.into();
         match self.face(style, text) {
             Face::Noto(ppem) => {
-                let tracking = self.fonts.tracking(spec::style(style.role).2, ppem);
+                let tracking = self.fonts.tracking(style.tracking, ppem);
                 self.fonts.measure(text, style.weight(), ppem, tracking) / self.density
             }
             Face::Pixel(cell) => {
@@ -741,7 +755,7 @@ impl Scene<'_> {
         match self.face(style, text) {
             Face::Noto(ppem) => {
                 let weight = style.weight();
-                let tracking = self.fonts.tracking(spec::style(style.role).2, ppem);
+                let tracking = self.fonts.tracking(style.tracking, ppem);
                 self.fonts.layout(text, weight, ppem, tracking, |p| {
                     if let Some(power) = icon_power(p.c) {
                         let x = (ox + p.x.round()) / d;
@@ -844,7 +858,7 @@ impl Scene<'_> {
         let style = style.into();
         self.format(id, args, Form::Full, |text| match self.face(style, text) {
             Face::Noto(ppem) => {
-                let tracking = self.fonts.tracking(spec::style(style.role).2, ppem);
+                let tracking = self.fonts.tracking(style.tracking, ppem);
                 let room = width * self.density;
                 self.fonts
                     .wrap(text, style.weight(), ppem, tracking, room, |_| {})
@@ -882,7 +896,7 @@ impl Scene<'_> {
             };
             match self.face(style, text) {
                 Face::Noto(ppem) => {
-                    let tracking = self.fonts.tracking(spec::style(style.role).2, ppem);
+                    let tracking = self.fonts.tracking(style.tracking, ppem);
                     let room = slot.w * self.density;
                     self.fonts
                         .wrap(text, style.weight(), ppem, tracking, room, line);
@@ -899,7 +913,6 @@ impl Scene<'_> {
 
     fn cap_width(&self, cap: Cap) -> f32 {
         match cap {
-            Cap::Key(label) => (self.measure(label, Role::Label) + 12.0).max(24.0),
             Cap::Pad(Glyph::Start) => 30.0,
             Cap::Pad(_) => 22.0,
         }
@@ -909,12 +922,6 @@ impl Scene<'_> {
         let w = self.cap_width(cap);
         let cy = baseline - self.cap(beside) / 2.0;
         match cap {
-            Cap::Key(label) => {
-                self.rounded(x, cy - 12.0, w, 24.0, 6.0, BORDER);
-                self.rounded(x + 1.0, cy - 11.0, w - 2.0, 22.0, 5.0, RAISED);
-                let y = cy + self.cap(Role::Label) / 2.0;
-                self.put(label, Role::Label, Slot::centered(x + w / 2.0, w, y), INK);
-            }
             Cap::Pad(Glyph::Start) => {
                 self.rounded(x, cy - 10.0, w, 20.0, 10.0, DIM);
                 for dy in [-4.0, 0.0, 4.0] {
@@ -1116,7 +1123,6 @@ enum Glyph {
 /// What sits before a hint: a keyboard key or a gamepad button.
 #[derive(Clone, Copy, PartialEq)]
 enum Cap {
-    Key(&'static str),
     Pad(Glyph),
 }
 /// One hint: an optional cap, then text.
@@ -1415,6 +1421,8 @@ impl Renderer {
             locale: self.kind.locale,
             density,
             device: ui.device,
+            mouse: ui.mouse,
+            pressed: ui.pressed,
             buffer: RefCell::new(std::mem::take(&mut self.text)),
             misfits: None,
             hits: RefCell::default(),
@@ -1508,21 +1516,10 @@ fn scene(
     }
     if !ui.paused && stage == Stage::Playing {
         if game.balls().iter().any(|b| b.active && b.held) {
-            match v.device {
-                Device::KeyboardMouse => v.say(
-                    TextId::KeysRelease,
-                    &[],
-                    Role::Body,
-                    Slot::line(720.0),
-                    CYAN,
-                ),
-                Device::Gamepad => {
-                    let items = [pad(Glyph::A, TextId::ActionRelease)];
-                    v.pack(&items, Role::Body, FULL, |line, w| {
-                        v.hint_line(line, w, 720.0, CYAN, Role::Body)
-                    });
-                }
-            }
+            let words = (TextId::ActionRelease, Role::Body.into());
+            let w = chips::prompt_width(v, Prompt::Serve, words, sheet::CHIP);
+            let at = (v.snap(WIDTH / 2.0 - w / 2.0), 720.0);
+            chips::prompt(v, Prompt::Serve, words, at, sheet::CHIP, CYAN);
         }
         if game.effects().notice_ticks > 0
             && let Some(power) = game.effects().notice
@@ -1831,15 +1828,10 @@ fn ready(v: &Scene, game: &Game) {
     let last = tip + lines.saturating_sub(1) as f32 * LINE;
     // The one inline hint: what to do next, in the interactive colour.
     let y = last + GROUP + cap_height(Role::Body);
-    match v.device {
-        Device::KeyboardMouse => v.say(TextId::KeysServe, &[], Role::Body, Slot::line(y), CYAN),
-        Device::Gamepad => {
-            let items = [pad(Glyph::A, TextId::ActionServe)];
-            v.pack(&items, Role::Body, FULL, |line, w| {
-                v.hint_line(line, w, y, CYAN, Role::Body)
-            });
-        }
-    }
+    let words = (TextId::ActionServe, Role::Body.into());
+    let w = chips::prompt_width(v, Prompt::Serve, words, sheet::CHIP);
+    let at = (v.snap(WIDTH / 2.0 - w / 2.0), v.snap(y));
+    chips::prompt(v, Prompt::Serve, words, at, sheet::CHIP, CYAN);
     let start = game.balls()[0].pos;
     let direction = game.launch_velocity().normalized();
     for i in 1..=5 {
@@ -1929,7 +1921,7 @@ fn attract(v: &Scene, ui: &Ui, profile: &Profile) {
             hint(TextId::KeysServe),
             hint(TextId::KeysPause),
         ],
-        Device::Gamepad => [
+        Device::Gamepad(_) => [
             hint(TextId::PadMove),
             pad(Glyph::A, TextId::ActionServe),
             Item {
@@ -1963,7 +1955,7 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
             let slot = Slot::left(back.x + 28.0, back.w - 38.0, baseline);
             v.say(TextId::ActionBack, &[], Role::Body, slot, DIM);
         }
-        Device::Gamepad => {
+        Device::Gamepad(_) => {
             v.cap_glyph(Cap::Pad(Glyph::B), back.x + 10.0, baseline, Role::Body);
             let slot = Slot::left(back.x + 40.0, back.w - 50.0, baseline);
             v.say(TextId::ActionBack, &[], Role::Body, slot, DIM);
@@ -1997,7 +1989,7 @@ fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
             hint(TextId::KeysPlay),
             hint(TextId::KeysBack),
         ],
-        Device::Gamepad => [
+        Device::Gamepad(_) => [
             hint(TextId::PadBrowse),
             pad(Glyph::A, TextId::ActionPlay),
             pad(Glyph::B, TextId::ActionBack),
@@ -2336,6 +2328,7 @@ fn power_color(power: Power) -> Color {
     }
 }
 
+mod chips;
 mod frame;
 mod sheet;
 #[cfg(test)]

@@ -75,6 +75,8 @@ pub(super) fn text(id: TextId) -> &'static str {
         DisplayWindow => "Ventana",
         LanguageSystem => "Sistema",
         ActionAdjust => "Ajustar",
+        KeySpace => "Espacio",
+        KeyEsc => "Esc",
         SectorName(s) => NAMES[s.index()],
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {

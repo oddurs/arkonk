@@ -8,19 +8,40 @@ use gilrs::{Axis, Button, EventType, Gilrs};
 pub enum Device {
     #[default]
     KeyboardMouse,
-    Gamepad,
+    Gamepad(Pad),
+}
+/// Which face-button glyphs a pad shows. Steam Deck and Steam Input
+/// present the Xbox layout, which is also the default for unknown pads.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Pad {
+    #[default]
+    Xbox,
+    PlayStation,
+}
+impl Pad {
+    /// Sony's USB vendor id marks a PlayStation pad.
+    pub fn from_vendor(vendor: Option<u16>) -> Self {
+        if vendor == Some(0x054C) {
+            Pad::PlayStation
+        } else {
+            Pad::Xbox
+        }
+    }
 }
 impl Device {
     /// Explicit input decides; a frame with both keeps the current device so
     /// prompts never flicker. Losing the last pad hands control back to the
     /// pointer, otherwise the cursor would stay hidden with nothing to drive it.
-    pub fn next(self, pointer: bool, pad: bool, pads_connected: bool) -> Self {
+    pub fn next(self, pointer: bool, pad: Option<Pad>, pads_connected: bool) -> Self {
         match (pointer, pad) {
-            (false, true) => Self::Gamepad,
-            (true, false) => Self::KeyboardMouse,
-            (false, false) if !pads_connected => Self::KeyboardMouse,
+            (false, Some(pad)) => Self::Gamepad(pad),
+            (true, None) => Self::KeyboardMouse,
+            (false, None) if !pads_connected => Self::KeyboardMouse,
             _ => self,
         }
+    }
+    pub fn is_pad(self) -> bool {
+        matches!(self, Self::Gamepad(_))
     }
 }
 
@@ -176,18 +197,19 @@ impl Gamepads {
     /// background, because gamepads keep reporting regardless of focus.
     pub fn poll(&mut self, dt: f64, focused: bool, menu_open: bool, pointer: bool) -> PadFrame {
         let Some(gilrs) = &mut self.gilrs else {
-            self.device = self.device.next(pointer, false, false);
+            self.device = self.device.next(pointer, None, false);
             return PadFrame::default();
         };
         let mut pressed = Presses::default();
         let mut tapped = None;
-        let mut activity = false;
+        // The pad touched this frame, by its family.
+        let mut activity = None;
         let mut disconnected = false;
         // Every event must be drained, even unfocused, or gilrs' state goes stale.
         while let Some(event) = gilrs.next_event() {
             match event.event {
                 EventType::ButtonPressed(button, _) if focused => {
-                    activity = true;
+                    activity = Some(Pad::from_vendor(gilrs.gamepad(event.id).vendor_id()));
                     match button {
                         Button::South => pressed.south = true,
                         Button::East => pressed.east = true,
@@ -221,7 +243,9 @@ impl Gamepads {
                 axis = pad_axis;
             }
             let stick = stick_dir(x, y);
-            activity |= stick.is_some();
+            if stick.is_some() {
+                activity = Some(Pad::from_vendor(pad.vendor_id()));
+            }
             held = held.or_else(|| {
                 [
                     (Button::DPadUp, Dir::Up),
@@ -235,7 +259,7 @@ impl Gamepads {
                 .or(stick)
             });
         }
-        let lost = disconnected && self.device == Device::Gamepad;
+        let lost = disconnected && self.device.is_pad();
         self.device = self.device.next(pointer, activity, connected);
         let step = self.repeat.update(held.or(tapped), dt);
         PadFrame {
@@ -323,13 +347,27 @@ mod tests {
     #[test]
     fn device_follows_the_last_input() {
         use Device::*;
-        assert_eq!(KeyboardMouse.next(false, true, true), Gamepad);
-        assert_eq!(Gamepad.next(true, false, true), KeyboardMouse);
-        assert_eq!(Gamepad.next(false, false, true), Gamepad);
-        assert_eq!(KeyboardMouse.next(false, false, true), KeyboardMouse);
-        assert_eq!(Gamepad.next(true, true, true), Gamepad);
-        assert_eq!(KeyboardMouse.next(true, true, true), KeyboardMouse);
-        assert_eq!(Gamepad.next(false, false, false), KeyboardMouse);
+        let (xbox, ps) = (Gamepad(Pad::Xbox), Gamepad(Pad::PlayStation));
+        assert_eq!(KeyboardMouse.next(false, Some(Pad::Xbox), true), xbox);
+        assert_eq!(xbox.next(true, None, true), KeyboardMouse);
+        assert_eq!(xbox.next(false, None, true), xbox);
+        assert_eq!(KeyboardMouse.next(false, None, true), KeyboardMouse);
+        assert_eq!(xbox.next(true, Some(Pad::Xbox), true), xbox);
+        assert_eq!(
+            KeyboardMouse.next(true, Some(Pad::Xbox), true),
+            KeyboardMouse
+        );
+        assert_eq!(xbox.next(false, None, false), KeyboardMouse);
+        // Touching another pad switches every glyph to its family.
+        assert_eq!(xbox.next(false, Some(Pad::PlayStation), true), ps);
+    }
+
+    #[test]
+    fn sony_pads_show_playstation_glyphs() {
+        assert_eq!(Pad::from_vendor(Some(0x054C)), Pad::PlayStation);
+        assert_eq!(Pad::from_vendor(Some(0x045E)), Pad::Xbox);
+        assert_eq!(Pad::from_vendor(Some(0x28DE)), Pad::Xbox);
+        assert_eq!(Pad::from_vendor(None), Pad::Xbox);
     }
 
     #[test]

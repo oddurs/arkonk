@@ -50,6 +50,9 @@ text_ids! {
     KeysBrowse,
     KeysPlay,
     KeysBack,
+    // Key names on keycap glyphs.
+    KeySpace,
+    KeyEsc,
     // Gamepad hints: a button glyph, then one of these.
     PadMove,
     PadBrowse,
@@ -194,6 +197,8 @@ impl TextId {
             SectorName(_) => &[Role::Title, Role::Caption],
             Plus | Fraction => &[Role::Figure],
             Settings => &[Role::Title],
+            // Keycaps set their names in the Label cut, untracked.
+            KeySpace | KeyEsc => &[Role::Label],
             _ => &[],
         }
     }

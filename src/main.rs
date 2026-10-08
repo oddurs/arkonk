@@ -31,14 +31,14 @@ use ark::{
 };
 use ark_text::Locale;
 use audio::Audio;
-use input::{Device, Gamepads};
+use input::{Device, Gamepads, Pad};
 use macroquad::prelude::*;
 use perf::Perf;
 use render::Renderer;
 use std::{path::PathBuf, time::Instant};
 use steam::Steam;
 use storage::{Origin, Profile};
-use ui::{Action, Controls, Preview, Screen, Ui};
+use ui::{Action, Controls, Preview, Prompt, Screen, Ui};
 
 /// A results card for screens the smoke test shows without playing to them.
 fn preview(stage: Stage) -> Option<Preview> {
@@ -352,6 +352,19 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             input::merge(Controls::read(), pad.controls)
         };
         focus.lost |= focus_lost || pad.lost;
+        // Glyphs flash pressed as their input fires.
+        ui.pressed.tick(frame_seconds as f32);
+        for (fired, prompt) in [
+            (confirm || click, Prompt::Serve),
+            (confirm, Prompt::Confirm),
+            (escape, Prompt::Back),
+            (left, Prompt::Left),
+            (right, Prompt::Right),
+        ] {
+            if fired {
+                ui.pressed.fire(prompt);
+            }
+        }
         focus.lost |= steam.overlay_opened();
         if effects {
             smoke::effects(&mut game, frames);
@@ -610,6 +623,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         if axis != 0.0 {
             mouse_control = false;
         }
+        ui.mouse = mouse_control;
         let mut input = Input {
             axis,
             target_x: mouse_control.then_some(mouse.x),
@@ -723,7 +737,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 180 => ui.preview = preview(Stage::Cleared),
                 190 => ui.screen = Screen::Sectors,
                 250 | 260 | 270 | 280 | 290 => {
-                    ui.device = Device::Gamepad;
+                    ui.device = Device::Gamepad(Pad::Xbox);
                     match frames {
                         250 => ui.screen = Screen::Title,
                         260 => ui.paused = true,
@@ -743,7 +757,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             ui.sector = SectorId::clamped(sector);
             ui.choice = 0;
             if pad {
-                ui.device = Device::Gamepad;
+                ui.device = Device::Gamepad(Pad::Xbox);
             }
         }
         renderer.draw(

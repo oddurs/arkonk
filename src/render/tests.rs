@@ -1,5 +1,5 @@
 use super::*;
-use crate::{settings::Settings, ui::Preview};
+use crate::{input::Pad, settings::Settings, ui::Preview};
 use ark::{Input, progress::Checkpoint};
 
 #[test]
@@ -281,7 +281,11 @@ fn check(
     let atlas = Atlas::build(&fonts).unwrap();
     let mut failures = Vec::new();
     for &density in densities {
-        for device in [Device::KeyboardMouse, Device::Gamepad] {
+        for device in [
+            Device::KeyboardMouse,
+            Device::Gamepad(Pad::Xbox),
+            Device::Gamepad(Pad::PlayStation),
+        ] {
             for (name, game, ui, profile) in screens {
                 let log = RefCell::new(Vec::new());
                 let v = Scene {
@@ -291,6 +295,8 @@ fn check(
                     locale,
                     density,
                     device,
+                    mouse: false,
+                    pressed: Pressed::default(),
                     buffer: RefCell::new(String::new()),
                     misfits: Some(&log),
                     hits: RefCell::default(),

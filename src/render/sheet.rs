@@ -4,8 +4,9 @@
 use super::*;
 use crate::{
     settings::{self, Value},
-    ui::List,
+    ui::{List, Prompt},
 };
+use chips::Lit;
 
 /// A sheet's width, and the most the fit chain may grow it to.
 pub(super) const NARROW: f32 = 400.0;
@@ -19,8 +20,9 @@ const ROW_GAP: f32 = S8;
 /// Where a row's label starts, and the confirm glyph's inset from its end.
 pub(super) const ROW_TEXT: f32 = 22.0;
 const GLYPH_INSET: f32 = 10.0;
-/// A glyph chip beside body text or inside a button.
+/// A glyph chip beside body text or inside a button, and beside captions.
 pub(super) const CHIP: f32 = 28.0;
+pub(super) const CHIP_SMALL: f32 = 22.0;
 const TITLE_BOX: f32 = 26.0 * 1.2;
 const HELP_LINE: f32 = 16.0 * 1.4;
 
@@ -300,77 +302,22 @@ pub(super) fn row(
             CHIP,
             CHIP,
         );
-        confirm_glyph(v, v.snap_rect(chip), primary);
+        let lit = if primary { Lit::Primary } else { Lit::Neutral };
+        let w = chips::width(v, Prompt::Confirm, CHIP);
+        chips::chip(
+            v,
+            Prompt::Confirm,
+            (chip.x + CHIP - w, chip.y + CHIP / 2.0),
+            CHIP,
+            lit,
+        );
     }
     v.hits.borrow_mut().push(r);
 }
 
-/// The confirm glyph: the Enter key or the pad's south button.
-fn confirm_glyph(v: &Scene, r: Rect, primary: bool) {
-    match v.device {
-        Device::KeyboardMouse => {
-            v.cap_glyph(
-                Cap::Key(""),
-                r.x,
-                r.y + r.h / 2.0 + v.cap(Role::Body) / 2.0,
-                Role::Body,
-            );
-            let (cx, cy) = (r.x + r.w / 2.0, r.y + r.h / 2.0);
-            let ink = if primary {
-                hex(0xdffaff)
-            } else {
-                hex(0xcfd6e3)
-            };
-            let t = v.thick(1.5);
-            v.line(
-                V2::new(cx + 5.0, cy - 5.0),
-                V2::new(cx + 5.0, cy + 1.0),
-                t,
-                ink,
-            );
-            v.line(
-                V2::new(cx + 5.0, cy + 1.0),
-                V2::new(cx - 5.0, cy + 1.0),
-                t,
-                ink,
-            );
-            v.line(
-                V2::new(cx - 5.0, cy + 1.0),
-                V2::new(cx - 2.0, cy - 2.0),
-                t,
-                ink,
-            );
-            v.line(
-                V2::new(cx - 5.0, cy + 1.0),
-                V2::new(cx - 2.0, cy + 4.0),
-                t,
-                ink,
-            );
-        }
-        Device::Gamepad => {
-            let baseline = r.y + r.h / 2.0 + v.cap(Role::Body) / 2.0;
-            v.cap_glyph(
-                Cap::Pad(Glyph::A),
-                r.x + (r.w - 22.0) / 2.0,
-                baseline,
-                Role::Body,
-            );
-        }
-    }
-}
-
-/// The back glyph at a sheet's top corner: Esc, or the pad's east button.
+/// The back glyph at a sheet's top corner.
 fn back_glyph(v: &Scene, r: Rect) {
-    let baseline = r.y + r.h / 2.0 + v.cap(Role::Body) / 2.0;
-    match v.device {
-        Device::KeyboardMouse => v.cap_glyph(Cap::Key("ESC"), r.x, baseline, Role::Body),
-        Device::Gamepad => v.cap_glyph(
-            Cap::Pad(Glyph::B),
-            r.x + (r.w - 22.0) / 2.0,
-            baseline,
-            Role::Body,
-        ),
-    }
+    chips::chip(v, Prompt::Back, (r.x, r.y + r.h / 2.0), CHIP, Lit::Neutral);
 }
 
 /// The label of an action on a sheet.
@@ -628,12 +575,12 @@ pub(super) fn settings(v: &Scene, ui: &Ui, profile: &Profile, focus: usize) {
     let top = y - SETTING_GAP + S16;
     let mid = top + HELP_LINE / 2.0;
     let x = r.x + PAD;
-    for (i, left) in [true, false].into_iter().enumerate() {
-        let chip = Rect::new(x + i as f32 * (22.0 + S8), mid - 11.0, 22.0, 22.0);
-        arrow_glyph(v, v.snap_rect(chip), left);
+    let mut text = x;
+    for prompt in [Prompt::Left, Prompt::Right] {
+        text += chips::chip(v, prompt, (text, mid), CHIP_SMALL, Lit::Neutral) + S8;
     }
     let verb = settings::ROWS[focus.min(rows.len() - 1)].verb();
-    let text = x + 2.0 * 22.0 + S8 + S12;
+    let text = text - S8 + S12;
     let baseline = v.snap(frame::baseline(top, 16.0, 1.4));
     v.say(
         verb,
@@ -674,22 +621,4 @@ fn toggle(v: &Scene, r: Rect, on: bool) {
         knob,
         if on { 1.0 } else { 0.5 },
     );
-}
-
-/// An arrow key, for changing a setting.
-fn arrow_glyph(v: &Scene, r: Rect, left: bool) {
-    v.cap_glyph(
-        Cap::Key(""),
-        r.x,
-        r.y + r.h / 2.0 + v.cap(Role::Body) / 2.0,
-        Role::Body,
-    );
-    let (cx, cy) = (r.x + r.w / 2.0, r.y + r.h / 2.0);
-    let dir = if left { -1.0 } else { 1.0 };
-    let t = v.thick(1.5);
-    let ink = hex(0xcfd6e3);
-    let head = V2::new(cx + 4.0 * dir, cy);
-    v.line(V2::new(cx - 4.0 * dir, cy), head, t, ink);
-    v.line(head, V2::new(cx + 1.0 * dir, cy - 3.0), t, ink);
-    v.line(head, V2::new(cx + 1.0 * dir, cy + 3.0), t, ink);
 }

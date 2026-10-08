@@ -19,6 +19,11 @@ pub struct Ui {
     pub save_error: bool,
     /// What the player touched last; prompts and the cursor follow it.
     pub device: Device,
+    /// The mouse, not the keyboard, has been driving the paddle, so field
+    /// prompts show the mouse.
+    pub mouse: bool,
+    /// Glyphs whose input just fired, to flash them pressed.
+    pub pressed: Pressed,
     /// A stage to draw instead of the game's own, so the smoke test can
     /// capture screens that play would take minutes to reach.
     pub preview: Option<Preview>,
@@ -29,6 +34,39 @@ pub struct Ui {
     /// The Settings sheet is open over the title or the pause sheet, with
     /// the focus on this row of [`crate::settings::ROWS`].
     pub settings: Option<usize>,
+}
+
+/// What an input glyph stands for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Prompt {
+    Confirm,
+    Back,
+    Left,
+    Right,
+    /// Serve or release a held ball: Space, the mouse, or the south button.
+    Serve,
+}
+
+/// How long each prompt's glyph has left to show pressed.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Pressed([f32; 5]);
+impl Pressed {
+    /// A glyph flashes pressed this long when its input fires.
+    const FLASH: f32 = 0.12;
+    fn index(prompt: Prompt) -> usize {
+        prompt as usize
+    }
+    pub fn fire(&mut self, prompt: Prompt) {
+        self.0[Self::index(prompt)] = Self::FLASH;
+    }
+    pub fn is(&self, prompt: Prompt) -> bool {
+        self.0[Self::index(prompt)] > 0.0
+    }
+    pub fn tick(&mut self, seconds: f32) {
+        for t in &mut self.0 {
+            *t = (*t - seconds).max(0.0);
+        }
+    }
 }
 
 /// A modal card over the field.
@@ -120,6 +158,8 @@ impl Default for Ui {
             sector: SectorId::FIRST,
             save_error: false,
             device: Device::KeyboardMouse,
+            mouse: false,
+            pressed: Pressed::default(),
             preview: None,
             sheet: None,
             // Tests and captures draw sheets already in place.
@@ -357,6 +397,16 @@ mod tests {
             hits.row_at(title_menu(false), menu.column(100.0, 0).center()),
             None
         );
+    }
+    #[test]
+    fn a_pressed_glyph_flashes_briefly() {
+        let mut p = Pressed::default();
+        p.fire(Prompt::Back);
+        assert!(p.is(Prompt::Back) && !p.is(Prompt::Confirm));
+        p.tick(0.1);
+        assert!(p.is(Prompt::Back));
+        p.tick(0.05);
+        assert!(!p.is(Prompt::Back));
     }
     #[test]
     fn a_new_sheet_opens_from_the_start() {
