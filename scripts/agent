@@ -1,0 +1,184 @@
+#!/bin/sh
+# The branch-per-unit workflow: one worktree, one branch, one pull request.
+# It never changes the caller's directory; it prints where things are instead.
+set -eu
+
+die() {
+    echo "agent: $*" >&2
+    exit 1
+}
+
+run() {
+    echo "+ $*" >&2
+    "$@"
+}
+
+usage() {
+    cat >&2 <<'EOF'
+usage: scripts/agent <command>
+  doctor             check the toolchain, hooks and GitHub access
+  start <type/slug>  create a worktree and branch from the default branch
+  check              run scripts/task check here
+  commit <message>   stage everything here and commit it
+  pr                 push this branch and open its pull request
+  sync               rebase this branch onto the default branch
+  done [branch]      squash-merge the branch's green PR, then remove its worktree
+  list               show worktrees and open pull requests
+EOF
+    exit 2
+}
+
+top=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
+# The main checkout, even when called from a linked worktree.
+main_dir=$(cd "$(git rev-parse --git-common-dir)/.." && pwd -P)
+repo=$(basename "$main_dir")
+worktrees=$(cd "$main_dir/.." && pwd -P)/.worktrees/$repo
+
+default_branch() {
+    ref=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null) ||
+        ref=$(git ls-remote --symref origin HEAD 2>/dev/null | sed -n 's|^ref: refs/heads/\(.*\)\tHEAD$|origin/\1|p')
+    [ -n "$ref" ] || die "cannot resolve origin's default branch"
+    echo "${ref#origin/}"
+}
+
+current_branch() {
+    git symbolic-ref --quiet --short HEAD || die "detached HEAD"
+}
+
+on_work_branch() {
+    branch=$(current_branch)
+    [ "$branch" != "$(default_branch)" ] || die "on $branch: start a branch with scripts/agent start <type/slug>"
+    echo "$branch"
+}
+
+pr_field() {
+    gh pr view "$1" --json "$2" --jq ".$2" 2>/dev/null
+}
+
+cmd_doctor() {
+    ok=1
+    need() {
+        if command -v "$1" >/dev/null 2>&1; then
+            echo "ok   $1"
+        else
+            echo "MISS $1: $2"
+            ok=0
+        fi
+    }
+    need git "install git"
+    need cargo "install Rust from https://rustup.rs"
+    need gh "install the GitHub CLI and run gh auth login"
+    want=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' "$top/Cargo.toml" | head -n 1)
+    have=$(rustc --version 2>/dev/null | cut -d' ' -f2)
+    if [ -n "$have" ] && [ "$(printf '%s\n%s\n' "$want" "$have" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)" = "$want" ]; then
+        echo "ok   rustc $have (needs $want)"
+    else
+        echo "MISS rustc ${have:-none}: needs $want"
+        ok=0
+    fi
+    if [ "$(git config core.hooksPath)" = .githooks ]; then
+        echo "ok   hooks (.githooks)"
+    else
+        echo "MISS hooks: run scripts/setup"
+        ok=0
+    fi
+    if gh auth status >/dev/null 2>&1; then
+        echo "ok   gh authenticated"
+    else
+        echo "MISS gh: run gh auth login"
+        ok=0
+    fi
+    echo "     default branch: $(default_branch); worktrees: $worktrees"
+    [ "$ok" = 1 ] || die "doctor found problems"
+}
+
+cmd_start() {
+    [ "$#" -eq 1 ] || usage
+    branch=$1
+    echo "$branch" | grep -Eq '^(feat|fix|chore|docs|perf|refactor|test)/[a-z0-9][a-z0-9.-]*$' ||
+        die "branch must be <type>/<slug>, type one of feat fix chore docs perf refactor test"
+    dir=$worktrees/$branch
+    if [ -d "$dir" ]; then
+        echo "agent: $branch already has a worktree" >&2
+        echo "$dir"
+        return
+    fi
+    base=$(default_branch)
+    run git fetch --quiet origin "$base"
+    mkdir -p "$(dirname "$dir")"
+    if git show-ref --verify --quiet "refs/heads/$branch"; then
+        run git worktree add "$dir" "$branch"
+    else
+        run git worktree add --no-track -b "$branch" "$dir" "origin/$base"
+    fi
+    echo "$dir"
+}
+
+cmd_check() {
+    run "$top/scripts/task" check
+}
+
+cmd_commit() {
+    [ "$#" -ge 1 ] || usage
+    on_work_branch >/dev/null
+    run git add --all
+    git diff --cached --quiet && die "nothing to commit"
+    run git commit --message "$*"
+}
+
+cmd_pr() {
+    branch=$(on_work_branch)
+    [ -z "$(git status --porcelain)" ] || die "uncommitted changes: commit them first"
+    # The pre-push hook runs scripts/task check.
+    run git push --set-upstream origin "$branch"
+    if url=$(pr_field "$branch" url) && [ -n "$url" ]; then
+        echo "$url"
+    else
+        run gh pr create --fill --base "$(default_branch)" --head "$branch"
+    fi
+}
+
+cmd_sync() {
+    on_work_branch >/dev/null
+    [ -z "$(git status --porcelain)" ] || die "uncommitted changes: commit them first"
+    base=$(default_branch)
+    run git fetch --quiet origin "$base"
+    GIT_EDITOR=true run git rebase "origin/$base"
+}
+
+cmd_done() {
+    branch=${1:-$(current_branch)}
+    [ "$branch" != "$(default_branch)" ] || die "give the branch to finish"
+    state=$(pr_field "$branch" state) || die "no pull request for $branch"
+    if [ "$state" = OPEN ]; then
+        # Merged from the main checkout, so gh never tries to switch this worktree.
+        (cd "$main_dir" && run gh pr merge "$branch" --squash)
+        state=$(pr_field "$branch" state)
+    fi
+    [ "$state" = MERGED ] || die "pull request for $branch is $state, not merged"
+    dir=$worktrees/$branch
+    if [ -d "$dir" ]; then
+        run git -C "$main_dir" worktree remove "$dir"
+    fi
+    if git -C "$main_dir" show-ref --verify --quiet "refs/heads/$branch"; then
+        run git -C "$main_dir" branch -D "$branch"
+    fi
+    run git -C "$main_dir" fetch --quiet --prune origin
+    if [ "$(git -C "$main_dir" symbolic-ref --quiet --short HEAD)" = "$(default_branch)" ]; then
+        run git -C "$main_dir" merge --ff-only --quiet "origin/$(default_branch)"
+    fi
+    case $top in "$dir") echo "agent: this worktree is gone; cd $main_dir" >&2 ;; esac
+}
+
+cmd_list() {
+    git worktree list
+    gh pr list --state open
+}
+
+[ "$#" -ge 1 ] || usage
+command=$1
+shift
+case $command in
+doctor | start | check | commit | pr | sync | done | list) "cmd_$command" "$@" ;;
+*) usage ;;
+esac

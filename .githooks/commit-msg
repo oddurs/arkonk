@@ -1,0 +1,28 @@
+#!/bin/sh
+# Conventional Commits, a short subject, and no assistant attribution.
+set -eu
+
+message=$(grep -v '^#' "$1")
+subject=$(printf '%s\n' "$message" | sed -n '1p')
+
+fail() {
+    echo "commit-msg: $*" >&2
+    echo "  subject: $subject" >&2
+    exit 1
+}
+
+case $subject in
+Merge\ * | Revert\ * | fixup!\ * | squash!\ * | amend!\ *) exit 0 ;;
+esac
+
+printf '%s\n' "$subject" |
+    grep -Eq '^(feat|fix|chore|docs|perf|refactor|test|build|ci|style|revert)(\([a-z0-9./_-]+\))?!?: [^ ]' ||
+    fail "use a Conventional Commit subject, e.g. 'fix(render): snap rims to whole pixels'"
+[ "${#subject}" -le 72 ] || fail "subject is ${#subject} characters; keep it to 72"
+case $subject in *.) fail "drop the trailing period" ;; esac
+
+# File names this repo uses for agent instructions are not attribution.
+if printf '%s\n' "$message" | sed -e 's/CLAUDE\.md//g' -e 's|\.claude/||g' |
+    grep -Eiq 'co-authored-by:.*(claude|anthropic|openai|copilot|gpt|gemini|noreply@anthropic)|generated (with|by) |🤖|\bclaude\b|\banthropic\b|as an ai\b|ai assistant'; then
+    fail "remove the assistant attribution; the work is published under the author's name"
+fi

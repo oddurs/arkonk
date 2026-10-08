@@ -24,6 +24,7 @@ task() {
         ;;
     build) run cargo build --locked --workspace --release ;;
     check)
+        trap 'status=$?; [ "$status" -eq 0 ] || echo "scripts/task check: FAILED" >&2' EXIT
         task fmt:check
         task lint
         task test
@@ -31,6 +32,7 @@ task() {
         # The benchmark asserts zero simulation allocations and full collision
         # budgets, so it is a gate, not just a measurement.
         run cargo bench --locked -p ark --bench tick
+        echo "scripts/task check: passed" >&2
         ;;
     *) usage ;;
     esac

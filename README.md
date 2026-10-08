@@ -300,6 +300,12 @@ id, packaging, and the exact partner-site configuration.
 
 ## Development
 
+After cloning, run `scripts/setup` once. It wires the git hooks in `.githooks`,
+which check commit messages, formatting and the full suite before a push, and
+then checks the toolchain. Work happens on a branch per change, each in its own
+worktree: `scripts/agent start feat/the-thing`, then `scripts/agent pr`, and
+`scripts/agent done` once it is green. `main` moves only through merged pull requests.
+
 ```sh
 scripts/task check
 cargo run --locked --release --bin arkonk -- --smoke-test
