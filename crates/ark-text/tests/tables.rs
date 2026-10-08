@@ -2,7 +2,8 @@
 //! no combining marks, and short forms that are actually shorter.
 use ark::Power;
 use ark_text::{
-    Arg, Form, Locale, Role, Script, TextId, capsule, grouped, short_template, template, write,
+    Arg, Form, Locale, Role, Script, TextId, capsule, grouped, icon, icon_power, short_template,
+    template, write, write_icons,
 };
 
 /// The `{…}` slots in a template, sorted.
@@ -171,4 +172,25 @@ fn pseudo_locale_expands_accents_and_brackets() {
         &[],
     );
     assert!(tip.starts_with("[W ") && tip.contains(" S "), "{tip}");
+}
+
+#[test]
+fn icons_can_come_out_as_marks_for_the_renderer() {
+    let tip = TextId::SectorTip(ark::sectors::SectorId::FIRST);
+    for locale in Locale::ALL {
+        let mut marked = String::new();
+        write_icons(&mut marked, locale, Form::Full, tip, &[]).unwrap();
+        let marks: Vec<_> = marked.chars().filter_map(icon_power).collect();
+        assert_eq!(marks, [Power::Wide, Power::Slow], "{locale:?}: {marked}");
+        // Everything else reads as the lettered text does.
+        let lettered: String = marked
+            .chars()
+            .map(|c| icon_power(c).map_or(c, capsule))
+            .collect();
+        assert_eq!(lettered, format(locale, tip, &[]));
+    }
+    for power in Power::ALL {
+        assert_eq!(icon_power(icon(power)), Some(power));
+    }
+    assert_eq!(icon_power('W'), None);
 }

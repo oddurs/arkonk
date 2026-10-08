@@ -66,9 +66,12 @@ fixed-length arrays for the same reason. `es-419` deliberately falls back to
   puts them. Each id's doc comment says what each slot holds. A test checks that
   every translation uses exactly the source's slots.
 - **Capsule icons.** `{icon:wide}`, `{icon:slow}`, `{icon:multi}`, `{icon:anchor}`
-  and `{icon:phase}` print the capsule letters W, S, M, A and P. They are
-  gameplay iconography and the same in every language; keep the placeholder,
-  never write the letter.
+  and `{icon:phase}` stand for the capsules W, S, M, A and P. The game draws
+  each as the capsule itself, a coloured pill with its letter, 1.5 em wide,
+  so a tip teaches the icon the player will see falling; plain text output
+  (`ark_text::write`) prints the letter. They are gameplay iconography and the
+  same in every language; keep the placeholder, never write the letter, and
+  leave a space on each side.
 - **Casing is authored, never computed.** Labels (`SCORE`, `LIVES`, medal and
   chapter names) are written in capitals where the script has them; headings,
   buttons and hints in sentence case; sector names as the language writes

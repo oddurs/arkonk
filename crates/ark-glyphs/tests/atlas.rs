@@ -1,6 +1,6 @@
 //! The committed atlases against the string tables: every character every
 //! string needs is baked at every size its role is drawn at.
-use ark_glyphs::{Fonts, Source, fonts, spec, supports};
+use ark_glyphs::{Fonts, ICON_EM, Source, fonts, spec, supports};
 use ark_text::{Arg, Form, Locale, Role, Script, TextId, write};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -173,4 +173,20 @@ fn every_role_snaps_to_a_baked_size() {
     // Steam Deck body text sits on the 18 px strike, lowercase just over 9 px.
     assert_eq!(spec::ppem(Role::Body, 800.0 / 900.0), Some(18));
     assert_eq!(spec::ppem(Role::Caption, 800.0 / 900.0), Some(14));
+}
+
+#[test]
+fn capsule_icons_take_their_width_and_wrap_like_words() {
+    let fonts = fonts(Locale::En).unwrap();
+    let regular = spec::Weight::Regular;
+    let icon = '\u{E000}';
+    assert!(ark_text::icon_power(icon).is_some());
+    let alone = fonts.measure(&icon.to_string(), regular, 20, 0.0);
+    assert!((alone - ICON_EM * 20.0).abs() < 1e-4);
+    let text = format!("{icon} Wide");
+    let word = fonts.measure(" Wide", regular, 20, 0.0);
+    assert!((fonts.measure(&text, regular, 20, 0.0) - alone - word).abs() < 1e-3);
+    let mut lines = Vec::new();
+    fonts.wrap(&text, regular, 20, 0.0, alone + 1.0, |l| lines.push(l));
+    assert_eq!(lines, [icon.to_string().as_str(), "Wide"]);
 }

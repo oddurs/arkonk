@@ -17,8 +17,8 @@ use ark::{
     sectors::{Chapter, SECTOR_COUNT, SectorId},
     tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
-use ark_glyphs::{Fonts, spec};
-use ark_text::{Arg, Form, Locale, Role, TextId, capsule};
+use ark_glyphs::{Fonts, ICON_EM, spec};
+use ark_text::{Arg, Form, Locale, Role, TextId, capsule, icon_power};
 use macroquad::models::Vertex;
 use macroquad::prelude::*;
 use std::{
@@ -333,10 +333,10 @@ impl Scene<'_> {
         self.rounded(x - 1.0, y - 1.0, w + 2.0, h + 2.0, 13.0, BORDER);
         self.rounded(x, y, w, h, 12.0, SURFACE);
     }
-    /// A rounded rectangle's edge, `t` thick, drawn inside its bounds.
-    #[allow(clippy::too_many_arguments)]
-    fn outline(&self, x: f32, y: f32, w: f32, h: f32, r: f32, t: f32, color: Color) {
+    /// The edge of `bounds` rounded by `r`, `t` thick, drawn inside it.
+    fn outline(&self, bounds: Rect, r: f32, t: f32, color: Color) {
         const STEPS: usize = 6;
+        let Rect { x, y, w, h } = bounds;
         let r = r.min(w / 2.0).min(h / 2.0).max(t);
         self.rect(x + r, y, w - 2.0 * r, t, color);
         self.rect(x + r, y + h - t, w - 2.0 * r, t, color);
@@ -505,6 +505,11 @@ impl Scene<'_> {
                 let (_, weight, tracking) = spec::style(role);
                 let tracking = self.fonts.tracking(tracking, ppem);
                 self.fonts.layout(text, weight, ppem, tracking, |p| {
+                    if let Some(power) = icon_power(p.c) {
+                        let x = (ox + p.x.round()) / d;
+                        self.chip(power, x, y, f32::from(ppem) / d, role);
+                        return;
+                    }
                     let cell = p
                         .glyph
                         .and_then(|g| self.atlas.glyph((p.source, weight, ppem, g)));
@@ -538,6 +543,16 @@ impl Scene<'_> {
             }
         }
     }
+    /// A capsule as the player sees it falling, `size` tall, sitting on the
+    /// capitals of `beside` text whose baseline is `baseline`.
+    fn chip(&self, power: Power, x: f32, baseline: f32, size: f32, beside: Role) {
+        let (w, cy) = (ICON_EM * size, baseline - self.cap(beside) / 2.0);
+        self.rounded(x, cy - size / 2.0, w, size, size / 2.0, power_color(power));
+        let mut letter = [0; 4];
+        let letter = capsule(power).encode_utf8(&mut letter);
+        let y = cy + self.cap(Role::Label) / 2.0;
+        self.put(letter, Role::Label, Slot::centered(x + w / 2.0, w, y), BG);
+    }
     /// Draws `text` aligned in `slot`; text wider than the slot is drawn
     /// anyway and reported to the layout tests.
     fn put(&self, text: &str, role: Role, slot: Slot, color: Color) -> f32 {
@@ -564,7 +579,8 @@ impl Scene<'_> {
     fn format<R>(&self, id: TextId, args: &[Arg], form: Form, with: impl FnOnce(&str) -> R) -> R {
         let mut buffer = self.buffer.borrow_mut();
         buffer.clear();
-        let _ = ark_text::write(&mut *buffer, self.locale, form, id, args);
+        // Capsules come out as icon marks, which `draw` sets as chips.
+        let _ = ark_text::write_icons(&mut *buffer, self.locale, form, id, args);
         with(&buffer)
     }
     /// Sets `id` in `slot`, switching to its short wording if the full one
@@ -763,7 +779,7 @@ impl Scene<'_> {
             self.rounded(r.x, r.y, r.w, r.h, 10.0, opacity(CYAN, 0.13));
         }
         if focused {
-            self.outline(r.x, r.y, r.w, r.h, 10.0, 1.5, opacity(CYAN, 0.7));
+            self.outline(r, 10.0, 1.5, opacity(CYAN, 0.7));
         }
         let baseline = r.y + r.h / 2.0 + self.cap(Role::Body) / 2.0;
         self.say(

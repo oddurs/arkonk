@@ -22,6 +22,8 @@ mod id;
 mod locale;
 mod tables;
 
-pub use format::{Arg, Form, capsule, grouped, short_template, template, write};
+pub use format::{
+    Arg, Form, capsule, grouped, icon, icon_power, short_template, template, write, write_icons,
+};
 pub use id::{Role, TextId};
 pub use locale::{Locale, Script};
