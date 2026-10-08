@@ -2,6 +2,8 @@ vendor/miniquad/** linguist-vendored -whitespace
 # Shell scripts and SteamPipe templates must keep LF endings on Windows checkouts.
 scripts/** text eol=lf
 packaging/steam/** text eol=lf
+# Rich presence files are compared byte for byte with the tables in a test.
+docs/steam/rich_presence/*.vdf text eol=lf
 *.ico binary
 *.icns binary
 # Baked glyph atlases; see docs/localization.md.
