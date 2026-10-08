@@ -91,8 +91,10 @@ const FOOTER: f32 = 872.0;
 /// Baseline-to-baseline distance between footer rows: captions are smaller
 /// than body text, so the rows need more air to read as separate lines.
 const FOOTER_LINE: f32 = 30.0;
-/// Text width inside the pause and results panels.
+/// Text width inside the results panels.
 const PANEL: f32 = 432.0;
+/// The width of the pause and results panels.
+const PANEL_W: f32 = 480.0;
 
 fn opacity(c: Color, alpha: f32) -> Color {
     Color::new(c.r, c.g, c.b, alpha)
@@ -614,6 +616,18 @@ impl Scene<'_> {
     fn width_of(&self, id: TextId, args: &[Arg], role: Role) -> f32 {
         self.format(id, args, Form::Full, |t| self.measure(t, role))
     }
+    /// How many lines `paragraph` would set `id` in, `width` wide.
+    fn lines(&self, (id, args): (TextId, &[Arg]), role: Role, width: f32) -> usize {
+        self.format(id, args, Form::Full, |text| match self.face(role, text) {
+            Face::Noto(ppem) => {
+                let (_, weight, tracking) = spec::style(role);
+                let tracking = self.fonts.tracking(tracking, ppem);
+                let room = width * self.density;
+                self.fonts.wrap(text, weight, ppem, tracking, room, |_| {})
+            }
+            Face::Pixel(_) => pixel_lines(text, width, |t| self.measure(t, role), |_| {}),
+        })
+    }
     /// Sets `id` across up to `max` lines from baseline `slot.y`, wrapping
     /// at word (or, in Chinese and Japanese, character) boundaries.
     /// Returns the lines used; more than `max` is reported.
@@ -627,7 +641,7 @@ impl Scene<'_> {
     ) -> usize {
         self.format(id, args, Form::Full, |text| {
             let mut lines = 0;
-            let mut line = |line: &str| {
+            let line = |line: &str| {
                 let y = slot.y + lines as f32 * leading(role);
                 if lines < max {
                     self.put(line, role, Slot { y, ..slot }, color);
@@ -648,23 +662,8 @@ impl Scene<'_> {
                     let room = slot.w * self.density;
                     self.fonts.wrap(text, weight, ppem, tracking, room, line);
                 }
-                // The pixel font spells only Latin, so spaces are the breaks.
                 Face::Pixel(_) => {
-                    let mut rest = text.trim();
-                    while !rest.is_empty() {
-                        let fits = |end: usize| self.measure(&rest[..end], role) <= slot.w;
-                        let end = if fits(rest.len()) {
-                            rest.len()
-                        } else {
-                            rest.match_indices(' ')
-                                .map(|(i, _)| i)
-                                .take_while(|&i| fits(i))
-                                .last()
-                                .unwrap_or(rest.len())
-                        };
-                        line(&rest[..end]);
-                        rest = rest[end..].trim_start();
-                    }
+                    pixel_lines(text, slot.w, |t| self.measure(t, role), line);
                 }
             }
             lines.min(max)
@@ -713,9 +712,15 @@ impl Scene<'_> {
         let cap = item.cap.map_or(0.0, |c| self.cap_width(c) + PAIR);
         cap + self.width_of(item.id, item.arg.as_slice(), role)
     }
-    /// Lays `items` into centred lines of at most `FULL` width; calls
+    /// Lays `items` into centred lines of at most `room` width; calls
     /// `line` with each line's items and width. Returns the line count.
-    fn pack(&self, items: &[Item], role: Role, mut line: impl FnMut(&[Item], f32)) -> usize {
+    fn pack(
+        &self,
+        items: &[Item],
+        role: Role,
+        room: f32,
+        mut line: impl FnMut(&[Item], f32),
+    ) -> usize {
         let mut start = 0;
         let mut lines = 0;
         while start < items.len() {
@@ -723,7 +728,7 @@ impl Scene<'_> {
             let mut end = start + 1;
             while end < items.len() {
                 let next = width + GROUP + self.item_width(&items[end], role);
-                if next > FULL {
+                if next > room {
                     break;
                 }
                 width = next;
@@ -760,7 +765,7 @@ impl Scene<'_> {
     fn footer(&self, rows: &[&[Item]], save_error: bool) {
         let count: usize = rows
             .iter()
-            .map(|items| self.pack(items, Role::Caption, |_, _| {}))
+            .map(|items| self.pack(items, Role::Caption, FULL, |_, _| {}))
             .sum::<usize>()
             + usize::from(save_error);
         if count > 4
@@ -779,7 +784,7 @@ impl Scene<'_> {
             y += FOOTER_LINE;
         }
         for &items in rows {
-            self.pack(items, Role::Caption, |line, width| {
+            self.pack(items, Role::Caption, FULL, |line, width| {
                 self.hint_line(line, width, y, DIM, Role::Caption);
                 y += FOOTER_LINE;
             });
@@ -872,6 +877,34 @@ impl Scene<'_> {
         self.ring(V2::new(cx, cy - 4.0), 5.0, 2.0, color);
         self.rounded(cx - 8.0, cy - 3.0, 16.0, 12.0, 2.5, color);
     }
+}
+
+/// Wraps pixel-font text into lines no wider than `room`. The pixel font
+/// spells only Latin, so spaces are the only breaks. Returns the count.
+fn pixel_lines<'t>(
+    text: &'t str,
+    room: f32,
+    measure: impl Fn(&str) -> f32,
+    mut line: impl FnMut(&'t str),
+) -> usize {
+    let mut count = 0;
+    let mut rest = text.trim();
+    while !rest.is_empty() {
+        let fits = |end: usize| measure(&rest[..end]) <= room;
+        let end = if fits(rest.len()) {
+            rest.len()
+        } else {
+            rest.match_indices(' ')
+                .map(|(i, _)| i)
+                .take_while(|&i| fits(i))
+                .last()
+                .unwrap_or(rest.len())
+        };
+        line(&rest[..end]);
+        count += 1;
+        rest = rest[end..].trim_start();
+    }
+    count
 }
 
 /// Xbox face-button names; Steam Deck and Steam Input present this layout.
@@ -1262,7 +1295,7 @@ fn scene(
                 ),
                 Device::Gamepad => {
                     let items = [pad(Glyph::A, TextId::ActionRelease)];
-                    v.pack(&items, Role::Body, |line, w| {
+                    v.pack(&items, Role::Body, FULL, |line, w| {
                         v.hint_line(line, w, 720.0, CYAN, Role::Body)
                     });
                 }
@@ -1285,17 +1318,7 @@ fn scene(
     let footer_error = ui.save_error && (ui.paused || stage != Stage::Playing);
     if ui.paused {
         v.scrim();
-        v.panel(240.0, 290.0, 480.0, 350.0);
-        v.say(
-            TextId::Paused,
-            &[],
-            Role::Display,
-            Slot::centered(WIDTH / 2.0, PANEL, 342.0),
-            INK,
-        );
-        menu(v, &ui::pause_menu(), ui.choice, None);
-        let note = Slot::centered(WIDTH / 2.0, PANEL, 576.0);
-        v.paragraph((TextId::RetryNote, &[]), Role::Body, note, 2, DIM);
+        pause(v, game, ui.choice, profile);
         match v.device {
             Device::Gamepad => {
                 let items = [
@@ -1305,7 +1328,7 @@ fn scene(
                 ];
                 v.footer(&[&items], footer_error);
             }
-            Device::KeyboardMouse => v.footer(&[&options(profile, v.device)], footer_error),
+            Device::KeyboardMouse => v.footer(&[], footer_error),
         }
     } else {
         match stage {
@@ -1672,6 +1695,46 @@ fn hud(v: &Scene, game: &Game, profile: &Profile) {
         );
     }
 }
+/// The pause card: where play stopped, the menu, what Retry does, and the
+/// settings keys at its foot. Everything stacks from the menu's top, which
+/// `ui` owns because the hit areas depend on it.
+fn pause(v: &Scene, game: &Game, focus: usize, profile: &Profile) {
+    let menu_at = ui::pause_menu();
+    let title = menu_at.top - GROUP;
+    let eyebrow = title - cap_height(Role::Display) - S12;
+    let top = eyebrow - cap_height(Role::Label) - PAD;
+    let text = PANEL_W - 2.0 * PAD;
+    let note = menu_at.bottom() + S16 + cap_height(Role::Caption);
+    let notes = v
+        .lines((TextId::RetryNote, &[]), Role::Caption, text)
+        .max(1);
+    // The settings keys are the panel's foot, set off by a rule. Key caps
+    // stand taller than the captions beside them by `reach` each side.
+    let options = options(profile, v.device);
+    let rule = note + (notes - 1) as f32 * leading(Role::Caption) + S24;
+    let reach = 12.0 - cap_height(Role::Caption) / 2.0;
+    let keys = rule + S16 + reach + cap_height(Role::Caption);
+    let rows = v.pack(&options, Role::Caption, text, |_, _| {});
+    let bottom = keys + (rows - 1) as f32 * FOOTER_LINE + reach + S16;
+    let left = WIDTH / 2.0 - PANEL_W / 2.0;
+    v.panel(left, top, PANEL_W, bottom - top);
+    v.rect(left, rule, PANEL_W, 1.0, BORDER);
+
+    let id = game.sector();
+    let chapter = id.sector().chapter;
+    let args = [Arg::Text(TextId::ChapterName(chapter)), Arg::Sector(id)];
+    let slot = |y| Slot::centered(WIDTH / 2.0, text, y);
+    let hue = sector_color(0, chapter);
+    v.say(TextId::ReadyEyebrow, &args, Role::Label, slot(eyebrow), hue);
+    v.say(TextId::Paused, &[], Role::Display, slot(title), INK);
+    menu(v, &menu_at, focus, None);
+    v.paragraph((TextId::RetryNote, &[]), Role::Caption, slot(note), 2, DIM);
+    let mut y = keys;
+    v.pack(&options, Role::Caption, text, |line, width| {
+        v.hint_line(line, width, y, DIM, Role::Caption);
+        y += FOOTER_LINE;
+    });
+}
 /// The eyebrow's baseline on the ready card; the rest stacks under it.
 const READY_TOP: f32 = 540.0;
 fn ready(v: &Scene, game: &Game) {
@@ -1700,7 +1763,7 @@ fn ready(v: &Scene, game: &Game) {
         Device::KeyboardMouse => v.say(TextId::KeysServe, &[], Role::Body, Slot::line(y), CYAN),
         Device::Gamepad => {
             let items = [pad(Glyph::A, TextId::ActionServe)];
-            v.pack(&items, Role::Body, |line, w| {
+            v.pack(&items, Role::Body, FULL, |line, w| {
                 v.hint_line(line, w, y, CYAN, Role::Body)
             });
         }
@@ -2192,7 +2255,7 @@ fn cleared(v: &Scene, game: &Game, summary: SectorSummary) {
         ),
         Device::Gamepad => {
             let items = [pad(Glyph::A, TextId::ActionContinue)];
-            v.pack(&items, Role::Caption, |line, w| {
+            v.pack(&items, Role::Caption, FULL, |line, w| {
                 v.hint_line(line, w, 602.0, MUTED, Role::Caption)
             });
         }

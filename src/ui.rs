@@ -127,7 +127,7 @@ pub fn pause_menu() -> Menu {
     use Action::*;
     Menu {
         actions: &[Resume, Retry, MainMenu],
-        top: 380.0,
+        top: 384.0,
     }
 }
 /// After the last life or the last sector.
