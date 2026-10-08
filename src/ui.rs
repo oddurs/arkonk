@@ -26,11 +26,15 @@ pub struct Ui {
     /// fades and rises in over its first moments.
     pub sheet: Option<Sheet>,
     pub sheet_open: f32,
+    /// The Settings sheet is open over the title or the pause sheet, with
+    /// the focus on this row of [`crate::settings::ROWS`].
+    pub settings: Option<usize>,
 }
 
 /// A modal card over the field.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Sheet {
+    Settings,
     Pause,
     Cleared,
     GameOver,
@@ -39,6 +43,9 @@ pub enum Sheet {
 impl Ui {
     /// The sheet this state shows over `stage`, if any.
     pub fn sheet_for(&self, stage: Stage) -> Option<Sheet> {
+        if self.settings.is_some() {
+            return Some(Sheet::Settings);
+        }
         if self.screen != Screen::Play {
             return None;
         }
@@ -68,8 +75,8 @@ impl Ui {
 /// on what the player saw, wherever the fit chain put it.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Hits {
-    /// The menu `rows` belong to.
-    pub menu: Option<Menu>,
+    /// The list `rows` belong to.
+    pub list: Option<List>,
     rows: [Rect; MAX_ROWS],
     count: usize,
     /// A sheet's back glyph.
@@ -85,9 +92,9 @@ impl Hits {
     pub fn rows(&self) -> &[Rect] {
         &self.rows[..self.count]
     }
-    /// The row of `menu` under `p`, when `menu` is the one drawn.
-    pub fn row_at(&self, menu: Menu, p: Vec2) -> Option<usize> {
-        if self.menu != Some(menu) {
+    /// The row of `list` under `p`, when `list` is the one drawn.
+    pub fn row_at(&self, list: impl Into<List>, p: Vec2) -> Option<usize> {
+        if self.list != Some(list.into()) {
             return None;
         }
         self.rows().iter().position(|r| r.contains(p))
@@ -117,6 +124,7 @@ impl Default for Ui {
             sheet: None,
             // Tests and captures draw sheets already in place.
             sheet_open: f32::INFINITY,
+            settings: None,
         }
     }
 }
@@ -131,6 +139,20 @@ pub enum Action {
     MainMenu,
     /// On to the next sector, or back to the sectors after practice.
     Next,
+    Settings,
+}
+
+/// A list of rows the pointer can hit: a menu of actions, or the
+/// Settings sheet's rows.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum List {
+    Menu(Menu),
+    Settings,
+}
+impl From<Menu> for List {
+    fn from(menu: Menu) -> Self {
+        List::Menu(menu)
+    }
 }
 
 /// A list of actions. The first row is the screen's primary action and
@@ -189,16 +211,16 @@ pub fn title_menu(saved: bool) -> Menu {
     use Action::*;
     Menu {
         actions: if saved {
-            &[Continue, NewJourney, Sectors]
+            &[Continue, NewJourney, Sectors, Settings]
         } else {
-            &[NewJourney, Sectors]
+            &[NewJourney, Sectors, Settings]
         },
     }
 }
 pub fn pause_menu() -> Menu {
     use Action::*;
     Menu {
-        actions: &[Resume, Retry, MainMenu],
+        actions: &[Resume, Retry, Settings, MainMenu],
     }
 }
 /// After the last life or the last sector.
@@ -288,8 +310,11 @@ mod tests {
     #[test]
     fn menus_offer_only_what_can_be_done() {
         use Action::*;
-        assert_eq!(title_menu(false).actions, [NewJourney, Sectors]);
-        assert_eq!(title_menu(true).actions, [Continue, NewJourney, Sectors]);
+        assert_eq!(title_menu(false).actions, [NewJourney, Sectors, Settings]);
+        assert_eq!(
+            title_menu(true).actions,
+            [Continue, NewJourney, Sectors, Settings]
+        );
         assert_eq!(pause_menu().action(0), Resume);
         // After a run, the way back in comes first and takes the focus.
         assert_eq!(result_menu(false).actions, [Retry, Sectors, MainMenu]);
@@ -297,21 +322,21 @@ mod tests {
     }
     #[test]
     fn menu_steps_wrap_over_the_rows_shown() {
-        let two = title_menu(false);
-        assert_eq!(two.step(0, true, false), 1);
-        assert_eq!(two.step(1, false, true), 0);
-        assert_eq!(two.step(0, false, true), 1);
-        let three = pause_menu();
+        let three = title_menu(false);
         assert_eq!(three.step(0, true, false), 2);
         assert_eq!(three.step(2, false, true), 0);
-        assert_eq!(three.step(1, false, false), 1);
+        assert_eq!(three.step(0, false, true), 1);
+        let four = pause_menu();
+        assert_eq!(four.step(0, true, false), 3);
+        assert_eq!(four.step(3, false, true), 0);
+        assert_eq!(four.step(1, false, false), 1);
         // A focus left over from a longer menu lands on the last row.
-        assert_eq!(two.step(2, false, false), 1);
+        assert_eq!(three.step(3, false, false), 2);
     }
     #[test]
     fn rows_are_hit_only_for_the_menu_drawn() {
         let mut hits = Hits {
-            menu: Some(pause_menu()),
+            list: Some(pause_menu().into()),
             ..Hits::default()
         };
         let menu = pause_menu();

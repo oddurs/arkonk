@@ -2,6 +2,10 @@
 //! a title, an optional back glyph, its actions, and one help line for the
 //! focused action. The band and rails stay lit around it; the field dims.
 use super::*;
+use crate::{
+    settings::{self, Value},
+    ui::List,
+};
 
 /// A sheet's width, and the most the fit chain may grow it to.
 pub(super) const NARROW: f32 = 400.0;
@@ -95,11 +99,7 @@ pub(super) fn draw(
         .map(|id| v.lines((id, &[]), Role::Caption, inner - ROW_TEXT))
         .max()
         .unwrap_or(0);
-    let head = if spec.back {
-        TITLE_BOX.max(CHIP)
-    } else {
-        TITLE_BOX
-    };
+    let head = head(spec.back);
     let list = actions
         .iter()
         .map(|&a| row_height(a) + ROW_GAP)
@@ -116,33 +116,15 @@ pub(super) fn draw(
         0.0
     };
     let h = PAD + head + S24 + content_h + list + help_h + PAD;
-    let field_mid = (TOP + BOTTOM) / 2.0;
-    let open = opening(ui.sheet_open);
-    let lift = v.snap(RISE * (1.0 - open));
-    let r = v.snap_rect(Rect::new(WIDTH / 2.0 - w / 2.0, field_mid - h / 2.0, w, h));
-    v.set_motion(open, lift);
-    glass(v, r, 16.0);
-
+    let r = open(v, ui, (w, h), (spec.title, title_room(w)), spec.back);
     let x = r.x + PAD;
     let mut y = r.y + PAD;
-    let title_top = y + (head - TITLE_BOX) / 2.0;
-    let title = Slot::left(
-        x,
-        title_room(w),
-        v.snap(frame::baseline(title_top, 26.0, 1.2)),
-    );
-    v.say(spec.title, &[], Role::Title, title, INK);
-    if spec.back {
-        let chip = Rect::new(r.x + w - PAD - CHIP, y + (head - CHIP) / 2.0, CHIP, CHIP);
-        back_glyph(v, v.snap_rect(chip));
-        v.hits.borrow_mut().back = Some(chip);
-    }
     y += head + S24;
     if spec.content > 0.0 {
         content(Rect::new(x, y, inner, spec.content));
         y += content_h;
     }
-    v.hits.borrow_mut().menu = Some(spec.menu);
+    v.hits.borrow_mut().list = Some(spec.menu.into());
     for (i, &action) in actions.iter().enumerate() {
         let row_rect = Rect::new(x, y, inner, row_height(action));
         row(
@@ -168,6 +150,39 @@ pub(super) fn draw(
     v.set_motion(1.0, 0.0);
 }
 
+/// The height of a sheet's title row, with or without a back glyph.
+fn head(back: bool) -> f32 {
+    if back { TITLE_BOX.max(CHIP) } else { TITLE_BOX }
+}
+
+/// Places a `w` × `h` sheet in the middle of the field, sets it moving
+/// into place, and draws its glass, title and back glyph. The caller
+/// draws the rest and then stops the motion.
+fn open(v: &Scene, ui: &Ui, (w, h): (f32, f32), (title, room): (TextId, f32), back: bool) -> Rect {
+    let field_mid = (TOP + BOTTOM) / 2.0;
+    let r = v.snap_rect(Rect::new(WIDTH / 2.0 - w / 2.0, field_mid - h / 2.0, w, h));
+    let t = opening(ui.sheet_open);
+    v.set_motion(t, v.snap(RISE * (1.0 - t)));
+    glass(v, r, 16.0);
+    let head = head(back);
+    let top = r.y + PAD;
+    let title_top = top + (head - TITLE_BOX) / 2.0;
+    let baseline = v.snap(frame::baseline(title_top, 26.0, 1.2));
+    v.say(
+        title,
+        &[],
+        Role::Title,
+        Slot::left(r.x + PAD, room, baseline),
+        INK,
+    );
+    if back {
+        let chip = Rect::new(r.x + w - PAD - CHIP, top + (head - CHIP) / 2.0, CHIP, CHIP);
+        back_glyph(v, v.snap_rect(chip));
+        v.hits.borrow_mut().back = Some(chip);
+    }
+    r
+}
+
 fn row_height(action: Action) -> f32 {
     if action == Action::Continue {
         TALL
@@ -184,6 +199,7 @@ fn help(action: Action) -> Option<TextId> {
         Action::MainMenu => Some(TextId::HelpMainMenu),
         Action::Sectors => Some(TextId::HelpSectors),
         Action::NewJourney => Some(TextId::HelpNewJourney),
+        Action::Settings => Some(TextId::HelpSettings),
         Action::Continue | Action::Next => None,
     }
 }
@@ -368,6 +384,7 @@ pub(super) fn label(action: Action, practice: bool) -> TextId {
         Action::MainMenu => TextId::MainMenu,
         Action::Next if practice => TextId::BackToSectors,
         Action::Next => TextId::NextSector,
+        Action::Settings => TextId::Settings,
     }
 }
 
@@ -506,4 +523,173 @@ pub(super) fn medal_pip(v: &Scene, r: Rect, earned: bool) {
     } else {
         v.shape(r, [radius; 4], Fill::flat(hex(0x232836)));
     }
+}
+
+/// Settings rows: their height, the gap between them, and the padding
+/// inside them, which bleeds past the sheet's own padding.
+const SETTING_ROW: f32 = 48.0;
+const SETTING_GAP: f32 = 4.0;
+const SETTING_PAD: f32 = S16;
+
+/// Sound, volume, display and language, each changed in place.
+pub(super) fn settings(v: &Scene, ui: &Ui, profile: &Profile, focus: usize) {
+    let rows = settings::ROWS;
+    let value_w = |row: settings::Row| match row.value(&profile.settings) {
+        Value::Toggle(_) => 40.0,
+        Value::Level(..) => 10.0 * 12.0 - 3.0 + 10.0 + 18.0,
+        Value::Text(id) => v.width_of(id, &[], Role::Caption),
+        Value::Native(name) => v.measure(name, Role::Caption),
+    };
+    let fits_in = |w: f32| {
+        let room = w - 2.0 * PAD;
+        fits(v, TextId::Settings, Role::Title.into(), room - CHIP - S16)
+            && rows
+                .iter()
+                .all(|&row| v.width_of(row.name(), &[], Role::Body) + S24 + value_w(row) <= room)
+    };
+    let w = if fits_in(NARROW) { NARROW } else { WIDE };
+    let list = rows.len() as f32 * (SETTING_ROW + SETTING_GAP) - SETTING_GAP;
+    let h = PAD + head(true) + S24 + list + S16 + HELP_LINE + PAD;
+    let r = open(
+        v,
+        ui,
+        (w, h),
+        (TextId::Settings, w - 2.0 * PAD - CHIP - S16),
+        true,
+    );
+    let mut y = r.y + PAD + head(true) + S24;
+    v.hits.borrow_mut().list = Some(List::Settings);
+    for (i, &row) in rows.iter().enumerate() {
+        let rr = v.snap_rect(Rect::new(
+            r.x + PAD - SETTING_PAD,
+            y,
+            w - 2.0 * (PAD - SETTING_PAD),
+            SETTING_ROW,
+        ));
+        if i == focus {
+            v.outline(rr, 12.0, v.thick(1.5), opacity(CYAN, 0.55));
+        }
+        let baseline = v.snap(rr.y + rr.h / 2.0 + v.cap(Role::Body) / 2.0);
+        let left = rr.x + SETTING_PAD;
+        let right = rr.x + rr.w - SETTING_PAD;
+        v.say(
+            row.name(),
+            &[],
+            Role::Body,
+            Slot::left(left, right - left, baseline),
+            INK,
+        );
+        let mid = rr.y + rr.h / 2.0;
+        let caption = v.snap(mid + v.cap(Role::Caption) / 2.0);
+        match row.value(&profile.settings) {
+            Value::Toggle(on) => toggle(v, Rect::new(right - 40.0, mid - 11.0, 40.0, 22.0), on),
+            Value::Level(level, max) => {
+                let figure = Figures::count(v.locale, u32::from(level));
+                v.put(
+                    figure.as_str(),
+                    Role::Caption,
+                    Slot::right(right, 18.0, caption),
+                    INK,
+                );
+                let first = right - 18.0 - 10.0 - (f32::from(max) * 12.0 - 3.0);
+                for i in 0..max {
+                    let pip =
+                        v.snap_rect(Rect::new(first + f32::from(i) * 12.0, mid - 2.5, 9.0, 5.0));
+                    let fill = if i < level {
+                        Fill::ramp(hex(0xb8f3fc), CYAN)
+                    } else {
+                        Fill::flat(hex(0x232836))
+                    };
+                    v.shape(pip, [2.0; 4], fill);
+                }
+            }
+            Value::Text(id) => {
+                v.say(
+                    id,
+                    &[],
+                    Role::Caption,
+                    Slot::right(right, right - left, caption),
+                    DIM,
+                );
+            }
+            Value::Native(name) => {
+                v.put(
+                    name,
+                    Role::Caption,
+                    Slot::right(right, right - left, caption),
+                    DIM,
+                );
+            }
+        }
+        v.hits.borrow_mut().push(rr);
+        y += SETTING_ROW + SETTING_GAP;
+    }
+    // The help line shows how to change the focused row.
+    let top = y - SETTING_GAP + S16;
+    let mid = top + HELP_LINE / 2.0;
+    let x = r.x + PAD;
+    for (i, left) in [true, false].into_iter().enumerate() {
+        let chip = Rect::new(x + i as f32 * (22.0 + S8), mid - 11.0, 22.0, 22.0);
+        arrow_glyph(v, v.snap_rect(chip), left);
+    }
+    let verb = settings::ROWS[focus.min(rows.len() - 1)].verb();
+    let text = x + 2.0 * 22.0 + S8 + S12;
+    let baseline = v.snap(frame::baseline(top, 16.0, 1.4));
+    v.say(
+        verb,
+        &[],
+        Role::Caption,
+        Slot::left(text, r.x + w - PAD - text, baseline),
+        DIM,
+    );
+    v.set_motion(1.0, 0.0);
+}
+
+/// A switch: cyan glass with the pearl knob at the right when on, dark
+/// with the knob at the left when off.
+fn toggle(v: &Scene, r: Rect, on: bool) {
+    let r = v.snap_rect(r);
+    let rim = v.thick(1.5);
+    let radius = r.h / 2.0;
+    let body = Rect::new(r.x + rim, r.y + rim, r.w - 2.0 * rim, r.h - 2.0 * rim);
+    if on {
+        v.shape(r, [radius; 4], Fill::ramp(hex(0xb8f3fc), CYAN));
+        v.shape(
+            body,
+            [radius - rim; 4],
+            Fill::ramp(mix(GLASS_BOTTOM, CYAN, 0.26), mix(GLASS_BOTTOM, CYAN, 0.12)),
+        );
+    } else {
+        v.shape(r, [radius; 4], Fill::flat(hex(0x2a3142)));
+        v.shape(body, [radius - rim; 4], Fill::flat(GLASS_BOTTOM));
+    }
+    let knob = 7.5;
+    let cx = if on {
+        r.x + r.w - 2.0 - knob
+    } else {
+        r.x + 2.0 + knob
+    };
+    v.pearl(
+        V2::new(cx, r.y + r.h / 2.0),
+        knob,
+        if on { 1.0 } else { 0.5 },
+    );
+}
+
+/// An arrow key, for changing a setting.
+fn arrow_glyph(v: &Scene, r: Rect, left: bool) {
+    v.cap_glyph(
+        Cap::Key(""),
+        r.x,
+        r.y + r.h / 2.0 + v.cap(Role::Body) / 2.0,
+        Role::Body,
+    );
+    let (cx, cy) = (r.x + r.w / 2.0, r.y + r.h / 2.0);
+    let dir = if left { -1.0 } else { 1.0 };
+    let t = v.thick(1.5);
+    let ink = hex(0xcfd6e3);
+    let head = V2::new(cx + 4.0 * dir, cy);
+    v.line(V2::new(cx - 4.0 * dir, cy), head, t, ink);
+    v.line(head, V2::new(cx + 1.0 * dir, cy - 3.0), t, ink);
+    v.line(head, V2::new(cx + 1.0 * dir, cy + 3.0), t, ink);
 }

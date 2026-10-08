@@ -2,6 +2,7 @@
 use crate::{
     display::MIN_PHYSICAL,
     input::{Dir, Presses, pad_controls},
+    settings::Settings,
     storage::Profile,
     ui::{Controls, Screen, Ui},
 };
@@ -30,7 +31,9 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
     );
     match frame {
         1 | 2 | 5 | 9 | 10 | 14 | 17 | 18 | 19 | 22 | 24 | 25 | 28 => keys.confirm = true,
-        7 | 8 | 12 | 13 | 15 | 16 => keys.down = true,
+        // Main menu is the pause sheet's last row: up wraps to it.
+        7 | 12 => keys.up = true,
+        15 | 16 => keys.down = true,
         6 | 11 | 23 | 30 => {
             keys.escape = true;
             keys.pause = true;
@@ -171,6 +174,32 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
             assert_eq!(game.stage(), Stage::Ready);
             assert!(game.sector().index() == 8 && game.mode() == Mode::Practice);
             println!("Results flow passed: game over focuses Retry, A retries");
+            keys.pause = true;
+        }
+        // Settings from the pause sheet: the volume changes live, and
+        // leaving returns to the pause sheet on its Settings row.
+        70 | 71 => {
+            assert!(ui.paused);
+            keys.down = true;
+        }
+        72 => {
+            assert_eq!(ui.choice, 2);
+            keys.confirm = true;
+        }
+        73 => {
+            assert_eq!(ui.settings, Some(0));
+            keys.down = true;
+        }
+        74 => keys.right = true,
+        75 => {
+            assert_eq!(ui.settings, Some(1));
+            assert_eq!(profile.settings.volume, Settings::default().volume + 1);
+            keys.escape = true;
+        }
+        76 => {
+            assert!(ui.settings.is_none() && ui.paused);
+            assert_eq!(ui.choice, 2);
+            println!("Settings flow passed: open from pause, adjust volume live, back to pause");
         }
         _ => {}
     }

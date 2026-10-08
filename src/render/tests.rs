@@ -186,6 +186,17 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
             veteran(0),
         ));
     }
+    for (row, paused, screen) in [(0, false, Screen::Title), (3, true, Screen::Play)] {
+        let ui = Ui {
+            screen,
+            paused,
+            settings: Some(row),
+            ..Ui::default()
+        };
+        let mut profile = veteran(3);
+        profile.settings.fullscreen = paused;
+        out.push((format!("settings {row}"), held.clone(), ui, profile));
+    }
     let profiles = [Profile::default(), veteran(3)];
     for (i, profile) in profiles.iter().enumerate() {
         let mut muted = profile.clone();
@@ -289,6 +300,12 @@ fn check(
                     device,
                     ..ui.clone()
                 };
+                // The Settings sheet names the language in use in itself.
+                let mut profile = profile.clone();
+                if ui.settings.is_some() && locale != Locale::Pseudo {
+                    profile.settings.locale = Some(locale);
+                }
+                let profile = &profile;
                 scene(&v, &Fx::default(), game, &ui, profile, 1.0, None);
                 for m in log.into_inner() {
                     let line = match m.missing {

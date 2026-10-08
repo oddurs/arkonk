@@ -33,9 +33,6 @@ pub(super) fn text(id: TextId) -> &'static str {
         ActionResume => "Retomar",
         ActionPlay => "Jogar",
         ActionBack => "Voltar",
-        SoundOn => "Som ligado",
-        SoundOff => "Som desligado",
-        Volume => "Volume {0}",
         Fullscreen => "Tela cheia",
         SectorsHeading => "Setores",
         PracticeNote => "Treinos nunca alteram sua jornada",
@@ -69,6 +66,15 @@ pub(super) fn text(id: TextId) -> &'static str {
         HelpMainMenu => "Sua jornada está salva",
         HelpSectors => "Treine em qualquer setor aberto",
         HelpNewJourney => "Recomeça no setor 01 · as medalhas ficam",
+        Settings => "Configurações",
+        HelpSettings => "Som, tela, idioma",
+        SettingSound => "Som",
+        SettingVolume => "Volume",
+        SettingDisplay => "Tela",
+        SettingLanguage => "Idioma",
+        DisplayWindow => "Janela",
+        LanguageSystem => "Sistema",
+        ActionAdjust => "Ajustar",
         SectorName(s) => NAMES[s.index()],
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
@@ -98,6 +104,7 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
         SectorSelect => Some("Setores"),
         NextSector => Some("Próximo"),
         BackToSectors => Some("Setores"),
+        Settings => Some("Opções"),
         _ => None,
     }
 }

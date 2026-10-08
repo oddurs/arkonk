@@ -379,7 +379,45 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         }
         focus.lost = false;
         let mut changed = false;
+        // The Settings sheet takes every input while it is open.
+        let settings_open = ui.settings.is_some();
+        if let Some(row) = ui.settings {
+            let rows = settings::ROWS;
+            let last = rows.len() - 1;
+            let hovered = renderer.hits().row_at(ui::List::Settings, pointer);
+            let mut row = match (up, down) {
+                (true, false) => row.checked_sub(1).unwrap_or(last),
+                (false, true) if row >= last => 0,
+                (false, true) => row + 1,
+                _ => row.min(last),
+            };
+            if (moved || click)
+                && let Some(at) = hovered
+            {
+                row = at;
+            }
+            let forward = right || confirm || (click && hovered.is_some());
+            if left || forward {
+                let setting = rows[row];
+                setting.step(&mut profile.settings, !left, ark_glyphs::supports);
+                dirty = true;
+                if setting == settings::Row::Language {
+                    let (language, _) = locale::choose(
+                        None,
+                        profile.settings.locale,
+                        steam.language(),
+                        locale::system(),
+                    );
+                    renderer.set_locale(language);
+                }
+            }
+            // Leaving returns to the sheet or menu that opened it, focused
+            // on its Settings row as before.
+            let back = escape || pause || (click && renderer.hits().back_at(pointer));
+            ui.settings = (!back).then_some(row);
+        }
         match ui.screen {
+            _ if settings_open => {}
             Screen::Title => {
                 let menu = ui::title_menu(profile.progress.checkpoint().is_some());
                 let hovered = renderer.hits().row_at(menu, pointer);
@@ -413,6 +451,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                             ui.screen = Screen::Sectors;
                             ui.sector = SectorId::clamped(profile.progress.unlocked_count() - 1);
                         }
+                        Action::Settings => ui.settings = Some(0),
                         Action::Resume | Action::Retry | Action::MainMenu | Action::Next => {}
                     }
                 }
@@ -534,6 +573,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                             home(&mut ui);
                             changed = true;
                         }
+                        Some(Action::Settings) => ui.settings = Some(0),
                         Some(Action::Continue | Action::Next) | None => {}
                     }
                 } else if !changed && game.stage() == Stage::Cleared {
@@ -653,6 +693,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         let draw_start = get_time();
         let actual_screen = ui.screen;
         let actual_pause = ui.paused;
+        let actual_settings = ui.settings;
         let measured = if perf_test { 3899 } else { 660 };
         let layouts = smoke && !flow && !perf_test && !effects;
         let layout_capture = if layouts && frames >= measured {
@@ -674,6 +715,10 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     });
                 }
                 150 => ui.paused = true,
+                155 => {
+                    ui.paused = true;
+                    ui.settings = Some(1);
+                }
                 160 => ui.preview = preview(Stage::GameOver),
                 180 => ui.preview = preview(Stage::Cleared),
                 190 => ui.screen = Screen::Sectors,
@@ -721,6 +766,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         ui.preview = None;
         ui.screen = actual_screen;
         ui.paused = actual_pause;
+        ui.settings = actual_settings;
         perf.draw((get_time() - draw_start) * 1000.0);
         if smoke && !flow && !perf_test {
             let capture = match frames {
@@ -728,6 +774,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 120 => Some("target/smoke-test.png"),
                 140 => Some("target/ready.png"),
                 150 => Some("target/paused.png"),
+                155 => Some("target/settings.png"),
                 160 => Some("target/game-over.png"),
                 170 => Some("target/stats.png"),
                 180 => Some("target/clear.png"),
@@ -782,7 +829,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 "target/relay.png"
             });
         }
-        if flow && frames >= 69 {
+        if flow && frames >= 76 {
             break;
         }
         frames += 1;

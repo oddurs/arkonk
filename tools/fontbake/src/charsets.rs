@@ -139,6 +139,20 @@ pub fn collect(group: &Group) -> Result<Sets, String> {
             }
         }
     }
+    // The Settings sheet names the language being spoken in that language,
+    // so each atlas holds its own locales' names.
+    for &locale in group.locales.iter().filter(|&&l| l != Locale::Pseudo) {
+        let name = locale.native_name();
+        for style in [
+            (Role::Caption, Weight::Regular),
+            (Role::Body, Weight::Regular),
+        ] {
+            chars
+                .entry(style)
+                .or_default()
+                .extend(name.chars().filter(|&c| mine(c)));
+        }
+    }
     if !group.cjk {
         // Every style, emphasised ones included, sets figures.
         let styles = spec::ROLES

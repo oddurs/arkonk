@@ -1457,6 +1457,10 @@ fn scene(
         } else {
             sectors(v, ui, profile);
         }
+        if let Some(row) = ui.settings {
+            sheet::dim(v, ui.sheet_open);
+            sheet::settings(v, ui, profile, row);
+        }
         return;
     }
     bricks(v, fx, game);
@@ -1535,7 +1539,10 @@ fn scene(
         }
     }
     let footer_error = ui.save_error && (ui.paused || stage != Stage::Playing);
-    if ui.paused {
+    if let Some(row) = ui.settings {
+        sheet::dim(v, ui.sheet_open);
+        sheet::settings(v, ui, profile, row);
+    } else if ui.paused {
         sheet::dim(v, ui.sheet_open);
         sheet::pause(v, ui, game);
         v.footer(&[], footer_error);
@@ -1843,41 +1850,10 @@ fn ready(v: &Scene, game: &Game) {
         );
     }
 }
-/// The sound, volume and display shortcuts. They are keyboard keys; a pad
-/// player still sees the levels.
-fn options(profile: &Profile, device: Device) -> [Item; 3] {
-    let sound = if profile.settings.muted {
-        TextId::SoundOff
-    } else {
-        TextId::SoundOn
-    };
-    let volume = Some(Arg::Count(u32::from(profile.settings.volume)));
-    let key = |k| match device {
-        Device::KeyboardMouse => Some(Cap::Key(k)),
-        Device::Gamepad => None,
-    };
-    [
-        Item {
-            cap: key("M"),
-            id: sound,
-            arg: None,
-        },
-        Item {
-            cap: key("[ ]"),
-            id: TextId::Volume,
-            arg: volume,
-        },
-        Item {
-            cap: key("F"),
-            id: TextId::Fullscreen,
-            arg: None,
-        },
-    ]
-}
 /// Draws the title's `menu` with `focus` on one row, and records its rows
 /// for the pointer. `detail` is the Continue row's second line.
 fn menu(v: &Scene, menu: &Menu, focus: usize, detail: Option<(TextId, &[Arg])>) {
-    v.hits.borrow_mut().menu = Some(*menu);
+    v.hits.borrow_mut().list = Some((*menu).into());
     for (i, &action) in menu.actions.iter().enumerate() {
         let detail = detail.filter(|_| action == Action::Continue);
         sheet::row(
@@ -1963,8 +1939,7 @@ fn attract(v: &Scene, ui: &Ui, profile: &Profile) {
             },
         ],
     };
-    let options = options(profile, v.device);
-    v.footer(&[&hints, &options], ui.save_error);
+    v.footer(&[&hints], ui.save_error);
 }
 fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
     let back = ui::back_rect();

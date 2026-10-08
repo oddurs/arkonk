@@ -61,12 +61,18 @@ text_ids! {
     ActionPlay,
     ActionBack,
 
-    // Settings shortcuts.
-    SoundOn,
-    SoundOff,
-    /// `{0}` volume step.
-    Volume,
+    // Settings.
+    Settings,
+    HelpSettings,
+    SettingSound,
+    SettingVolume,
+    SettingDisplay,
+    SettingLanguage,
+    DisplayWindow,
     Fullscreen,
+    /// Follow Steam's language, then the system's.
+    LanguageSystem,
+    ActionAdjust,
 
     // Sector select.
     SectorsHeading,
@@ -154,7 +160,7 @@ impl TextId {
         match self {
             ContinueDetail => 3,
             Fraction | ReadyEyebrow => 2,
-            Volume | SwiftWithin | PlaySector | UnlockHint | Plus => 1,
+            SwiftWithin | PlaySector | UnlockHint | Plus => 1,
             _ => 0,
         }
     }
@@ -170,9 +176,9 @@ impl TextId {
             SectorName(_) => Role::Display,
             KeysMove | KeysServe | KeysPause | KeysRelease | KeysBrowse | KeysPlay | KeysBack
             | PadMove | PadBrowse | ActionServe | ActionPause | ActionRelease | ActionSelect
-            | ActionPlay | ActionBack | SoundOn | SoundOff | Volume | Fullscreen | SaveFailed
-            | ContinueDetail | PracticeNote | HelpResume | HelpRetry | HelpMainMenu
-            | HelpSectors | HelpNewJourney | ExtraLife => Role::Caption,
+            | ActionPlay | ActionBack | Fullscreen | SaveFailed | ContinueDetail | PracticeNote
+            | HelpResume | HelpRetry | HelpMainMenu | HelpSectors | HelpNewJourney | ExtraLife
+            | HelpSettings | DisplayWindow | LanguageSystem | ActionAdjust => Role::Caption,
             _ => Role::Body,
         }
     }
@@ -187,6 +193,7 @@ impl TextId {
         match self {
             SectorName(_) => &[Role::Title, Role::Caption],
             Plus | Fraction => &[Role::Figure],
+            Settings => &[Role::Title],
             _ => &[],
         }
     }
@@ -207,6 +214,7 @@ impl TextId {
                 | NextSector
                 | BackToSectors
                 | PlaySector
+                | Settings
                 | SectorName(_)
         )
     }

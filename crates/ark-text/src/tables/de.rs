@@ -34,9 +34,6 @@ pub(super) fn text(id: TextId) -> &'static str {
         ActionResume => "Fortsetzen",
         ActionPlay => "Spielen",
         ActionBack => "Zurück",
-        SoundOn => "Ton an",
-        SoundOff => "Ton aus",
-        Volume => "Lautstärke {0}",
         Fullscreen => "Vollbild",
         SectorsHeading => "Sektoren",
         PracticeNote => "Übungsrunden verändern deine Reise nie",
@@ -70,6 +67,15 @@ pub(super) fn text(id: TextId) -> &'static str {
         HelpMainMenu => "Deine Reise ist gespeichert",
         HelpSectors => "Übe jeden offenen Sektor",
         HelpNewJourney => "Neu ab Sektor 01 · Medaillen bleiben",
+        Settings => "Einstellungen",
+        HelpSettings => "Ton, Anzeige, Sprache",
+        SettingSound => "Ton",
+        SettingVolume => "Lautstärke",
+        SettingDisplay => "Anzeige",
+        SettingLanguage => "Sprache",
+        DisplayWindow => "Fenster",
+        LanguageSystem => "System",
+        ActionAdjust => "Anpassen",
         SectorName(s) => NAMES[s.index()],
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
@@ -99,6 +105,7 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
         SectorSelect => Some("Sektoren"),
         NextSector => Some("Weiter"),
         BackToSectors => Some("Sektoren"),
+        Settings => Some("Optionen"),
         _ => None,
     }
 }
