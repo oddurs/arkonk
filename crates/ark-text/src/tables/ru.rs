@@ -63,6 +63,7 @@ pub(super) fn text(id: TextId) -> &'static str {
         KeyEsc => "Esc",
         SectorsOf => "{0} из {1} секторов",
         TargetBest => "{0} · рекорд {1}",
+        LifeGained => "+1 жизнь",
         SectorName(s) => NAMES[s.index()],
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
@@ -71,11 +72,11 @@ pub(super) fn text(id: TextId) -> &'static str {
             Chapter::Afterlight => "СУМЕРКИ",
         },
         PowerName(p) => match p {
-            Power::Wide => "Ширина",
-            Power::Slow => "Замедление",
-            Power::Multi => "Мультимяч",
-            Power::Anchor => "Якорь",
-            Power::Phase => "Фаза",
+            Power::Wide => "ШИРИНА",
+            Power::Slow => "ЗАМЕДЛЕНИЕ",
+            Power::Multi => "МУЛЬТИМЯЧ",
+            Power::Anchor => "ЯКОРЬ",
+            Power::Phase => "ФАЗА",
         },
     }
 }
@@ -93,6 +94,7 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
         BackToSectors => Some("Секторы"),
         SectorsOf => Some("{0}/{1}"),
         TargetBest => Some("{0}"),
+        LifeGained => Some("+1"),
         _ => None,
     }
 }

@@ -63,6 +63,7 @@ pub(super) fn text(id: TextId) -> &'static str {
         KeyEsc => "Esc",
         SectorsOf => "{0} / {1} 个星区",
         TargetBest => "{0} · 最佳 {1}",
+        LifeGained => "+1 生命",
         SectorName(s) => NAMES[s.index()],
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
@@ -93,6 +94,7 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
         BackToSectors => Some("星区"),
         SectorsOf => Some("{0}/{1}"),
         TargetBest => Some("{0}"),
+        LifeGained => Some("+1"),
         _ => None,
     }
 }

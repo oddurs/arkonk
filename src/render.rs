@@ -4,7 +4,7 @@ use crate::{
     perf::Perf,
     pixel_font,
     storage::Profile,
-    ui::{self, Action, Hits, Menu, Pressed, Prompt, Screen, Ui},
+    ui::{self, Action, Hits, Menu, Pressed, Screen, Ui},
 };
 use ark::{
     Events, Game, Medals, Mode, Power, SectorSummary, Stage,
@@ -120,8 +120,6 @@ fn leading(style: impl Into<Style>) -> f32 {
     let style = style.into();
     style.size * spec::line(style.role)
 }
-/// The footer's last baseline; rows stack upward from it.
-const FOOTER: f32 = 872.0;
 
 fn opacity(c: Color, alpha: f32) -> Color {
     Color::new(c.r, c.g, c.b, alpha)
@@ -889,18 +887,6 @@ impl Scene<'_> {
         })
     }
 
-    /// The save warning, until the band reports it.
-    fn footer(&self, save_error: bool) {
-        if save_error {
-            self.say(
-                TextId::SaveFailed,
-                &[],
-                Role::Caption,
-                Slot::line(FOOTER),
-                INK,
-            );
-        }
-    }
     fn logo(&self, x: f32, y: f32, cell: f32) {
         for (letter, character) in "ARKONK".chars().enumerate() {
             let color = if character == 'O' { CYAN } else { INK };
@@ -974,6 +960,9 @@ pub struct Fx {
     previous_sector: Option<SectorId>,
     /// Lives when this sector began; the band rings each one lost since.
     entry_lives: u8,
+    /// Lives a tick ago, and how long a life just gained stays ringed.
+    previous_lives: u8,
+    life_gained: f32,
     paddle_flash: f32,
     wall_flash: f32,
     pickup_flash: f32,
@@ -991,6 +980,8 @@ impl Default for Fx {
             previous_score: 0,
             previous_sector: None,
             entry_lives: 0,
+            previous_lives: 0,
+            life_gained: 0.0,
             paddle_flash: 0.0,
             wall_flash: 0.0,
             pickup_flash: 0.0,
@@ -1108,7 +1099,13 @@ impl Renderer {
             fx.previous_bricks = hp_grid(game);
             fx.previous_score = game.score();
             fx.entry_lives = game.lives();
+            fx.previous_lives = game.lives();
         }
+        fx.life_gained = (fx.life_gained - DT).max(0.0);
+        if game.lives() > fx.previous_lives {
+            fx.life_gained = 1.0;
+        }
+        fx.previous_lives = game.lives();
         for (i, ball) in game.balls().iter().enumerate() {
             if !ball.active || ball.held || game.stage() != Stage::Playing {
                 fx.trail_len[i] = 0;
@@ -1294,7 +1291,7 @@ fn scene(
         }
     }
     balls(v, fx, game, alpha);
-    frame::band_play(v, fx, game, profile);
+    frame::band_play(v, fx, game, profile, ui.notice > 0.0);
     let mut letter = [0; 4];
     for drop in game.capsules() {
         if drop.active {
@@ -1308,48 +1305,26 @@ fn scene(
             );
         }
     }
+    // Points float from the brick in caption-sized figures.
     for popup in &fx.popups {
         if popup.life > 0.0 {
-            let color = opacity(INK, (popup.life * 3.0).min(1.0));
+            let color = opacity(INK, 0.85 * (popup.life * 3.0).min(1.0));
             v.format(TextId::Plus, &[Arg::Count(popup.value)], Form::Full, |t| {
-                v.put(
-                    t,
-                    Role::Label,
-                    Slot::centered(popup.pos.x, 120.0, popup.pos.y),
-                    color,
-                )
+                let slot = Slot::centered(popup.pos.x, 120.0, popup.pos.y);
+                v.put(t, Role::Caption, slot, color)
             });
         }
     }
     if !ui.paused && stage == Stage::Playing {
-        if game.balls().iter().any(|b| b.active && b.held) {
-            let words = (TextId::ActionRelease, Role::Body.into());
-            let w = chips::prompt_width(v, Prompt::Serve, words, sheet::CHIP);
-            let at = (v.snap(WIDTH / 2.0 - w / 2.0), 720.0);
-            chips::prompt(v, Prompt::Serve, words, at, sheet::CHIP, CYAN);
-        }
-        if game.effects().notice_ticks > 0
-            && let Some(power) = game.effects().notice
-        {
-            let fade = (game.effects().notice_ticks as f32 / 60.0).min(1.0);
-            let color = opacity(power_color(power), fade);
-            v.say(
-                TextId::PowerName(power),
-                &[],
-                Role::Body,
-                Slot::line(687.0),
-                color,
-            );
-        }
+        moments::release(v, game);
+        moments::power(v, game);
     }
-    let footer_error = ui.save_error && (ui.paused || stage != Stage::Playing);
     if let Some(row) = ui.settings {
         sheet::dim(v, ui.sheet_open);
         sheet::settings(v, ui, profile, row);
     } else if ui.paused {
         sheet::dim(v, ui.sheet_open);
         sheet::pause(v, ui, game);
-        v.footer(footer_error);
     } else {
         match stage {
             Stage::Ready => screens::ready(v, game),
@@ -1360,7 +1335,6 @@ fn scene(
             Stage::GameOver | Stage::Victory => {
                 sheet::dim(v, ui.sheet_open);
                 sheet::results(v, ui, game, stage == Stage::Victory);
-                v.footer(footer_error);
             }
             Stage::Playing => {}
         }
@@ -1746,6 +1720,7 @@ fn power_color(power: Power) -> Color {
 
 mod chips;
 mod frame;
+mod moments;
 mod screens;
 mod sheet;
 #[cfg(test)]

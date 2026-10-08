@@ -62,6 +62,7 @@ pub(super) fn text(id: TextId) -> &'static str {
         KeyEsc => "Esc",
         SectorsOf => "{0} settori su {1}",
         TargetBest => "{0} · record {1}",
+        LifeGained => "+1 vita",
         SectorName(s) => NAMES[s.index()],
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
@@ -70,11 +71,11 @@ pub(super) fn text(id: TextId) -> &'static str {
             Chapter::Afterlight => "CREPUSCOLO",
         },
         PowerName(p) => match p {
-            Power::Wide => "Largo",
-            Power::Slow => "Lento",
-            Power::Multi => "Multipalla",
-            Power::Anchor => "Ancora",
-            Power::Phase => "Fase",
+            Power::Wide => "LARGO",
+            Power::Slow => "LENTO",
+            Power::Multi => "MULTIPALLA",
+            Power::Anchor => "ANCORA",
+            Power::Phase => "FASE",
         },
     }
 }
@@ -92,6 +93,7 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
         BackToSectors => Some("Settori"),
         SectorsOf => Some("{0}/{1}"),
         TargetBest => Some("{0}"),
+        LifeGained => Some("+1"),
         _ => None,
     }
 }

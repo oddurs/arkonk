@@ -101,6 +101,8 @@ text_ids! {
     BackToSectors,
 
     SaveFailed,
+    /// Under the band's lives when a chapter earns one.
+    LifeGained,
     PerfTitle,
 
     // Help for the focused action, one caption line under a sheet's list.
@@ -158,13 +160,17 @@ impl TextId {
         use TextId::*;
         match self {
             StatMedals | StatBest | MedalClear | MedalClean | MedalSwift | ReadyEyebrow
-            | StatPoints | StatTime | StatBonus | StatChain | ChapterName(_) => Role::Label,
+            | StatPoints | StatTime | StatBonus | StatChain | ChapterName(_) | PowerName(_) => {
+                Role::Label
+            }
             SectorsHeading | Paused | JourneyComplete | OneMoreOrbit | SectorClear => Role::Title,
             SectorName(_) => Role::Display,
             ActionServe | ActionRelease | ActionSelect | ActionBack | Fullscreen | SaveFailed
             | ContinueDetail | PracticeNote | SectorsOf | TargetBest | UnlockHint | Tagline
             | HelpResume | HelpRetry | HelpMainMenu | HelpSectors | HelpNewJourney | ExtraLife
-            | HelpSettings | DisplayWindow | LanguageSystem | ActionAdjust => Role::Caption,
+            | LifeGained | HelpSettings | DisplayWindow | LanguageSystem | ActionAdjust => {
+                Role::Caption
+            }
             _ => Role::Body,
         }
     }
@@ -180,7 +186,8 @@ impl TextId {
             SectorName(_) => &[Role::Title, Role::Caption],
             // The ready card sets a tip as body text, the detail sheet as a caption.
             SectorTip(_) => &[Role::Caption],
-            Plus => &[Role::Figure],
+            // Results set points as figures; play floats them as captions.
+            Plus => &[Role::Figure, Role::Caption],
             Settings => &[Role::Title],
             // Keycaps set their names in the Label cut, untracked.
             KeySpace | KeyEsc => &[Role::Label],

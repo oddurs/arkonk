@@ -149,42 +149,45 @@ pub(super) fn pips(v: &Scene, centre: f32, top: f32, current: Option<SectorId>, 
 }
 
 /// The band in play: the score, the sector and the journey, and the lives.
-pub(super) fn band_play(v: &Scene, fx: &Fx, game: &Game, profile: &Profile) {
+pub(super) fn band_play(v: &Scene, fx: &Fx, game: &Game, profile: &Profile, notice: bool) {
     let (left, right) = (BAND.x + BAND_PAD, BAND.x + BAND.w - BAND_PAD);
     let mid = BAND.y + BAND.h / 2.0;
     let score = Figures::count(v.locale, game.score());
-    let figure = Role::Figure;
-    let size = spec::style(figure).0;
+    let size = spec::style(Role::Figure).0;
     let side = 280.0;
+    let at = v.snap(baseline(mid - size / 2.0, size, 1.0));
     v.put(
         score.as_str(),
-        figure,
-        Slot::left(left, side, v.snap(baseline(mid - size / 2.0, size, 1.0))),
+        Role::Figure,
+        Slot::left(left, side, at),
         INK,
     );
-    // The sector's name over the journey: a 20-unit line, 10 apart, then
-    // three-unit pips, centred as one block.
-    let block = 20.0 + 10.0 + 3.0;
-    let top = mid - block / 2.0;
-    let name = Slot::centered(
-        WIDTH / 2.0,
-        right - left - 2.0 * side,
-        v.snap(baseline(top, 20.0, 1.0)),
+    if notice {
+        moments::status(v, mid, TextId::SaveFailed);
+    } else {
+        // The sector's name over the journey: a 20-unit line, 10 apart,
+        // then three-unit pips, centred as one block.
+        let block = 20.0 + 10.0 + 3.0;
+        let top = mid - block / 2.0;
+        let at = v.snap(baseline(top, 20.0, 1.0));
+        let name = Slot::centered(WIDTH / 2.0, right - left - 2.0 * side, at);
+        let strong = Style::from(Role::Body).strong();
+        v.say(TextId::SectorName(game.sector()), &[], strong, name, INK);
+        pips(v, WIDTH / 2.0, top + 30.0, Some(game.sector()), profile);
+    }
+    lives(
+        v,
+        right,
+        mid,
+        game.lives(),
+        (fx.entry_lives, fx.life_gained),
     );
-    v.say(
-        TextId::SectorName(game.sector()),
-        &[],
-        Role::Body,
-        name,
-        INK,
-    );
-    pips(v, WIDTH / 2.0, top + 30.0, Some(game.sector()), profile);
-    lives(v, right, mid, game.lives(), fx.entry_lives);
 }
 
 /// Lives as pearls ending at `right`, and a dim ring for each life lost
-/// since the sector began.
-fn lives(v: &Scene, right: f32, mid: f32, lives: u8, entry: u8) {
+/// since the sector began. A life just gained wears an amber ring for a
+/// second, with "+1 life" under the row.
+fn lives(v: &Scene, right: f32, mid: f32, lives: u8, (entry, gained): (u8, f32)) {
     const D: f32 = 12.0;
     const GAP: f32 = 9.0;
     let lost = entry.saturating_sub(lives);
@@ -192,18 +195,30 @@ fn lives(v: &Scene, right: f32, mid: f32, lives: u8, entry: u8) {
     for i in 0..count {
         let x = right - D / 2.0 - f32::from(count - 1 - i) * (D + GAP);
         let p = V2::new(v.snap(x), v.snap(mid));
+        let bounds = Rect::new(p.x - D / 2.0, p.y - D / 2.0, D, D);
         if i < lives {
-            v.halo(
-                Rect::new(p.x - D / 2.0, p.y - D / 2.0, D, D),
-                D / 2.0,
-                4.0,
-                opacity(hex(0xdcf0ff), 0.3),
-            );
+            if gained > 0.0 && i + 1 == lives {
+                v.halo(bounds, D / 2.0, 12.0, opacity(AMBER, 0.6 * gained));
+                v.ring(p, D / 2.0, 4.0, opacity(AMBER, 0.25 * gained));
+            }
+            v.halo(bounds, D / 2.0, 4.0, opacity(hex(0xdcf0ff), 0.3));
             v.pearl(p, D / 2.0, 1.0);
         } else {
             let t = v.thick(1.5);
             v.ring(p, D / 2.0 - t, t, hex(0x3a4256));
         }
+    }
+    if gained > 0.0 {
+        let caption = Style::from(Role::Caption).sized(13.0);
+        let at = v.snap(mid + D / 2.0 + 8.0 + v.cap(caption));
+        let colour = opacity(AMBER, gained.min(0.5) * 2.0);
+        v.say(
+            TextId::LifeGained,
+            &[],
+            caption,
+            Slot::right(right, 160.0, at),
+            colour,
+        );
     }
 }
 
@@ -237,7 +252,7 @@ const PAIR_BLOCK: f32 = 15.0 + 8.0 + 28.0;
 
 /// The band on the title: the best score, the journey (the saved sector
 /// lit), and the medals.
-pub(super) fn band_title(v: &Scene, profile: &Profile) {
+pub(super) fn band_title(v: &Scene, profile: &Profile, notice: bool) {
     let (left, right) = (BAND.x + BAND_PAD, BAND.x + BAND.w - BAND_PAD);
     let mid = BAND.y + BAND.h / 2.0;
     let top = mid - PAIR_BLOCK / 2.0;
@@ -263,6 +278,10 @@ pub(super) fn band_title(v: &Scene, profile: &Profile) {
     );
     let medals = (profile.progress.medal_count(), 3 * SECTOR_COUNT as u32);
     out_of(v, medals, style, (right, figure));
+    if notice {
+        moments::status(v, mid, TextId::SaveFailed);
+        return;
+    }
     // The journey: twelve pips over how many sectors are open.
     let block = 3.0 + 10.0 + 15.0 * 1.4;
     let top = mid - block / 2.0;
@@ -282,7 +301,7 @@ pub(super) fn band_title(v: &Scene, profile: &Profile) {
 }
 
 /// The band on sector select: the way back, where you are, the medals.
-pub(super) fn band_sectors(v: &Scene, profile: &Profile) {
+pub(super) fn band_sectors(v: &Scene, profile: &Profile, notice: bool) {
     let (left, right) = (BAND.x + BAND_PAD, BAND.x + BAND.w - BAND_PAD);
     let mid = BAND.y + BAND.h / 2.0;
     let chip = chips::chip(
@@ -308,14 +327,13 @@ pub(super) fn band_sectors(v: &Scene, profile: &Profile) {
         chip + 10.0 + back.min(200.0),
         40.0,
     ));
-    let at = v.snap(mid + v.cap(Role::Title) / 2.0);
-    v.say(
-        TextId::SectorsHeading,
-        &[],
-        Role::Title,
-        Slot::centered(WIDTH / 2.0, 320.0, at),
-        INK,
-    );
+    if notice {
+        moments::status(v, mid, TextId::SaveFailed);
+    } else {
+        let at = v.snap(mid + v.cap(Role::Title) / 2.0);
+        let slot = Slot::centered(WIDTH / 2.0, 320.0, at);
+        v.say(TextId::SectorsHeading, &[], Role::Title, slot, INK);
+    }
     let style = Style::from(Role::Figure).sized(24.0);
     let figure = v.snap(mid + v.cap(style) / 2.0);
     let medals = (profile.progress.medal_count(), 3 * SECTOR_COUNT as u32);

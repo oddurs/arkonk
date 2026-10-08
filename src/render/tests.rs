@@ -103,6 +103,7 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
     for s in SectorId::all() {
         let ui = Ui {
             save_error: s.index() == 0,
+            notice: if s.index() == 0 { 3.0 } else { 0.0 },
             ..Ui::default()
         };
         out.push((
@@ -144,12 +145,28 @@ fn screens() -> Vec<(String, Game, Ui, Profile)> {
             launch: true,
             ..Input::default()
         });
-        out.push((format!("play, {}", s.index()), practice, play, veteran(0)));
+        let news = Ui {
+            notice: 3.0,
+            ..play.clone()
+        };
+        out.push((
+            format!("play, {}", s.index()),
+            practice.clone(),
+            play,
+            veteran(0),
+        ));
+        out.push((
+            format!("play, {}, life gained", s.index()),
+            practice,
+            news,
+            veteran(0),
+        ));
     }
     let locked = Ui {
         screen: Screen::Sectors,
         sector: SectorId::clamped(5),
         save_error: true,
+        notice: 3.0,
         ..Ui::default()
     };
     out.push((
@@ -312,7 +329,15 @@ fn check(
                     profile.settings.locale = Some(locale);
                 }
                 let profile = &profile;
-                scene(&v, &Fx::default(), game, &ui, profile, 1.0, None);
+                let fx = Fx {
+                    life_gained: if name.ends_with("life gained") {
+                        1.0
+                    } else {
+                        0.0
+                    },
+                    ..Fx::default()
+                };
+                scene(&v, &fx, game, &ui, profile, 1.0, None);
                 for m in log.into_inner() {
                     let line = match m.missing {
                         Some(c) => format!("{locale:?} {name}: no glyph for {c:?} in {:?}", m.text),

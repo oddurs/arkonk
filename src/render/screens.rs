@@ -25,7 +25,7 @@ fn title_help(action: Action) -> Option<TextId> {
 
 /// The logo, the line under it, the menu, and help for the focused row.
 pub(super) fn title(v: &Scene, ui: &Ui, profile: &Profile) {
-    frame::band_title(v, profile);
+    frame::band_title(v, profile, ui.notice > 0.0);
     v.logo(WIDTH / 2.0 - (35.0 * LOGO_CELL) / 2.0, LOGO_TOP, LOGO_CELL);
     let tagline = Style::from(Role::Caption).sized(18.0);
     let line = v.snap(frame::baseline(TAGLINE_TOP, 18.0, 1.4));
@@ -77,7 +77,7 @@ pub(super) fn card_rect(id: SectorId) -> Rect {
 /// The sector map: chapter columns of cards, and the selected sector's
 /// detail docked under them with its Play action.
 pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
-    frame::band_sectors(v, profile);
+    frame::band_sectors(v, profile, ui.notice > 0.0);
     for chapter in Chapter::ALL {
         let x = 84.0 + chapter.first_sector().index() as f32 / 4.0 * 272.0;
         let at = v.snap(frame::baseline(152.0, 15.0, 1.0));

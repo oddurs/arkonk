@@ -40,6 +40,9 @@ use steam::Steam;
 use storage::{Origin, Profile};
 use ui::{Action, Controls, Preview, Prompt, Screen, Ui};
 
+/// How long news stays in the band.
+const NOTICE_SECONDS: f32 = 3.0;
+
 /// A results card for screens the smoke test shows without playing to them.
 fn preview(stage: Stage) -> Option<Preview> {
     Some(Preview {
@@ -273,6 +276,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
     let subscriber = macroquad::input::utils::register_input_subscriber();
     let mut focus = Focus::default();
     let mut pads = Gamepads::new(!smoke);
+    let mut save_error_shown = false;
     let showcase = smoke::showcase();
     loop {
         let now = get_time();
@@ -695,6 +699,13 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 }
             }
         }
+        // A save failure is news for three seconds in the band, each time
+        // saving starts failing.
+        if ui.save_error && !save_error_shown {
+            ui.notice = NOTICE_SECONDS;
+        }
+        save_error_shown = ui.save_error;
+        ui.notice = (ui.notice - frame_seconds as f32).max(0.0);
         steam.presence(ui.screen == Screen::Play, &game);
         let show_cursor = ui.device == Device::KeyboardMouse
             && (ui.screen != Screen::Play || ui.paused || game.stage() != Stage::Playing);

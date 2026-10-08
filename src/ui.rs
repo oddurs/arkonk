@@ -17,6 +17,8 @@ pub struct Ui {
     /// The cursor on the sector grid.
     pub sector: SectorId,
     pub save_error: bool,
+    /// Seconds left for news in the band (the save failure).
+    pub notice: f32,
     /// What the player touched last; prompts and the cursor follow it.
     pub device: Device,
     /// The mouse, not the keyboard, has been driving the paddle, so field
@@ -162,6 +164,7 @@ impl Default for Ui {
             choice: 0,
             sector: SectorId::FIRST,
             save_error: false,
+            notice: 0.0,
             device: Device::KeyboardMouse,
             mouse: false,
             pressed: Pressed::default(),
