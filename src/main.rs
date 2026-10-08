@@ -778,14 +778,23 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     ui.settings = Some(1);
                 }
                 160 => ui.preview = preview(Stage::GameOver),
+                165 => ui.preview = preview(Stage::Victory),
                 180 => ui.preview = preview(Stage::Cleared),
                 190 => ui.screen = Screen::Sectors,
-                250 | 260 | 270 | 280 | 290 => {
-                    ui.device = Device::Gamepad(Pad::Xbox);
+                250 | 260 | 265 | 270 | 275 | 280 | 290 => {
+                    ui.device = Device::Gamepad(if frames == 265 {
+                        Pad::PlayStation
+                    } else {
+                        Pad::Xbox
+                    });
                     match frames {
                         250 => ui.screen = Screen::Title,
-                        260 => ui.paused = true,
+                        260 | 265 => ui.paused = true,
                         270 => ui.screen = Screen::Sectors,
+                        275 => {
+                            ui.paused = true;
+                            ui.settings = Some(1);
+                        }
                         280 => ui.preview = preview(Stage::Cleared),
                         _ => ui.preview = preview(Stage::Ready),
                     }
@@ -834,6 +843,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 150 => Some("target/paused.png"),
                 155 => Some("target/settings.png"),
                 160 => Some("target/game-over.png"),
+                165 => Some("target/victory.png"),
                 170 => Some("target/stats.png"),
                 180 => Some("target/clear.png"),
                 190 => Some("target/sectors.png"),
@@ -841,7 +851,9 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 244 => Some("target/locale-switch.png"),
                 250 => Some("target/attract-pad.png"),
                 260 => Some("target/paused-pad.png"),
+                265 => Some("target/paused-ps.png"),
                 270 => Some("target/sectors-pad.png"),
+                275 => Some("target/settings-pad.png"),
                 280 => Some("target/clear-pad.png"),
                 290 => Some("target/ready-pad.png"),
                 _ => None,
