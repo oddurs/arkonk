@@ -242,7 +242,8 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             "windowed"
         }
     ));
-    let mut audio = Audio::new().await;
+    // Hidden test runs share a desk with someone working; `--show` is for watching one.
+    let mut audio = Audio::new(smoke && !flag("--show")).await;
     let mut perf = Perf::new();
     let mut trace = perf::FrameTrace::new(perf_test);
     let mut ui = Ui::default();

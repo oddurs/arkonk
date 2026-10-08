@@ -46,8 +46,8 @@ low-resolution machines. MIT, public repository.
   (`target/*.png`). Check Metal with `MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1`, and
   turn validation off for timings.
 - Never take full-screen screenshots; they capture the owner's desktop.
-- Graphical tests on macOS run hidden: no focus, Dock icon or visible window, and
-  the game behaves as focused. `--show` opens a normal window to watch. Timings still
+- Graphical tests on macOS run hidden: no focus, Dock icon, visible window or sound,
+  and the game behaves as focused. `--show` opens a normal window to watch. Timings still
   skew under load, so only one agent runs them at a time.
 - The owner's shell aliases `cp`, `mv` and `rm` to prompt. Use `command cp -f` and its
   siblings. Never run anything that waits for input: no `-i`, no editors, no pagers

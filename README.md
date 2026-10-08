@@ -320,8 +320,9 @@ reports frame statistics,
 and exits automatically. On macOS every test mode runs hidden so it never takes
 over the desktop: the window is transparent and click-through, the process has no
 Dock icon or menu bar, it never takes focus, and the game behaves as if focused.
-Add `--show` to watch a run in a normal, focused window. Windows and Linux test
-runs still open a normal window. On OpenGL it also writes `target/smoke-test.png` and
+Every test run is silent: sounds load, so the run checks them, but none play.
+Add `--show` to watch and hear a run in a normal, focused window. Windows and Linux
+test runs still open a normal window. On OpenGL it also writes `target/smoke-test.png` and
 presentation captures. Metal texture readback is not implemented by Miniquad;
 use macOS window capture for Metal screenshots. To check Metal correctness, run the smoke/effects and flow tests
 with `MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1`; disable validation for timings.

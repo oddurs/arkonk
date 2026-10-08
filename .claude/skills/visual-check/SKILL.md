@@ -6,8 +6,8 @@ description: Use after changing anything drawn, laid out, or driven by input. Ru
 # Visual check
 
 On macOS these tests run hidden: the window is transparent and click-through, never
-takes focus, and the game behaves as focused. Add `--show` to watch one in a normal
-window. Timings still skew when runs overlap, so only one agent runs them at a time.
+takes focus, plays no sound, and the game behaves as focused. Add `--show` to watch
+and hear one in a normal window. Timings still skew when runs overlap, so only one agent runs them at a time.
 Never take a full-screen screenshot; use the captures the game writes.
 
 1. Build once:
