@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "РАССВЕТ",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "УТРО",
+            Chapter::Zenith => "ЗЕНИТ",
+            Chapter::GoldenHour => "ЗОЛОТОЙ ЧАС",
             Chapter::Afterlight => "СУМЕРКИ",
             Chapter::BlueHour => "СИНИЙ ЧАС",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "ЗАТМЕНИЕ",
+            Chapter::Aurora => "АВРОРА",
         },
         PowerName(p) => match p {
             Power::Wide => "ШИРИНА",
@@ -149,202 +149,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Первый свет",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Дрейф",
+    "Горизонт",
+    "Проблеск",
+    "Жаворонок",
+    "Фонари",
+    "Прилив",
+    "Восход солнца",
     "Спутники",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Точка росы",
+    "Диафрагма",
+    "Монастырь",
+    "Замковый камень",
+    "Солнечные часы",
+    "Камера-обскура",
+    "Роза ветров",
     "Попутный поток",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Нить накала",
+    "Меридиан",
+    "Каскад",
     "Наплыв",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Серпантин",
+    "Солнцестояние",
     "Резонанс",
     "Призма",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Соты",
+    "Морская пена",
     "Течение",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Урожай",
+    "Калейдоскоп",
+    "Гобелен",
+    "Длинные тени",
     "Послесвечение",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Хризалида",
+    "Жеода",
     "Параллакс",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Цитадель",
+    "Наутилус",
+    "Вечерня",
     "Сверхновая",
     "Восход луны",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Сумрак",
+    "Свет лампы",
+    "Светлячки",
+    "Маяк",
+    "Ноктюрн",
+    "Глубокое поле",
+    "Созвездие",
+    "Полутень",
+    "Метроном",
+    "Корона",
+    "Сизигия",
+    "Пульсар",
+    "Затвор",
+    "Умбра",
+    "Полная фаза",
+    "Солнечный ветер",
+    "Северное сияние",
+    "Ленты",
+    "Полярная ночь",
+    "Собор",
+    "Мерцание",
+    "Сингулярность",
     "Возвращение",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Первый свет",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Дрейф",
+    "Горизонт",
+    "Проблеск",
+    "Жаворонок",
+    "Фонари",
+    "Прилив",
+    "Солнце",
     "Спутники",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Роса",
+    "Диафрагма",
+    "Монастырь",
+    "Замок",
+    "Часы",
+    "Обскура",
+    "Роза",
     "Поток",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Нить",
+    "Меридиан",
+    "Каскад",
     "Наплыв",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Серпантин",
+    "Солнцестояние",
     "Резонанс",
     "Призма",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Соты",
+    "Пена",
     "Течение",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Урожай",
+    "Калейдо",
+    "Гобелен",
+    "Тени",
     "Свечение",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Хризалида",
+    "Жеода",
     "Параллакс",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Цитадель",
+    "Наутилус",
+    "Вечерня",
     "Сверхновая",
     "Луна",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Сумрак",
+    "Лампа",
+    "Светлячки",
+    "Маяк",
+    "Ноктюрн",
+    "Глубина",
+    "Звёзды",
+    "Полутень",
+    "Метроном",
+    "Корона",
+    "Сизигия",
+    "Пульсар",
+    "Затвор",
+    "Умбра",
+    "Полнота",
+    "Ветер",
+    "Сияние",
+    "Ленты",
+    "Полярная ночь",
+    "Собор",
+    "Мерцание",
+    "Сингулярность",
     "Возврат",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Ширина: поймайте падающую капсулу",
+    "{icon:slow} Замедление: поймайте её, и мяч притормозит",
+    "Направляйте: края платформы отправляют мяч в стороны",
+    "Одинокие искры: догоните каждую",
+    "Отправьте мяч вверх по открытым крыльям",
+    "Очистите каждый фонарь снизу",
+    "Поймайте волну: бейте от боковых стен",
+    "Скалывайте солнце снизу, ряд за рядом",
     "{icon:anchor} Якорь: поймайте мяч, прицельтесь и отпустите",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Бронированные кирпичи выдерживают два удара: следите за краями",
+    "{icon:anchor} Цельтесь в проём в стене",
+    "Одна дверь: отправьте мяч во двор",
+    "Выбейте замковый камень, и арка откроется",
+    "Читайте углы: каждая тень — это удар",
+    "{icon:anchor} Одно узкое отверстие: удерживайте, цельтесь, отпускайте",
+    "Каждая сторона света ведёт к сердцу",
     "Янтарные ядра: каждый взрыв задевает четырёх соседей",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Коснитесь нити в любом месте: она горит в обе стороны",
+    "Разделите поле по меридиану",
+    "Запустите каскад с любого конца",
     "Откройте путь через две линии реле",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Три линии реле: по одному чистому удару",
+    "Кольцо горит целиком: найдите путь к его краю",
     "Соседние ядра передают реакцию дальше",
     "{icon:multi} Мультимяч: три мяча, один проход",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Ядро в каждой ячейке: вскройте их",
+    "Брызги повсюду: выпустите три мяча",
     "Пробейтесь в карманы за бронёй",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Полное поле: {icon:multi} Мультимяч быстро его зачистит",
+    "Зеркала повсюду: разбейте одну сторону, затем её двойника",
+    "Потяните за одну нить, и ткань распустится",
+    "Пробейте пол и подожгите длинный фитиль",
     "{icon:phase} Фаза: три касания кирпичей без отскока",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Фаза проходит сквозь оболочку к ядру",
+    "Расколите жеоду, и её кристаллы загорятся",
     "Пробейте оболочку, затем подожгите внутренний путь",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Входите через врата или сквозь стену с {icon:phase} Фазой",
+    "Спиралью внутрь: внешний виток загорается первым",
+    "Три колокола: звоните в каждый снизу",
     "Поймайте мяч, пока остальные летят",
     "Следуйте за реле вокруг открытого центра",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Свет уходит: изучите поле, пока можете",
+    "В темноте мяч и платформа несут свет",
+    "Светлячки: ядра светятся даже в темноте",
+    "Проведите светом платформы по берегу",
+    "Больше мячей, больше света: {icon:multi} Мультимяч",
+    "Глубокое поле: каждая тусклая точка — кирпич",
+    "Соедините звёзды: яркие — это ядра",
+    "Врата гаснут в ритме: ждите просвета",
+    "Тик-так: врата отсчитывают время",
+    "Корона открывается в ритме: бейте внутрь",
+    "Призрачные врата стряхивают взрыв: выберите момент для искры",
+    "Пульсар: быстрые удары, быстрые руки",
+    "Затвор открывается на миг: будьте готовы",
+    "Наполовину в тени: сторона с вратами держит ритм",
+    "Зажгите солнце, пока луна твёрдая",
+    "Ветер дует в одну сторону: плывите с ним к ядрам",
+    "Завесы света: сметайте их {icon:multi} Мультимячом",
+    "Каждая лента привязана к вратам: разрежьте обе половины",
+    "Долгая ночь: цельтесь по свету, который несёте",
+    "Войдите через двери и поднимитесь к розетке",
+    "Всё сразу: следите за ядрами",
+    "Бейте по кольцу, когда врата твердеют",
     "Последняя орбита: пусть каждый проход считается",
 ];

@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "СВІТАНОК",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "РАНОК",
+            Chapter::Zenith => "ЗЕНІТ",
+            Chapter::GoldenHour => "ЗОЛОТА ГОДИНА",
             Chapter::Afterlight => "СУТІНКИ",
             Chapter::BlueHour => "СИНЯ ГОДИНА",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "ЗАТЕМНЕННЯ",
+            Chapter::Aurora => "АВРОРА",
         },
         PowerName(p) => match p {
             Power::Wide => "ШИРИНА",
@@ -150,202 +150,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Перше світло",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Дрейф",
+    "Горизонт",
+    "Проблиск",
+    "Жайворонок",
+    "Ліхтарі",
+    "Приплив",
+    "Схід сонця",
     "Супутники",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Точка роси",
+    "Діафрагма",
+    "Монастир",
+    "Замковий камінь",
+    "Сонячний годинник",
+    "Камера-обскура",
+    "Роза вітрів",
     "Попутний потік",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Нитка розжарення",
+    "Меридіан",
+    "Каскад",
     "Перехід",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Серпантин",
+    "Сонцестояння",
     "Резонанс",
     "Призма",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Соти",
+    "Морська піна",
     "Підводна течія",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Врожай",
+    "Калейдоскоп",
+    "Гобелен",
+    "Довгі тіні",
     "Післясвітіння",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Хризаліда",
+    "Жеода",
     "Паралакс",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Цитадель",
+    "Наутилус",
+    "Вечірня",
     "Наднова",
     "Схід місяця",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Присмерк",
+    "Світло лампи",
+    "Світлячки",
+    "Маяк",
+    "Ноктюрн",
+    "Глибоке поле",
+    "Сузір’я",
+    "Напівтінь",
+    "Метроном",
+    "Корона",
+    "Сизигія",
+    "Пульсар",
+    "Затвор",
+    "Умбра",
+    "Повна фаза",
+    "Сонячний вітер",
+    "Північне сяйво",
+    "Стрічки",
+    "Полярна ніч",
+    "Собор",
+    "Мерехтіння",
+    "Сингулярність",
     "Повернення",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Перше світло",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Дрейф",
+    "Горизонт",
+    "Проблиск",
+    "Жайворонок",
+    "Ліхтарі",
+    "Приплив",
+    "Сонце",
     "Супутники",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Роса",
+    "Діафрагма",
+    "Монастир",
+    "Замок",
+    "Годинник",
+    "Обскура",
+    "Роза",
     "Потік",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Нитка",
+    "Меридіан",
+    "Каскад",
     "Перехід",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Серпантин",
+    "Сонцестояння",
     "Резонанс",
     "Призма",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Соти",
+    "Піна",
     "Течія",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Врожай",
+    "Калейдо",
+    "Гобелен",
+    "Тіні",
     "Сяйво",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Хризаліда",
+    "Жеода",
     "Паралакс",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Цитадель",
+    "Наутилус",
+    "Вечірня",
     "Наднова",
     "Місяць",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Присмерк",
+    "Лампа",
+    "Світлячки",
+    "Маяк",
+    "Ноктюрн",
+    "Глибінь",
+    "Зорі",
+    "Напівтінь",
+    "Метроном",
+    "Корона",
+    "Сизигія",
+    "Пульсар",
+    "Затвор",
+    "Умбра",
+    "Повнота",
+    "Вітер",
+    "Сяйво",
+    "Стрічки",
+    "Полярна ніч",
+    "Собор",
+    "Мерехтіння",
+    "Сингулярність",
     "Повернення",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Ширина: спіймайте капсулу, що падає",
+    "{icon:slow} Сповільнення: спіймайте її, і м’яч пригальмує",
+    "Спрямовуйте: краї платформи відправляють м’яч убік",
+    "Самотні іскри: наздоганяйте кожну",
+    "Відправте м’яч угору відкритими крилами",
+    "Очистьте кожен ліхтар знизу",
+    "Осідлайте хвилю: б’йте від бічних стін",
+    "Відколюйте сонце знизу, ряд за рядом",
     "{icon:anchor} Якір: спіймайте м’яч, прицільтеся й відпустіть",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Броньована цегла витримує два удари: стежте за краями",
+    "{icon:anchor} Цільтеся в проріз у стіні",
+    "Одні двері: відправте м’яч у двір",
+    "Вибийте замковий камінь, і арка відкриється",
+    "Читайте кути: кожна тінь — це удар",
+    "{icon:anchor} Один вузький отвір: утримуйте, цільтеся, відпускайте",
+    "Кожна сторона світу веде до серця",
     "Бурштинові ядра: кожен вибух зачіпає чотирьох сусідів",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Торкніться нитки будь-де: вона горить в обидва боки",
+    "Розділіть поле по меридіану",
+    "Запустіть каскад з будь-якого кінця",
     "Відкрийте шлях крізь дві лінії реле",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Три лінії реле: по одному чистому удару",
+    "Кільце горить цілком: знайдіть шлях до його краю",
     "Сусідні ядра передають реакцію далі",
     "{icon:multi} Мультим’яч: три м’ячі, один прохід",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Ядро в кожній комірці: розкрийте їх",
+    "Бризки всюди: випустіть три м’ячі",
     "Пробийтеся в кишені за бронею",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Повне поле: {icon:multi} Мультим’яч швидко його зачистить",
+    "Дзеркала всюди: розбийте один бік, потім його двійника",
+    "Потягніть за одну нитку, і тканина розпуститься",
+    "Пробийте підлогу й підпаліть довгий гніт",
     "{icon:phase} Фаза: три удари по цеглі без відскоку",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Фаза проходить крізь оболонку до ядра",
+    "Розколіть жеоду, і її кристали засяють",
     "Пробийте оболонку, потім підпаліть внутрішній шлях",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Заходьте крізь браму або крізь стіну з {icon:phase} Фазою",
+    "Спіраллю досередини: зовнішній виток спалахує першим",
+    "Три дзвони: дзвоніть у кожен знизу",
     "Спіймайте м’яч, поки інші летять",
     "Слідуйте за реле навколо відкритого центру",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Світло відходить: вивчіть поле, поки можете",
+    "У темряві м’яч і платформа несуть світло",
+    "Світлячки: ядра світяться навіть у темряві",
+    "Проведіть світлом платформи по узбережжю",
+    "Більше м’ячів, більше світла: {icon:multi} Мультим’яч",
+    "Глибоке поле: кожна тьмяна цятка — цеглина",
+    "З’єднайте зорі: яскраві — це ядра",
+    "Брами гаснуть у ритмі: чекайте на просвіт",
+    "Тік-так: брами відлічують час",
+    "Корона відкривається в ритмі: бийте всередину",
+    "Примарна брама струшує вибух: влучіть іскрою вчасно",
+    "Пульсар: швидкі удари, швидкі руки",
+    "Затвор відкривається на мить: будьте готові",
+    "Наполовину в тіні: бік із брамами тримає ритм",
+    "Запаліть сонце, поки місяць твердий",
+    "Вітер дме в один бік: пливіть із ним до ядер",
+    "Завіси світла: змітайте їх {icon:multi} Мультим’ячем",
+    "Кожна стрічка прив’язана до брами: розріжте обидві половини",
+    "Довга ніч: цільтеся за світлом, яке несете",
+    "Увійдіть крізь двері й підніміться до розети",
+    "Усе одразу: стежте за ядрами",
+    "Бийте по кільцю, коли брами тверднуть",
     "Остання орбіта: хай кожен прохід важить",
 ];

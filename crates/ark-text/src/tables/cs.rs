@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "ÚSVIT",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "RÁNO",
+            Chapter::Zenith => "ZENIT",
+            Chapter::GoldenHour => "ZLATÁ HODINKA",
             Chapter::Afterlight => "SOUMRAK",
             Chapter::BlueHour => "MODRÁ HODINKA",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "ZATMĚNÍ",
+            Chapter::Aurora => "AURORA",
         },
         PowerName(p) => match p {
             Power::Wide => "ŠIROKÁ",
@@ -150,202 +150,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "První světlo",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Unášení",
+    "Obzor",
+    "Záblesk",
+    "Skřivan",
+    "Lucerny",
+    "Příliv",
+    "Východ slunce",
     "Satelity",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Rosný bod",
+    "Clona",
+    "Ambit",
+    "Klenák",
+    "Sluneční hodiny",
+    "Dírka",
+    "Růžice větrů",
     "Úplav",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Vlákno",
+    "Poledník",
+    "Kaskáda",
     "Prolínání",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Serpentiny",
+    "Slunovrat",
     "Rezonance",
     "Hranol",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Plástev",
+    "Mořská tříšť",
     "Spodní proud",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Žně",
+    "Kaleidoskop",
+    "Tapiserie",
+    "Dlouhé stíny",
     "Dosvit",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Kukla",
+    "Geoda",
     "Paralaxa",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Citadela",
+    "Nautilus",
+    "Nešpory",
     "Supernova",
     "Východ měsíce",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Šero",
+    "Světlo lampy",
+    "Světlušky",
+    "Maják",
+    "Nokturno",
+    "Hluboké pole",
+    "Souhvězdí",
+    "Polostín",
+    "Metronom",
+    "Koróna",
+    "Syzygie",
+    "Pulsar",
+    "Závěrka",
+    "Umbra",
+    "Totalita",
+    "Sluneční vítr",
+    "Polární záře",
+    "Stuhy",
+    "Polární noc",
+    "Katedrála",
+    "Třpyt",
+    "Singularita",
     "Návrat domů",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "První světlo",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Unášení",
+    "Obzor",
+    "Záblesk",
+    "Skřivan",
+    "Lucerny",
+    "Příliv",
+    "Slunce",
     "Satelity",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Rosa",
+    "Clona",
+    "Ambit",
+    "Klenák",
+    "Hodiny",
+    "Dírka",
+    "Růžice",
     "Úplav",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Vlákno",
+    "Poledník",
+    "Kaskáda",
     "Prolínání",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Serpentiny",
+    "Slunovrat",
     "Rezonance",
     "Hranol",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Plástev",
+    "Tříšť",
     "Proud",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Žně",
+    "Kaleido",
+    "Tapiserie",
+    "Stíny",
     "Dosvit",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Kukla",
+    "Geoda",
     "Paralaxa",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Citadela",
+    "Nautilus",
+    "Nešpory",
     "Supernova",
     "Měsíc",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Šero",
+    "Lampa",
+    "Světlušky",
+    "Maják",
+    "Nokturno",
+    "Hlubina",
+    "Hvězdy",
+    "Polostín",
+    "Metronom",
+    "Koróna",
+    "Syzygie",
+    "Pulsar",
+    "Závěrka",
+    "Umbra",
+    "Totalita",
+    "Vítr",
+    "Záře",
+    "Stuhy",
+    "Polární noc",
+    "Katedrála",
+    "Třpyt",
+    "Singularita",
     "Návrat",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Široká: chyť padající kapsli",
+    "{icon:slow} Pomalá: chyť ji a míček zvolní",
+    "Naváděj: okraje pálky pošlou míček do stran",
+    "Osamělé jiskry: pronásleduj každou",
+    "Pošli míček nahoru otevřenými křídly",
+    "Vyčisti každou lucernu zespodu",
+    "Plav se na vlně: odrážej od bočních stěn",
+    "Odštipuj slunce zespodu, řadu po řadě",
     "{icon:anchor} Kotva: chyť míček, zamiř a pusť ho",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Pancéřové cihly snesou dva zásahy: hlídej okraje",
+    "{icon:anchor} Zamiř skrz mezeru ve zdi",
+    "Jediné dveře: pošli míček na nádvoří",
+    "Vyraz klenák a oblouk se otevře",
+    "Čti úhly: každý stín je jeden odpal",
+    "{icon:anchor} Jedna úzká dírka: drž, zamiř, pusť",
+    "Každá světová strana vede k srdci",
     "Jantarová jádra: každý výbuch zasáhne čtyři sousedy",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Dotkni se vlákna kdekoli: hoří oběma směry",
+    "Rozděl pole podél poledníku",
+    "Spusť kaskádu z kteréhokoli konce",
     "Otevři cestu skrz obě řady relé",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Tři řady relé: každá jeden čistý odpal",
+    "Prstenec hoří celý: najdi cestu k jeho okraji",
     "Sousední jádra šíří reakci dál",
     "{icon:multi} Multimíček: tři míčky, jeden průchod",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Jádro v každé buňce: rozlom je",
+    "Tříšť všude: vypusť tři míčky",
     "Proraž se do kapes za pancířem",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Plné pole: {icon:multi} Multimíček ho rychle vyčistí",
+    "Zrcadla všude: rozbij jednu stranu, pak její dvojče",
+    "Zatáhni za jednu nit a tkanina se rozpáře",
+    "Proraž podlahu a zapal dlouhou zápalnou šňůru",
     "{icon:phase} Fáze: tři zásahy cihel bez odrazu",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Fáze proklouzne skořápkou až k jádru",
+    "Rozlom geodu a její krystaly se rozsvítí",
     "Proraž skořápku, pak zapal vnitřní trasu",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Vstup branou, nebo skrz zeď s {icon:phase} Fází",
+    "Do spirály: vnější závit se rozsvítí první",
+    "Tři zvony: zazvoň na každý zespodu",
     "Chyť vracející se míček, zatímco ostatní letí",
     "Sleduj relé kolem volného středu",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Světlo mizí: nauč se pole, dokud můžeš",
+    "Ve tmě nesou světlo míček a pálka",
+    "Světlušky: jádra září i ve tmě",
+    "Přejeď světlem pálky přes pobřeží",
+    "Víc míčků, víc světla: {icon:multi} Multimíček",
+    "Hluboké pole: každá slabá tečka je cihla",
+    "Spoj hvězdy: ty jasné jsou jádra",
+    "Brány slábnou v rytmu: počkej na mezeru",
+    "Tik, tak: brány drží čas",
+    "Koróna se otevírá v rytmu: udeř dovnitř",
+    "Přízračná brána vyvzdoruje výbuch: načasuj jiskru",
+    "Pulsar: rychlé údery, rychlé ruce",
+    "Závěrka se na chvíli otevře: buď připraven",
+    "Napůl ve stínu: strana s branami drží rytmus",
+    "Zažehni slunce, dokud je měsíc pevný",
+    "Vítr vane jedním směrem: pluj s ním k jádrům",
+    "Závěsy světla: smeť je {icon:multi} Multimíčkem",
+    "Každá stuha je přivázaná k bráně: přeřízni obě poloviny",
+    "Dlouhá noc: miř podle světla, které neseš",
+    "Dveřmi dovnitř a nahoru k rozetě",
+    "Všechno najednou: sleduj jádra",
+    "Udeř do prstence, když brány ztuhnou",
     "Poslední oběh: využij každý průchod",
 ];
