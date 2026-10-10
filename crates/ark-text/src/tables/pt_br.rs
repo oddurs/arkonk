@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "ALVORADA",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "MANHÃ",
+            Chapter::Zenith => "ZÊNITE",
+            Chapter::GoldenHour => "HORA DOURADA",
             Chapter::Afterlight => "CREPÚSCULO",
             Chapter::BlueHour => "HORA AZUL",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "ECLIPSE",
+            Chapter::Aurora => "AURORA",
         },
         PowerName(p) => match p {
             Power::Wide => "LARGO",
@@ -149,202 +149,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Primeira luz",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Deriva",
+    "Horizonte",
+    "Lampejo",
+    "Cotovia",
+    "Lanternas",
+    "Maré",
+    "Nascer do sol",
     "Satélites",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Ponto de orvalho",
+    "Abertura",
+    "Claustro",
+    "Pedra angular",
+    "Relógio de sol",
+    "Estenopo",
+    "Rosa dos ventos",
     "Esteira",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Filamento",
+    "Meridiano",
+    "Cascata",
     "Transição",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Zigue-zague",
+    "Solstício",
     "Ressonância",
     "Prisma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Favo",
+    "Borrifo",
     "Ressaca",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Colheita",
+    "Caleidoscópio",
+    "Tapeçaria",
+    "Sombras longas",
     "Arrebol",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Crisálida",
+    "Geodo",
     "Paralaxe",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Cidadela",
+    "Nautilus",
+    "Vésperas",
     "Supernova",
     "Nascer da lua",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Lusco-fusco",
+    "Luz de lampião",
+    "Vaga-lumes",
+    "Farol",
+    "Noturno",
+    "Campo profundo",
+    "Constelação",
+    "Penumbra",
+    "Metrônomo",
+    "Coroa solar",
+    "Sizígia",
+    "Pulsar",
+    "Obturador",
+    "Umbra",
+    "Totalidade",
+    "Vento solar",
+    "Borealis",
+    "Fitas",
+    "Noite polar",
+    "Catedral",
+    "Cintilação",
+    "Singularidade",
     "Regresso",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Primeira luz",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Deriva",
+    "Horizonte",
+    "Lampejo",
+    "Cotovia",
+    "Lanternas",
+    "Maré",
+    "Sol",
     "Satélites",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Orvalho",
+    "Abertura",
+    "Claustro",
+    "Pedra",
+    "Relógio",
+    "Estenopo",
+    "Rosa",
     "Esteira",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Filamento",
+    "Meridiano",
+    "Cascata",
     "Transição",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Zigue-zague",
+    "Solstício",
     "Ressonância",
     "Prisma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Favo",
+    "Borrifo",
     "Ressaca",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Colheita",
+    "Caleido",
+    "Tapeçaria",
+    "Sombras",
     "Arrebol",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Crisálida",
+    "Geodo",
     "Paralaxe",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Cidadela",
+    "Nautilus",
+    "Vésperas",
     "Supernova",
     "Lua",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Lusco",
+    "Lampião",
+    "Vaga-lumes",
+    "Farol",
+    "Noturno",
+    "Campo profundo",
+    "Estrelas",
+    "Penumbra",
+    "Metrônomo",
+    "Coroa",
+    "Sizígia",
+    "Pulsar",
+    "Obturador",
+    "Umbra",
+    "Totalidade",
+    "Vento",
+    "Borealis",
+    "Fitas",
+    "Noite polar",
+    "Catedral",
+    "Cintilação",
+    "Singularidade",
     "Regresso",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Largo: pegue a cápsula que cai",
+    "{icon:slow} Lento: pegue-a e a bola desacelera",
+    "Conduza: as bordas da raquete mandam a bola para os lados",
+    "Faíscas solitárias: persiga cada uma",
+    "Mande a bola pelas alas abertas",
+    "Limpe cada lanterna por baixo",
+    "Surfe a maré: rebata nas paredes laterais",
+    "Lasque o sol por baixo, fileira por fileira",
     "{icon:anchor} Âncora: pegue a bola, mire e depois solte",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Tijolos blindados levam dois golpes: cuidado com as bordas",
+    "{icon:anchor} Mire pela fresta na parede",
+    "Só uma porta: mande a bola para o pátio",
+    "Derrube a pedra angular e o arco se abre",
+    "Leia os ângulos: cada sombra é uma tacada",
+    "{icon:anchor} Um único estenopo estreito: segure, mire, solte",
+    "Cada ponto cardeal leva ao coração",
     "Núcleos âmbar: cada explosão atinge seus quatro vizinhos",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Toque o filamento em qualquer ponto: ele queima nos dois sentidos",
+    "Divida o campo pelo meridiano",
+    "Comece a cascata por qualquer uma das pontas",
     "Abra caminho pelas duas linhas de relés",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Três linhas de relé: uma tacada limpa em cada",
+    "O anel queima inteiro: ache um caminho até a borda",
     "Núcleos vizinhos propagam a reação",
     "{icon:multi} Multibola: três bolas, uma abertura",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Um núcleo em cada célula: abra todas",
+    "Borrifos por toda parte: solte três bolas",
     "Invada os bolsões atrás da blindagem",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Campo cheio: {icon:multi} Multibola limpa rápido",
+    "Espelhos por toda parte: quebre um lado, depois o gêmeo",
+    "Puxe um fio e a trama se desfaz",
+    "Rompa o piso e acenda o pavio longo",
     "{icon:phase} Fase: três contatos com tijolos sem quicar",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Fase atravessa a casca até o núcleo",
+    "Abra um geodo e seus cristais se acendem",
     "Perfure a casca e depois acenda a rota interna",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Entre pelo portal, ou pela parede com {icon:phase} Fase",
+    "Em espiral: a volta externa acende primeiro",
+    "Três sinos: toque cada um por baixo",
     "Pegue uma bola enquanto as outras continuam",
     "Siga o relé ao redor do centro aberto",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "A luz está indo embora: aprenda o campo enquanto pode",
+    "No escuro, sua bola e sua raquete levam a luz",
+    "Vaga-lumes: os núcleos brilham até no escuro",
+    "Varra a costa com a luz da raquete",
+    "Mais bolas, mais luz: {icon:multi} Multibola",
+    "Campo profundo: cada pontinho fraco é um tijolo",
+    "Una as estrelas: as brilhantes são núcleos",
+    "Portais somem no compasso: espere a brecha",
+    "Tique, taque: os portais marcam o tempo",
+    "A coroa abre no compasso: acerte dentro",
+    "Um portal fantasma ignora a explosão: acerte a faísca na hora",
+    "Um pulsar: batidas rápidas, mãos rápidas",
+    "O obturador abre por um instante: fique pronto",
+    "Metade na sombra: o lado dos portais marca o tempo",
+    "Acenda o sol enquanto a lua está sólida",
+    "O vento corre num só sentido: surfe até os núcleos",
+    "Cortinas de luz: varra com {icon:multi} Multibola",
+    "Cada fita prende a um portal: corte as duas metades",
+    "A longa noite: mire pela luz que você carrega",
+    "Entre pelas portas, suba até o rosetão",
+    "Tudo ao mesmo tempo: vigie os núcleos",
+    "Acerte o anel quando os portais ficarem sólidos",
     "Uma última órbita: faça cada abertura valer",
 ];
