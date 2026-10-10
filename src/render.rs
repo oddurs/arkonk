@@ -1,5 +1,5 @@
 use crate::{
-    atlas::{Atlas, Cell},
+    atlas::{Atlas, Cell, Strikes},
     input::Device,
     perf::Perf,
     pixel_font,
@@ -136,6 +136,59 @@ impl Style {
             spec::style(self.role).1
         }
     }
+}
+
+/// The sizes, in scene units, that text is set at besides each role's own:
+/// the places [`Style::sized`] is called, and a chip's key label beside
+/// body text and beside captions ([`chips::size`]). The atlas packs only
+/// the strikes these need at the screen's density, so a new size belongs
+/// here; the layout tests report any glyph the atlas then lacks.
+const SIZED: [(Role, f32); 9] = [
+    (Role::Display, 26.0),
+    (Role::Figure, 28.0),
+    (Role::Figure, 24.0),
+    (Role::Body, 18.0),
+    (Role::Caption, 18.0),
+    (Role::Caption, 15.0),
+    (Role::Caption, 13.0),
+    (Role::Label, chips::label_size(28.0)),
+    (Role::Label, chips::label_size(22.0)),
+];
+
+/// Every role with every size it is set at, in scene units.
+#[cfg(test)]
+pub(crate) fn sizes() -> impl Iterator<Item = (Role, f32)> {
+    spec::ROLES
+        .into_iter()
+        .map(|r| (r, spec::style(r).0))
+        .chain(SIZED)
+}
+
+/// Each role, cut and baked size text can be set in at `density`: every
+/// size the role is set at and the size below it the fit chain steps to,
+/// in the role's cut, and at the role's own size in its strong cut too
+/// (emphasis is only ever given to body text at its own size).
+pub(crate) fn rungs_at(density: f32) -> impl Iterator<Item = (Role, Weight, u8)> {
+    let own = spec::ROLES.into_iter().map(|r| (r, spec::style(r).0, true));
+    let sized = SIZED.into_iter().map(|(r, size)| (r, size, false));
+    own.chain(sized).flat_map(move |(role, size, own)| {
+        let ppem = spec::ppem_px(role, size * density);
+        let cuts = [Some(spec::style(role).1), own.then(|| spec::strong(role))];
+        [Some(ppem), spec::step_down(role, ppem)]
+            .into_iter()
+            .flatten()
+            .flat_map(move |ppem| cuts.into_iter().flatten().map(move |w| (role, w, ppem)))
+    })
+}
+
+/// The strikes an atlas needs at `density`: every cut and size of
+/// [`rungs_at`].
+pub(crate) fn strikes_at(density: f32) -> Strikes {
+    let mut out = Strikes::default();
+    for (_, weight, ppem) in rungs_at(density) {
+        out.add(weight, ppem);
+    }
+    out
 }
 
 /// Side margin for full-width text, and the widest a centred line may be.
@@ -1538,14 +1591,15 @@ impl Fx {
     }
 }
 
-/// The type for one locale: its fonts and the atlas built from them.
+/// The type for one locale: its fonts and the atlas built from them for
+/// one density.
 struct Type {
     locale: Locale,
     fonts: Fonts,
     atlas: Atlas,
 }
 impl Type {
-    fn new(locale: Locale) -> Self {
+    fn new(locale: Locale, strikes: Strikes) -> Self {
         // A locale this build cannot draw falls back to English. The linked
         // atlases are unpacked by the ark-glyphs tests, so English failing
         // too would mean a corrupt binary, with nothing left to draw with.
@@ -1561,18 +1615,22 @@ impl Type {
                 )
             }
         };
-        let atlas =
-            Atlas::build(&fonts).expect("linked atlases inflate; the tests unpack every strike");
         Self {
             locale,
+            atlas: pack(&fonts, strikes),
             fonts,
-            atlas,
         }
     }
 }
 
+fn pack(fonts: &Fonts, strikes: Strikes) -> Atlas {
+    Atlas::build(fonts, strikes).expect("linked atlases inflate; the tests unpack every strike")
+}
+
 pub struct Renderer {
     kind: Type,
+    /// The density the atlas was last fitted to.
+    density: f32,
     texture: Option<Texture2D>,
     /// `None` if the driver rejected the shader; frames then keep blended alpha.
     opaque: Option<Material>,
@@ -1589,8 +1647,10 @@ impl Renderer {
         // Rounded shapes use about 2.5 indices per vertex; the default 5,000
         // indices would split a dense frame long before its 10,000 vertices.
         macroquad::window::gl_set_drawcall_buffer_capacity(BATCH_VERTICES, BATCH_INDICES);
+        let density = View::current().map_or(1.0, |v| v.density);
         let mut renderer = Self {
-            kind: Type::new(locale),
+            kind: Type::new(locale, strikes_at(density)),
+            density,
             texture: None,
             opaque: opaque_material(metal),
             metal,
@@ -1613,8 +1673,28 @@ impl Renderer {
     /// Switches language, rebuilding the atlas for its scripts.
     pub fn set_locale(&mut self, locale: Locale) {
         if locale != self.kind.locale {
-            self.kind = Type::new(locale);
+            self.kind = Type::new(locale, self.kind.atlas.strikes());
             self.upload();
+        }
+    }
+    /// Repacks the atlas when the screen's density needs other strikes: on
+    /// a resize, a move to another display, or an offscreen capture at
+    /// another size. Called before a frame is drawn, and a density
+    /// between the same baked sizes keeps the atlas it has.
+    fn fit(&mut self, density: f32) {
+        if density == self.density {
+            return;
+        }
+        self.density = density;
+        let strikes = strikes_at(density);
+        if strikes != self.kind.atlas.strikes() {
+            self.kind.atlas = pack(&self.kind.fonts, strikes);
+            self.upload();
+            let atlas = &self.kind.atlas;
+            crate::diagnostics::info(format_args!(
+                "Glyph atlas {}x{} for density {density:.3}",
+                atlas.width, atlas.height
+            ));
         }
     }
     pub fn locale(&self) -> Locale {
@@ -1667,6 +1747,7 @@ impl Renderer {
         let Some(view) = View::current() else {
             return;
         };
+        self.fit(view.density);
         set_camera(&view.camera(screen_width(), screen_height()));
         self.frame(view, game, ui, profile, alpha, perf);
     }
@@ -1685,6 +1766,7 @@ impl Renderer {
         if self.metal {
             return;
         }
+        self.fit(view.density);
         let target = render_target(width, height);
         let mut camera = view.camera(width as f32, height as f32);
         camera.render_target = Some(target.clone());

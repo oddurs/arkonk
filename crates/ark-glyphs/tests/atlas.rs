@@ -44,11 +44,7 @@ fn every_string_has_its_glyphs_at_every_size_it_is_drawn() {
             for form in [Form::Full, Form::Short] {
                 let mut text = String::new();
                 write(&mut text, locale, form, id, &args).unwrap();
-                let mut styles: Vec<_> = [id.role(), Role::Body]
-                    .iter()
-                    .chain(id.also())
-                    .map(|&r| (r, spec::style(r).1))
-                    .collect();
+                let mut styles: Vec<_> = id.roles().map(|r| (r, spec::style(r).1)).collect();
                 if id.strong() {
                     styles.push((Role::Body, spec::strong(Role::Body)));
                 }
@@ -58,6 +54,14 @@ fn every_string_has_its_glyphs_at_every_size_it_is_drawn() {
                             let glyph = p.glyph.unwrap_or_else(|| {
                                 panic!("{locale:?} {id:?}: no glyph for {:?}", p.c)
                             });
+                            if p.source == Source::Latin {
+                                let face = fonts.latin.face(weight).unwrap();
+                                assert!(
+                                    face.serves(glyph, locale),
+                                    "{locale:?} {id:?}: {:?} not marked as {locale:?}'s",
+                                    p.c
+                                );
+                            }
                             let set = &strikes[&(p.source, weight, ppem)];
                             assert!(
                                 set.contains(&glyph),

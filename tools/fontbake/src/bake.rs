@@ -222,7 +222,7 @@ fn render(sc: &mut Scaler<'_>, glyphs: &[Shaped], scale: f32) -> Option<Bitmap> 
 
 pub fn group(group: &Group, sets: &Sets, fonts: &BTreeMap<&str, Vec<u8>>) -> Result<Baked, String> {
     let mut bytes = b"ARKG".to_vec();
-    bytes.push(2);
+    bytes.push(3);
     let mut report = String::new();
     let weights: Vec<Weight> = Weight::ALL
         .into_iter()
@@ -271,6 +271,18 @@ pub fn group(group: &Group, sets: &Sets, fonts: &BTreeMap<&str, Vec<u8>>) -> Res
         }
         for (_, _, advance) in &glyphs {
             bytes.extend((advance.round() as u16).to_le_bytes());
+        }
+        // Only a file drawing several locales says which use each glyph.
+        let masked = group.locales.len() > 1;
+        bytes.push(u8::from(masked));
+        if masked {
+            for (unit, _, _) in &glyphs {
+                let mask = sets.locales.get(unit).copied().unwrap_or(0);
+                if mask == 0 {
+                    return Err(format!("{file}: no locale sets {unit:?}"));
+                }
+                bytes.extend(mask.to_le_bytes());
+            }
         }
         bytes.extend(put::<u16>(kerns.len(), "kern count")?.to_le_bytes());
         for (a, b, k) in &kerns {

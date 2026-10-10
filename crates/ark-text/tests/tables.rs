@@ -299,8 +299,9 @@ fn thai_marks_where_lines_may_break_and_nothing_else_does() {
                 "{locale:?} {id:?} holds a zero width space"
             );
         }
-        // Long Thai text must offer somewhere to wrap. An English
-        // placeholder awaiting translation has its own spaces to break at.
+        // Long Thai text must offer somewhere to wrap: a marked break, or
+        // a space the table writes, as Thai does around a number, a Latin
+        // word or a capsule icon.
         let thai = template(Locale::Th, id);
         let script = thai.chars().any(|c| ('\u{0E00}'..='\u{0E7F}').contains(&c));
         if script && thai.chars().count() > 12 {

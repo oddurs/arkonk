@@ -81,6 +81,11 @@ fn screenful(name: String, (w, h): (f32, f32)) -> Screenful {
     }
 }
 
+/// The atlas a frame in `fonts` gets at `view`'s density.
+fn atlas_for(fonts: &Fonts, view: &View) -> Atlas {
+    Atlas::build(fonts, strikes_at(view.density)).unwrap()
+}
+
 /// Every screen size the layout is checked at: the frame widths where
 /// the classes meet, the presets from 4K down to a 160 × 128 handheld,
 /// and every density where a baked size changes.
@@ -137,12 +142,12 @@ fn every_class_is_reached_by_the_frame_width() {
 #[test]
 fn overscan_keeps_the_band_and_sheets_in_the_safe_area() {
     let fonts = ark_glyphs::fonts(Locale::En).unwrap();
-    let atlas = Atlas::build(&fonts).unwrap();
     let plain = View::fit(1920.0, 1080.0, 1.0).unwrap();
     // Desktop reports no overscan: the safe area is the whole screen.
     assert!(plain.safe.x <= 0.0 && plain.safe.y <= 0.0);
     let tv = View::fit_inset(1920.0, 1080.0, 1.0, 0.05).unwrap();
     assert!(tv.safe.y > plain.safe.y && tv.safe.x > plain.safe.x);
+    let atlas = atlas_for(&fonts, &tv);
     let ui = Ui {
         screen: Screen::Play,
         paused: true,
@@ -433,10 +438,15 @@ fn check(
     views: &[Screenful],
 ) -> Vec<String> {
     let fonts = ark_glyphs::fonts(locale).unwrap();
-    let atlas = Atlas::build(&fonts).unwrap();
     let mut failures = Vec::new();
+    // Packed again only where a view's density needs other strikes, as
+    // the renderer does.
+    let mut atlas = atlas_for(&fonts, &views[0].view);
     for at in views {
         let view = &at.view;
+        if atlas.strikes() != strikes_at(view.density) {
+            atlas = atlas_for(&fonts, view);
+        }
         // One physical pixel, in scene units: what a layout may be off by.
         let px = 1.0 / view.density;
         let screen = Rect::new(
@@ -549,7 +559,6 @@ fn figures_group_on_the_stack() {
 #[test]
 fn every_drawn_row_is_one_hit_area() {
     let fonts = ark_glyphs::fonts(Locale::En).unwrap();
-    let atlas = Atlas::build(&fonts).unwrap();
     for (ui, menu) in [
         (
             Ui {
@@ -562,6 +571,7 @@ fn every_drawn_row_is_one_hit_area() {
         (Ui::default(), ui::title_menu(false)),
     ] {
         let view = View::fit(WIDTH, HEIGHT, 1.0).unwrap();
+        let atlas = atlas_for(&fonts, &view);
         let v = Scene::new(
             None,
             (&atlas, &fonts, Locale::En),
@@ -593,7 +603,6 @@ fn every_drawn_row_is_one_hit_area() {
 #[test]
 fn the_small_pager_stays_in_the_field_above_the_cards() {
     let fonts = ark_glyphs::fonts(Locale::En).unwrap();
-    let atlas = Atlas::build(&fonts).unwrap();
     let ui = Ui {
         screen: Screen::Sectors,
         ..Ui::default()
@@ -604,6 +613,7 @@ fn the_small_pager_stays_in_the_field_above_the_cards() {
         .collect();
     assert!(!small.is_empty());
     for at in &small {
+        let atlas = atlas_for(&fonts, &at.view);
         let v = Scene::new(
             None,
             (&atlas, &fonts, Locale::En),
@@ -633,7 +643,6 @@ fn the_small_pager_stays_in_the_field_above_the_cards() {
 fn padlocks_keep_clear_of_text() {
     for locale in [Locale::En, Locale::Pseudo] {
         let fonts = ark_glyphs::fonts(locale).unwrap();
-        let atlas = Atlas::build(&fonts).unwrap();
         for sector in [4, 7] {
             let ui = Ui {
                 screen: Screen::Sectors,
@@ -641,6 +650,7 @@ fn padlocks_keep_clear_of_text() {
                 ..Ui::default()
             };
             for at in views().iter().filter(|s| s.view.class != Class::Compact) {
+                let atlas = atlas_for(&fonts, &at.view);
                 let log = RefCell::new(Log::default());
                 let v = Scene::new(
                     None,
@@ -702,7 +712,7 @@ fn arabic_sheets_mirror() {
         }
         let rtl = locale == Locale::Ar;
         let fonts = ark_glyphs::fonts(locale).unwrap();
-        let atlas = Atlas::build(&fonts).unwrap();
+        let atlas = atlas_for(&fonts, &view);
         let log = RefCell::new(Log::default());
         let v = Scene::new(
             None,
@@ -761,14 +771,14 @@ fn arabic_sheets_mirror() {
                 "{locale:?}: label not at the left"
             );
         }
-        settings_rows_mirror(locale, &fonts, &atlas);
+        settings_rows_mirror(locale, &fonts);
     }
 }
 
 /// The Effects and Contrast rows of the Settings sheet, in a regular window
 /// and on a Compact page: the name leads the row and the value ends it, so
 /// in Arabic the name is at the right and the value at the left.
-fn settings_rows_mirror(locale: Locale, fonts: &Fonts, atlas: &Atlas) {
+fn settings_rows_mirror(locale: Locale, fonts: &Fonts) {
     let rtl = locale == Locale::Ar;
     let last = crate::settings::ROWS.len() - 1;
     let ui = Ui {
@@ -786,6 +796,7 @@ fn settings_rows_mirror(locale: Locale, fonts: &Fonts, atlas: &Atlas) {
     ];
     for (w, h) in [(1920.0, 1080.0), (240.0, 240.0)] {
         let view = View::fit(w, h, 1.0).unwrap();
+        let atlas = &atlas_for(fonts, &view);
         let log = RefCell::new(Log::default());
         let v = Scene::new(
             None,
@@ -883,8 +894,8 @@ fn busiest(sector: usize, fill: Option<u8>) -> Game {
 /// every trail full and every brick just hit.
 fn tally(game: &Game, profile: &Profile) -> Tally {
     let fonts = ark_glyphs::fonts(Locale::En).unwrap();
-    let atlas = Atlas::build(&fonts).unwrap();
     let view = View::fit(1920.0, 1800.0, 1.0).unwrap();
+    let atlas = atlas_for(&fonts, &view);
     let ui = Ui {
         screen: Screen::Play,
         ..Ui::default()
@@ -1011,8 +1022,8 @@ fn a_wall_bounce_lights_the_wall_where_the_ball_struck() {
 #[test]
 fn one_pixel_parts_of_flat_pieces_never_round_away() {
     let fonts = ark_glyphs::fonts(Locale::En).unwrap();
-    let atlas = Atlas::build(&fonts).unwrap();
     let view = View::fit(240.0, 240.0, 1.0).unwrap();
+    let atlas = atlas_for(&fonts, &view);
     assert_eq!(view.class, Class::Compact);
     let ui = Ui::default();
     let v = Scene::new(

@@ -1,5 +1,6 @@
 //! Which glyphs each atlas needs: every string in every table, in the
-//! roles that set it, plus the figures and icons the game formats itself.
+//! roles that set it and no others, plus the figures and icons the game
+//! formats itself, and which locales use each glyph.
 //! A glyph is usually one character; Thai bakes a consonant with its marks
 //! as one, and Arabic bakes each letter's contextual form.
 use crate::{
@@ -116,6 +117,15 @@ pub struct Sets {
     pub units: BTreeMap<Style, BTreeSet<Unit>>,
     /// Adjacent single-character pairs per weight, for kerning.
     pub pairs: BTreeMap<Weight, BTreeSet<(char, char)>>,
+    /// The locales whose text sets each glyph, as `ark_glyphs::locale_bit`
+    /// masks; the runtime packs only the current locale's.
+    pub locales: BTreeMap<Unit, u64>,
+}
+
+/// `locale`'s bit in a glyph's locale mask, as the atlas reader expects.
+pub fn bit(locale: Locale) -> u64 {
+    let index = Locale::ALL.iter().position(|&l| l == locale);
+    1 << index.expect("every locale is in Locale::ALL")
 }
 
 /// Figures and punctuation the game formats into labels, values and
@@ -133,16 +143,12 @@ fn figures() -> BTreeSet<char> {
 
 /// Every string as the game can show it: full and short forms, filled
 /// with numbers wherever a slot takes one, with the styles it is set in.
+/// Rich presence has none: Steam draws it.
 fn strings(locale: Locale) -> Result<Vec<(Vec<Style>, String)>, String> {
     let mut out = Vec::new();
     for id in TextId::all() {
         let args = vec![Arg::Count(1_234_567); id.arity()];
-        // Any string may also be set as body text.
-        let mut styles: Vec<Style> = [id.role(), Role::Body]
-            .iter()
-            .chain(id.also())
-            .map(|&r| (r, spec::style(r).1))
-            .collect();
+        let mut styles: Vec<Style> = id.roles().map(|r| (r, spec::style(r).1)).collect();
         if id.strong() {
             styles.push((Role::Body, spec::strong(Role::Body)));
         }
@@ -197,14 +203,21 @@ fn units(kind: Kind, s: &str) -> Vec<Unit> {
 pub fn collect(group: &Group) -> Result<Sets, String> {
     let mut units_by_style: BTreeMap<Style, BTreeSet<Unit>> = BTreeMap::new();
     let mut pairs: BTreeMap<Weight, BTreeSet<(char, char)>> = BTreeMap::new();
+    let mut locales: BTreeMap<Unit, u64> = BTreeMap::new();
+    let everyone = group.locales.iter().fold(0, |m, &l| m | bit(l));
     let figures = figures();
     // Kerning needs both glyphs to be plain characters of the same font;
     // Thai clusters and Arabic forms are placed without it.
     let kerned = matches!(group.kind, Kind::Latin | Kind::Cjk);
     let owned = |c: char| units(group.kind, &c.to_string()) == [vec![c]];
-    let mut add = |styles: &[Style], s: &str| {
+    let mut add = |styles: &[Style], s: &str, mask: u64| {
         let mine = units(group.kind, s);
         let all: Vec<char> = s.chars().collect();
+        if !styles.is_empty() {
+            for unit in &mine {
+                *locales.entry(unit.clone()).or_default() |= mask;
+            }
+        }
         for &style in styles {
             units_by_style
                 .entry(style)
@@ -221,7 +234,7 @@ pub fn collect(group: &Group) -> Result<Sets, String> {
     };
     for &locale in group.locales {
         for (styles, s) in strings(locale)? {
-            add(&styles, &s);
+            add(&styles, &s, bit(locale));
         }
     }
     // The Settings sheet names the language being spoken in that language,
@@ -233,6 +246,7 @@ pub fn collect(group: &Group) -> Result<Sets, String> {
                 (Role::Body, Weight::Regular),
             ],
             locale.native_name(),
+            bit(locale),
         );
     }
     if group.kind == Kind::Latin {
@@ -260,9 +274,14 @@ pub fn collect(group: &Group) -> Result<Sets, String> {
             .entry((Role::Body, Weight::Regular))
             .or_default()
             .extend((' '..='~').map(|c| vec![c]));
+        // Every locale sets these, whatever its strings hold.
+        for c in figures.into_iter().chain('A'..='Z').chain(' '..='~') {
+            *locales.entry(vec![c]).or_default() |= everyone;
+        }
     }
     Ok(Sets {
         units: units_by_style,
         pairs,
+        locales,
     })
 }

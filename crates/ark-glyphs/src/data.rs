@@ -4,9 +4,10 @@
 //! Layout, little-endian throughout:
 //!
 //! ```text
-//! file    "ARKG" version:u8=2 faces:u8 face…
+//! file    "ARKG" version:u8=3 faces:u8 face…
 //! face    weight:u8 (0 Regular, 1 Medium, 2 Display) key:u8 upem:u16 ascent:i16 descent:i16 cap_height:i16 x_height:i16
 //!         glyphs:u16 keys:[[u32; key]; glyphs] advances:[u16; glyphs]   (sorted by key)
+//!         masked:u8 (0 or 1) [locales:u64; glyphs if masked]
 //!         kerns:u16 [left:u16 right:u16 value:i16; kerns]          (sorted by pair)
 //!         strikes:u8 strike…
 //! strike  ppem:u8 unpacked:u32 packed:u32 deflate(unpacked)[packed]
@@ -17,9 +18,13 @@
 //! consonant and its marks (`key` characters, zero-padded). Glyph indices
 //! count into the face's `keys`. Each glyph's pixels are
 //! `w × h` coverage bytes, row by row, following the previous glyph's.
+//! A file that draws several locales (Noto Sans, for all of them) marks
+//! which use each glyph: bit `i` of its mask is `Locale::ALL[i]`. A file
+//! for one locale's script is unmasked.
 //! Advances and kerning are in font units; `left` and `top` place the
 //! bitmap relative to the pen on the baseline, in pixels, `top` upward.
 use crate::spec::Weight;
+use ark_text::Locale;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
@@ -64,6 +69,12 @@ impl<'a> Reader<'a> {
     }
 }
 
+/// `locale`'s bit in a glyph's locale mask.
+pub fn locale_bit(locale: Locale) -> u64 {
+    let index = Locale::ALL.iter().position(|&l| l == locale).unwrap_or(0);
+    1 << index
+}
+
 fn u16_at(bytes: &[u8], i: usize) -> Option<u16> {
     let b = bytes.get(i * 2..i * 2 + 2)?;
     Some(u16::from_le_bytes([b[0], b[1]]))
@@ -71,6 +82,10 @@ fn u16_at(bytes: &[u8], i: usize) -> Option<u16> {
 fn u32_at(bytes: &[u8], i: usize) -> Option<u32> {
     let b = bytes.get(i * 4..i * 4 + 4)?;
     Some(u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+}
+fn u64_at(bytes: &[u8], i: usize) -> Option<u64> {
+    let b = bytes.get(i * 8..i * 8 + 8)?;
+    Some(u64::from_le_bytes(b.try_into().ok()?))
 }
 
 /// One atlas file: a script group's faces.
@@ -84,7 +99,7 @@ impl Font {
     /// later, by [`Strike::unpack`].
     pub fn parse(bytes: &'static [u8]) -> Result<Self, Error> {
         let mut r = Reader { bytes };
-        if r.take(4)? != b"ARKG" || r.u8()? != 2 {
+        if r.take(4)? != b"ARKG" || r.u8()? != 3 {
             return Err(Error::Header);
         }
         let mut faces = [None; 3];
@@ -118,6 +133,8 @@ pub struct Face {
     pub x_height: i16,
     chars: &'static [u8],
     advances: &'static [u8],
+    /// Empty when every glyph serves every locale the file draws.
+    locales: &'static [u8],
     kerns: &'static [u8],
     strikes: &'static [u8],
     strike_count: u8,
@@ -143,6 +160,11 @@ impl Face {
         let glyphs = usize::from(r.u16()?);
         let chars = r.take(glyphs * 4 * usize::from(key))?;
         let advances = r.take(glyphs * 2)?;
+        let locales = match r.u8()? {
+            0 => &[][..],
+            1 => r.take(glyphs * 8)?,
+            _ => return Err(Error::Header),
+        };
         let kern_count = usize::from(r.u16()?);
         let kerns = r.take(kern_count * 6)?;
         let strike_count = r.u8()?;
@@ -161,6 +183,7 @@ impl Face {
             x_height,
             chars,
             advances,
+            locales,
             kerns,
             strikes,
             strike_count,
@@ -208,6 +231,13 @@ impl Face {
     /// The advance, in font units.
     pub fn advance(&self, glyph: u16) -> u16 {
         u16_at(self.advances, usize::from(glyph)).unwrap_or(0)
+    }
+
+    /// Whether `locale` sets `glyph`: every glyph of a file for one
+    /// locale's script, and in Noto Sans those its text uses.
+    pub fn serves(&self, glyph: u16, locale: Locale) -> bool {
+        self.locales.is_empty()
+            || u64_at(self.locales, usize::from(glyph)).is_some_and(|m| m & locale_bit(locale) != 0)
     }
 
     /// Pair kerning between two glyphs, in font units.
