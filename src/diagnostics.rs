@@ -83,8 +83,8 @@ pub fn error(message: impl Display) {
     write_line("error", message);
 }
 
-/// The only worker thread in the process is the Windows/Linux audio mixer, which
-/// panics when no output device opens. After that, sound must stay off.
+/// The only worker thread that can panic is the Windows/Linux audio mixer, which
+/// does when its output device fails. After that, sound must stay off.
 pub fn worker_panicked() -> bool {
     WORKER_PANICKED.load(Ordering::Relaxed)
 }

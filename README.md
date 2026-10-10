@@ -151,8 +151,9 @@ the menu says so. Legacy `best.txt` scores are imported automatically.
 (save failures, progress recovery, audio loss), and automatic pauses. It rotates to
 `arkonk.1.log` past 256 KiB, and one session writes at most that much. A crash
 writes `logs/crash-<UTC time>.txt` with the panic message, location, backtrace,
-version, OS, and graphics backend; the newest ten are kept. On Windows and Linux a
-missing or failed audio device leaves the game running muted. No account, network
+version, OS, and graphics backend; the newest ten are kept. A missing, failed or
+hung audio device leaves the game running muted: the device starts off the main
+thread, and one log line says why it gave up. No account, network
 connection, or asset download is used during play.
 
 ## Presentation
@@ -304,6 +305,8 @@ window/fullscreen setup before treating frame pacing as finished.
 The released Miniquad Metal path needed fixes for offscreen attachment formats,
 Retina clipping, resizing, and GPU buffer reuse. The narrow, vendored patch and its
 limits are documented in [vendor/miniquad/ARKONK.md](vendor/miniquad/ARKONK.md).
+Miniquad's audio backend, quad-snd, is vendored too so a broken audio device
+cannot hang or abort startup; see [vendor/quad-snd/ARKONK.md](vendor/quad-snd/ARKONK.md).
 Native desktop runtime testing on Windows/Linux and testing on physical
 controllers remain release work; CI build and packaging coverage is not runtime
 or Steam Deck certification.
@@ -347,8 +350,11 @@ reports frame statistics,
 and exits automatically. On macOS every test mode runs hidden so it never takes
 over the desktop: the window is transparent and click-through, the process has no
 Dock icon or menu bar, it never takes focus, and the game behaves as if focused.
-Every test run is silent: sounds load, so the run checks them, but none play.
-Add `--show` to watch and hear a run in a normal, focused window. Windows and Linux
+Every test run is silent and never opens the audio device: sounds load, so the run
+checks them, but none play. Add `--show` to watch and hear a run in a normal,
+focused window. `--audio` is a development aid that keeps the device in a hidden
+run, to check how startup copes with the desk's audio; it plays sound when the
+device works. Windows and Linux
 test runs still open a normal window. On OpenGL it also writes `target/smoke-test.png` and
 presentation captures. Metal texture readback is not implemented by Miniquad;
 use macOS window capture for Metal screenshots. To check Metal correctness, run the smoke/effects and flow tests

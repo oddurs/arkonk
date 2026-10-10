@@ -281,8 +281,10 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             "windowed"
         }
     ));
-    // Hidden test runs share a desk with someone working; `--show` is for watching one.
-    let mut audio = Audio::new(smoke && !flag("--show")).await;
+    // Hidden test runs share a desk with someone working, and must not depend
+    // on its audio device; `--show` is for watching one. `--audio` keeps the
+    // device in a hidden run, to test how startup copes with the desk's audio.
+    let mut audio = Audio::new(smoke && !flag("--show") && !flag("--audio")).await;
     let mut perf = Perf::new();
     let mut trace = perf::FrameTrace::new(perf_test);
     let mut ui = Ui::default();
@@ -345,6 +347,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         }
         // A settings screen changes `profile.settings.fullscreen`; this applies it.
         let held = display.update(profile.settings.fullscreen, frame_seconds);
+        audio.poll();
         audio.muted = profile.settings.muted;
         audio.volume = f32::from(profile.settings.volume) / f32::from(settings::MAX_VOLUME);
         let mouse = render::mouse().unwrap_or(last_mouse);
@@ -901,11 +904,12 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
         }
         if smoke && !flow && frames == measured {
             println!(
-                "Render smoke: {} frames, score {}, collision caps {}, sounds loaded {}/17",
+                "Render smoke: {} frames, score {}, collision caps {}, sounds loaded {}/17, {}",
                 frames + 1,
                 game.score(),
                 game.diagnostics().budget_exhausted,
-                audio.loaded()
+                audio.loaded(),
+                audio.output()
             );
             for line in &perf.lines {
                 println!("{line}");
