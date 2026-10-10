@@ -43,59 +43,80 @@ unsafe extern "C" fn saudio_coreaudio_callback(
 
 impl AudioContext {
     pub fn new() -> AudioContext {
-        use crate::mixer::{self, Mixer};
+        use crate::mixer::Mixer;
 
         let (mixer_builder, mixer_ctrl) = Mixer::new();
-        let mixer = Box::new(mixer_builder.build());
-
-        unsafe {
-            let fmt = _saudio_AudioStreamBasicDescription {
-                mSampleRate: consts::RATE as f64,
-                mFormatID: _saudio_kAudioFormatLinearPCM,
-                mFormatFlags: _saudio_kLinearPCMFormatFlagIsFloat
-                    | _saudio_kAudioFormatFlagIsPacked,
-                mFramesPerPacket: 1,
-                mChannelsPerFrame: consts::CHANNELS,
-                mBytesPerFrame: 4 * consts::CHANNELS,
-                mBytesPerPacket: 4 * consts::CHANNELS,
-                mBitsPerChannel: 32,
-                mReserved: 0,
-            };
-            let mut ca_audio_queue: _saudio_AudioQueueRef = std::mem::zeroed();
-            let res = AudioQueueNewOutput(
-                &fmt,
-                Some(saudio_coreaudio_callback),
-                Box::into_raw(mixer) as *mut _,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                0,
-                &mut ca_audio_queue,
-            );
-            assert!(res == 0);
-            assert!(ca_audio_queue.is_null() == false);
-
-            // create 2 audio buffers
-            for _ in 0..2 {
-                let mut buf: _saudio_AudioQueueBufferRef = std::ptr::null_mut();
-                let buf_byte_size = consts::BUFFER_FRAMES * fmt.mBytesPerFrame;
-                let res = AudioQueueAllocateBuffer(ca_audio_queue, buf_byte_size, &mut buf);
-                assert!(res == 0);
-                assert!(buf.is_null() == false);
-                (*buf).mAudioDataByteSize = buf_byte_size;
-                std::ptr::write_bytes(
-                    (*buf).mAudioData as *mut u8,
-                    0,
-                    (*buf).mAudioDataByteSize as usize,
-                );
-                AudioQueueEnqueueBuffer(ca_audio_queue, buf, 0, std::ptr::null_mut());
-            }
-
-            let res = AudioQueueStart(ca_audio_queue, std::ptr::null_mut());
-            assert!(res == 0);
-        }
+        // ARKONK: deferred to `start_output`; see `output` in lib.rs.
+        crate::output::park(Box::new(move |ready| {
+            let _ = ready.send(unsafe { start_queue(mixer_builder.build()) });
+        }));
 
         AudioContext { mixer_ctrl }
     }
+}
+
+/// ARKONK: the upstream body of `AudioContext::new`, with each `assert!`
+/// turned into an error. `AudioQueueStart` can block for many seconds and then
+/// fail when coreaudiod is wedged, so this runs on its own thread.
+///
+/// The mixer is never freed, even after a failure: it holds the receiving end
+/// of `MixerControl`'s channel, and dropping it would make every later send
+/// print "Audio thread died".
+unsafe fn start_queue(mixer: crate::mixer::Mixer) -> Result<(), String> {
+    let mixer = Box::into_raw(Box::new(mixer));
+    let fmt = _saudio_AudioStreamBasicDescription {
+        mSampleRate: consts::RATE as f64,
+        mFormatID: _saudio_kAudioFormatLinearPCM,
+        mFormatFlags: _saudio_kLinearPCMFormatFlagIsFloat | _saudio_kAudioFormatFlagIsPacked,
+        mFramesPerPacket: 1,
+        mChannelsPerFrame: consts::CHANNELS,
+        mBytesPerFrame: 4 * consts::CHANNELS,
+        mBytesPerPacket: 4 * consts::CHANNELS,
+        mBitsPerChannel: 32,
+        mReserved: 0,
+    };
+    let mut ca_audio_queue: _saudio_AudioQueueRef = std::mem::zeroed();
+    let res = AudioQueueNewOutput(
+        &fmt,
+        Some(saudio_coreaudio_callback),
+        mixer as *mut _,
+        std::ptr::null_mut(),
+        std::ptr::null_mut(),
+        0,
+        &mut ca_audio_queue,
+    );
+    if res != 0 || ca_audio_queue.is_null() {
+        return Err(format!("AudioQueueNewOutput failed (OSStatus {res})"));
+    }
+
+    // create 2 audio buffers
+    for _ in 0..2 {
+        let mut buf: _saudio_AudioQueueBufferRef = std::ptr::null_mut();
+        let buf_byte_size = consts::BUFFER_FRAMES * fmt.mBytesPerFrame;
+        let res = AudioQueueAllocateBuffer(ca_audio_queue, buf_byte_size, &mut buf);
+        if res != 0 || buf.is_null() {
+            return Err(dispose(ca_audio_queue, "AudioQueueAllocateBuffer", res));
+        }
+        (*buf).mAudioDataByteSize = buf_byte_size;
+        std::ptr::write_bytes(
+            (*buf).mAudioData as *mut u8,
+            0,
+            (*buf).mAudioDataByteSize as usize,
+        );
+        AudioQueueEnqueueBuffer(ca_audio_queue, buf, 0, std::ptr::null_mut());
+    }
+
+    let res = AudioQueueStart(ca_audio_queue, std::ptr::null_mut());
+    if res != 0 {
+        return Err(dispose(ca_audio_queue, "AudioQueueStart", res));
+    }
+    Ok(())
+}
+
+/// Frees a queue that never started and names the call that failed.
+unsafe fn dispose(queue: _saudio_AudioQueueRef, call: &str, res: _saudio_OSStatus) -> String {
+    AudioQueueDispose(queue, true);
+    format!("{call} failed (OSStatus {res})")
 }
 
 pub struct Sound {

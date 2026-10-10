@@ -14,7 +14,8 @@ low-resolution machines. MIT, public repository.
   rebake (skill: `rebake-glyphs`).
 - Graphical checks open a real window, hidden on macOS unless `--show`: `target/release/arkonk --smoke-test --opengl`,
   `--flow-test`, `--effects-test`, `--perf-test`, plus `--locale <tag|pseudo>`
-  (skill: `visual-check`).
+  (skill: `visual-check`). Test runs never open the audio device; `--audio` keeps
+  it, a development aid for checking startup against the desk's audio.
 - `./scripts/build-macos.sh` builds the app bundle. Packaging is
   `scripts/package.sh`; releasing is in `docs/RELEASING.md`.
 
@@ -34,7 +35,8 @@ low-resolution machines. MIT, public repository.
 - Glyphs are Noto atlases baked at build time (`crates/ark-glyphs/data/*.bin`). There
   are no font files at runtime.
 - `vendor/miniquad` carries Metal fixes. Read `vendor/miniquad/ARKONK.md` before
-  touching it.
+  touching it. `vendor/quad-snd` starts the audio device off the main thread and
+  without panics; see its `ARKONK.md`.
 - Only `src/steam.rs` calls Steamworks, behind the opt-in `steam` feature.
 - Rendering is one batched pass. No new shaders, render targets or blurs, and no
   allocation on the draw path. Measure frame-time changes against a `main` baseline

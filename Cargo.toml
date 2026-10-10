@@ -3,8 +3,8 @@ members = [".", "crates/ark", "crates/ark-glyphs", "crates/ark-text", "tools/fon
 # The font baker is run by hand (docs/localization.md); it is not a default member.
 default-members = [".", "crates/ark", "crates/ark-glyphs", "crates/ark-text"]
 # Path dependencies under the workspace root join it automatically; the
-# vendored miniquad must stay outside so lints never run on it.
-exclude = ["vendor/miniquad"]
+# vendored crates must stay outside so lints never run on them.
+exclude = ["vendor/miniquad", "vendor/quad-snd"]
 resolver = "3"
 
 [workspace.package]
@@ -39,6 +39,9 @@ ark-glyphs = { path = "crates/ark-glyphs" }
 ark-text = { path = "crates/ark-text" }
 gilrs = "0.11.2"
 macroquad = { version = "0.4.16", features = ["audio"] }
+# macroquad's audio backend, named directly only to start its output device;
+# see vendor/quad-snd/ARKONK.md.
+quad-snd = "0.2.8"
 steamworks = { version = "0.13.1", optional = true }
 # The OS language list, through each platform's own API; no dependencies
 # on desktop targets.
@@ -69,3 +72,6 @@ opt-level = 3
 # Localized macOS Metal fixes; provenance and patch scope in vendor/miniquad/ARKONK.md.
 [patch.crates-io]
 miniquad = { path = "vendor/miniquad" }
+# The audio device starts off the main thread and fails without a panic;
+# see vendor/quad-snd/ARKONK.md.
+quad-snd = { path = "vendor/quad-snd" }

@@ -98,10 +98,15 @@ unsafe fn setup_pcm_device() -> *mut sys::snd_pcm_t {
     pcm_handle
 }
 
-unsafe fn audio_thread(mut mixer: crate::mixer::Mixer) {
+unsafe fn audio_thread(
+    mut mixer: crate::mixer::Mixer,
+    ready: mpsc::Sender<Result<(), String>>,
+) {
     let mut buffer: Vec<f32> = vec![0.0; consts::PCM_BUFFER_SIZE as usize * 2];
 
     let pcm_handle = setup_pcm_device();
+    // ARKONK: a panic above drops `ready` unsent, which also reports failure.
+    let _ = ready.send(Ok(()));
 
     loop {
         // Wait for PCM to be ready for next write (no timeout)
@@ -156,9 +161,10 @@ impl AudioContext {
         use crate::mixer::Mixer;
 
         let (mixer_builder, mixer_ctrl) = Mixer::new();
-        std::thread::spawn(move || unsafe {
-            audio_thread(mixer_builder.build());
-        });
+        // ARKONK: deferred to `start_output`; see `output` in lib.rs.
+        crate::output::park(Box::new(move |ready| unsafe {
+            audio_thread(mixer_builder.build(), ready);
+        }));
 
         AudioContext { mixer_ctrl }
     }

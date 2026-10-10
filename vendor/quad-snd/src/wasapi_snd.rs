@@ -64,7 +64,10 @@ mod consts {
     pub const BUFFER_FRAMES: u32 = 4096;
 }
 
-unsafe fn audio_thread(mut mixer: crate::mixer::Mixer) {
+unsafe fn audio_thread(
+    mut mixer: crate::mixer::Mixer,
+    ready: mpsc::Sender<Result<(), String>>,
+) {
     CoInitializeEx(std::ptr::null_mut(), COINIT_MULTITHREADED);
 
     let buffer_end_event = CreateEventA(std::ptr::null_mut(), FALSE, FALSE, std::ptr::null());
@@ -156,6 +159,8 @@ unsafe fn audio_thread(mut mixer: crate::mixer::Mixer) {
     assert!(hr >= 0, "SetEventHandle failed");
 
     (*audio_client).Start();
+    // ARKONK: a panic above drops `ready` unsent, which also reports failure.
+    let _ = ready.send(Ok(()));
     loop {
         WaitForSingleObject(buffer_end_event, INFINITE);
 
@@ -195,9 +200,10 @@ impl AudioContext {
         use crate::mixer::Mixer;
 
         let (mixer_builder, mixer_ctrl) = Mixer::new();
-        std::thread::spawn(move || unsafe {
-            audio_thread(mixer_builder.build());
-        });
+        // ARKONK: deferred to `start_output`; see `output` in lib.rs.
+        crate::output::park(Box::new(move |ready| unsafe {
+            audio_thread(mixer_builder.build(), ready);
+        }));
 
         AudioContext { mixer_ctrl }
     }
