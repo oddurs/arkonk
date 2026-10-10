@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "ŞAFAK",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "SABAH",
+            Chapter::Zenith => "ZENİT",
+            Chapter::GoldenHour => "ALTIN SAAT",
             Chapter::Afterlight => "ALACAKARANLIK",
             Chapter::BlueHour => "MAVİ SAAT",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "TUTULMA",
+            Chapter::Aurora => "AURORA",
         },
         PowerName(p) => match p {
             Power::Wide => "GENİŞ",
@@ -150,202 +150,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "İlk Işık",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Sürüklenme",
+    "Ufuk",
+    "Parıltı",
+    "Tarlakuşu",
+    "Fenerler",
+    "Gelgit",
+    "Gün Doğumu",
     "Uydular",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Çiğ Noktası",
+    "Diyafram",
+    "Manastır",
+    "Kilit Taşı",
+    "Güneş Saati",
+    "İğne Deliği",
+    "Rüzgârgülü",
     "Hava Akımı",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Filaman",
+    "Meridyen",
+    "Çağlayan",
     "Geçiş",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Keskin Viraj",
+    "Gündönümü",
     "Rezonans",
     "Prizma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Petek",
+    "Deniz Köpüğü",
     "Dip Akıntısı",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Hasat",
+    "Kaleydoskop",
+    "Duvar Halısı",
+    "Uzun Gölgeler",
     "Son Işıltı",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Koza",
+    "Jeod",
     "Paralaks",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Hisar",
+    "Nautilus",
+    "Akşam Ayini",
     "Süpernova",
     "Ay Doğuşu",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Akşam Loşluğu",
+    "Lamba Işığı",
+    "Ateşböcekleri",
+    "Deniz Feneri",
+    "Noktürn",
+    "Derin Alan",
+    "Takımyıldız",
+    "Yarıgölge",
+    "Metronom",
+    "Korona",
+    "Sizijî",
+    "Pulsar",
+    "Deklanşör",
+    "Umbra",
+    "Tam Tutulma",
+    "Güneş Rüzgârı",
+    "Kuzey Işıkları",
+    "Şeritler",
+    "Kutup Gecesi",
+    "Katedral",
+    "Titrek Işık",
+    "Tekillik",
     "Eve Dönüş",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "İlk Işık",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Sürükle",
+    "Ufuk",
+    "Parıltı",
+    "Tarlakuşu",
+    "Fenerler",
+    "Gelgit",
+    "Gün",
     "Uydular",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Çiğ",
+    "Diyafram",
+    "Manastır",
+    "Kilit",
+    "Saat",
+    "Delik",
+    "Rüzgârgülü",
     "Hava Akımı",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Filaman",
+    "Meridyen",
+    "Çağlayan",
     "Geçiş",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Viraj",
+    "Gündönümü",
     "Rezonans",
     "Prizma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Petek",
+    "Köpük",
     "Akıntı",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Hasat",
+    "Kaleydo",
+    "Halı",
+    "Gölgeler",
     "Son Işıltı",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Koza",
+    "Jeod",
     "Paralaks",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Hisar",
+    "Nautilus",
+    "Ayin",
     "Süpernova",
     "Ay Doğuşu",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Loşluk",
+    "Lamba",
+    "Böcekler",
+    "Fener",
+    "Noktürn",
+    "Derinlik",
+    "Yıldızlar",
+    "Yarıgölge",
+    "Metronom",
+    "Korona",
+    "Sizijî",
+    "Pulsar",
+    "Deklanşör",
+    "Umbra",
+    "Tam",
+    "Rüzgâr",
+    "Kuzey",
+    "Şeritler",
+    "Kutup Gecesi",
+    "Katedral",
+    "Titrek",
+    "Tekillik",
     "Eve Dönüş",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Geniş: düşen kapsülü yakala",
+    "{icon:slow} Yavaş: yakala, top sakinleşsin",
+    "Yönlendir: raketin kenarları topu geniş açıyla yollar",
+    "Yalnız kıvılcımlar: her birinin peşine düş",
+    "Topu açık kanatlardan yukarı yolla",
+    "Her feneri aşağıdan temizle",
+    "Dalgaya bin: yan duvarlardan sektir",
+    "Güneşi aşağıdan oy, sıra sıra",
     "{icon:anchor} Çapa: topu yakala, nişan al, sonra bırak",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Zırhlı tuğlalar iki vuruşa dayanır: kenarlara dikkat",
+    "{icon:anchor} Duvardaki boşluktan nişan al",
+    "Tek bir kapı: topu avluya gönder",
+    "Kilit taşını devir, kemer açılsın",
+    "Açıları oku: her gölge bir atış",
+    "{icon:anchor} Tek bir dar delik: tut, nişan al, bırak",
+    "Her yön kalbe çıkar",
     "Kehribar çekirdekler: her patlama dört komşusuna ulaşır",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Filamana herhangi bir yerden dokun: iki yöne de yanar",
+    "Alanı meridyen boyunca böl",
+    "Çağlayanı iki uçtan birinden başlat",
     "İki röle hattı arasından bir yol aç",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Üç röle hattı: her biri için tek temiz atış",
+    "Halka bütünüyle yanar: kenarına giden bir yol bul",
     "Komşu çekirdekler tepkimeyi taşır",
     "{icon:multi} Çoklu top: üç top, tek açıklık",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Her hücrede bir çekirdek: hepsini kır",
+    "Her yerde köpük: üç topu serbest bırak",
     "Zırhın ardındaki ceplere gir",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Dolu alan: {icon:multi} Çoklu top hızla temizler",
+    "Her yerde aynalar: bir tarafı kır, sonra ikizini",
+    "Bir ipi çek, dokuma çözülsün",
+    "Zemini kır ve uzun fitili tutuştur",
     "{icon:phase} Faz: sekmeden üç tuğla teması",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Faz kabuğun içinden çekirdeğe sızar",
+    "Bir jeodu kır, kristalleri aydınlansın",
     "Kabuğu del, sonra iç rotayı ateşle",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Kapıdan gir ya da {icon:phase} Faz ile duvarın içinden",
+    "Spiralle içeri: dış sarım önce yanar",
+    "Üç çan: her birini aşağıdan çal",
     "Diğer toplar uçarken dönen bir topu yakala",
     "Açık merkezin çevresinde röleyi izle",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Işık çekiliyor: alanı fırsat varken öğren",
+    "Karanlıkta topun ve raketin ışığı taşır",
+    "Ateşböcekleri: çekirdekler karanlıkta bile parlar",
+    "Raketin ışığını kıyıda gezdir",
+    "Daha çok top, daha çok ışık: {icon:multi} Çoklu top",
+    "Derin alan: her sönük nokta bir tuğla",
+    "Yıldızları birleştir: parlak olanlar çekirdek",
+    "Kapılar ritimle solar: boşluğu bekle",
+    "Tik, tak: kapılar zamanı tutar",
+    "Korona ritimle açılır: içeriye vur",
+    "Hayalet kapı patlamayı savuşturur: kıvılcımı zamanla",
+    "Bir pulsar: hızlı vuruşlar, hızlı eller",
+    "Deklanşör bir anlığına açılır: hazır ol",
+    "Yarısı gölgede: kapılı taraf ritmi tutar",
+    "Ay katıyken güneşi tutuştur",
+    "Rüzgâr tek yöne eser: onunla çekirdeklere süzül",
+    "Işık perdeleri: {icon:multi} Çoklu top ile süpür",
+    "Her şerit bir kapıya bağlı: iki yarısını da kes",
+    "Uzun gece: taşıdığın ışığa göre nişan al",
+    "Kapılardan gir, gül pencereye çık",
+    "Hepsi bir arada: çekirdeklere dikkat et",
+    "Kapılar katılaşırken halkaya vur",
     "Son bir yörünge: her açıklığı değerlendir",
 ];

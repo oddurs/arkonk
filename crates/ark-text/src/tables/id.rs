@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "FAJAR",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "PAGI",
+            Chapter::Zenith => "ZENIT",
+            Chapter::GoldenHour => "JAM EMAS",
             Chapter::Afterlight => "SENJA",
             Chapter::BlueHour => "JAM BIRU",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "GERHANA",
+            Chapter::Aurora => "AURORA",
         },
         PowerName(p) => match p {
             Power::Wide => "LEBAR",
@@ -150,202 +150,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Cahaya Pertama",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Hanyut",
+    "Cakrawala",
+    "Kerlip",
+    "Branjangan",
+    "Lentera",
+    "Air Pasang",
+    "Matahari Terbit",
     "Satelit",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Titik Embun",
+    "Apertur",
+    "Biara",
+    "Batu Kunci",
+    "Jam Matahari",
+    "Lubang Jarum",
+    "Mawar Angin",
     "Arus Seret",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Filamen",
+    "Meridian",
+    "Kaskade",
     "Silang Pudar",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Tikungan Tajam",
+    "Solstis",
     "Resonansi",
     "Prisma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Sarang Lebah",
+    "Percik Ombak",
     "Arus Bawah",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Panen",
+    "Kaleidoskop",
+    "Permadani",
+    "Bayang Panjang",
     "Pendar Senja",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Kepompong",
+    "Geode",
     "Paralaks",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Benteng",
+    "Nautilus",
+    "Vesper",
     "Supernova",
     "Bulan Terbit",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Remang-remang",
+    "Cahaya Lampu",
+    "Kunang-kunang",
+    "Mercusuar",
+    "Nokturne",
+    "Medan Dalam",
+    "Rasi Bintang",
+    "Penumbra",
+    "Metronom",
+    "Korona",
+    "Sizigi",
+    "Pulsar",
+    "Rana",
+    "Umbra",
+    "Totalitas",
+    "Angin Surya",
+    "Borealis",
+    "Pita",
+    "Malam Kutub",
+    "Katedral",
+    "Kemilau",
+    "Singularitas",
     "Pulang",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Cahaya",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Hanyut",
+    "Cakrawala",
+    "Kerlip",
+    "Branjangan",
+    "Lentera",
+    "Pasang",
+    "Mentari",
     "Satelit",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Embun",
+    "Apertur",
+    "Biara",
+    "Kunci",
+    "Jam",
+    "Lubang",
+    "Mawar",
     "Arus Seret",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Filamen",
+    "Meridian",
+    "Kaskade",
     "Pudar",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Tikungan",
+    "Solstis",
     "Resonansi",
     "Prisma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Sarang",
+    "Percik",
     "Arus Bawah",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Panen",
+    "Kaleido",
+    "Permadani",
+    "Bayang",
     "Pendar",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Kepompong",
+    "Geode",
     "Paralaks",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Benteng",
+    "Nautilus",
+    "Vesper",
     "Supernova",
     "Bulan Terbit",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Remang",
+    "Lampu",
+    "Kunang",
+    "Mercusuar",
+    "Nokturne",
+    "Dalam",
+    "Bintang",
+    "Penumbra",
+    "Metronom",
+    "Korona",
+    "Sizigi",
+    "Pulsar",
+    "Rana",
+    "Umbra",
+    "Totalitas",
+    "Angin",
+    "Borealis",
+    "Pita",
+    "Malam",
+    "Katedral",
+    "Kemilau",
+    "Singularitas",
     "Pulang",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Lebar: tangkap kapsul yang jatuh",
+    "{icon:slow} Lambat: tangkap, dan bola melambat",
+    "Arahkan: tepi dayung melontarkan bola ke samping",
+    "Percikan api sendirian: kejar satu per satu",
+    "Kirim bola naik lewat sayap yang terbuka",
+    "Bersihkan setiap lentera dari bawah",
+    "Tunggangi ombak: pantulkan dari dinding samping",
+    "Pahat matahari dari bawah, baris demi baris",
     "{icon:anchor} Jangkar: tangkap bola, bidik, lalu lepaskan",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Bata berlapis baja butuh dua pukulan: awasi tepinya",
+    "{icon:anchor} Bidik lewat celah di dinding",
+    "Satu pintu saja: kirim bola ke halaman dalam",
+    "Hancurkan batu kunci dan lengkungnya terbuka",
+    "Baca sudutnya: setiap bayangan adalah satu tembakan",
+    "{icon:anchor} Satu lubang sempit: tahan, bidik, lepaskan",
+    "Setiap arah mata angin menuju jantung",
     "Inti amber: setiap ledakan mengenai empat tetangganya",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Sentuh filamen di mana saja: ia terbakar ke dua arah",
+    "Belah medan di sepanjang meridian",
+    "Mulai kaskade dari kedua ujung mana pun",
     "Buka jalan melewati dua jalur relai",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Tiga jalur relai: satu tembakan bersih tiap jalur",
+    "Cincin terbakar utuh: cari jalan ke tepinya",
     "Inti yang bertetangga meneruskan reaksi",
     "{icon:multi} Multibola: tiga bola, satu celah",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Satu inti di tiap sel: pecahkan semuanya",
+    "Percikan di mana-mana: lepaskan tiga bola",
     "Tembus ke kantong di balik lapisan baja",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Medan penuh: {icon:multi} Multibola membersihkannya cepat",
+    "Cermin di mana-mana: pecahkan satu sisi, lalu kembarannya",
+    "Tarik satu benang dan anyamannya terurai",
+    "Tembus lantai dan nyalakan sumbu panjang",
     "{icon:phase} Fase: tiga sentuhan bata tanpa memantul",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Fase menembus cangkang sampai ke inti",
+    "Pecahkan geode dan kristalnya menyala",
     "Tembus cangkangnya, lalu nyalakan rute dalam",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Masuk lewat gerbang, atau tembus dinding dengan {icon:phase} Fase",
+    "Berputar ke dalam: lilitan terluar menyala duluan",
+    "Tiga lonceng: bunyikan satu per satu dari bawah",
     "Tangkap bola yang kembali selagi bola lain terus melaju",
     "Ikuti relai mengitari bagian tengah yang terbuka",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Cahaya memudar: pelajari medan selagi bisa",
+    "Dalam gelap, bola dan dayungmu membawa cahaya",
+    "Kunang-kunang: inti bersinar bahkan dalam gelap",
+    "Sapukan cahaya dayung ke seluruh pantai",
+    "Lebih banyak bola, lebih banyak cahaya: {icon:multi} Multibola",
+    "Medan dalam: setiap titik redup adalah bata",
+    "Hubungkan bintang: yang terang adalah inti",
+    "Gerbang memudar mengikuti irama: tunggu celahnya",
+    "Tik, tok: gerbang menjaga waktu",
+    "Korona terbuka mengikuti irama: pukul ke dalam",
+    "Gerbang hantu menepis ledakan: atur waktu percikannya",
+    "Sebuah pulsar: irama cepat, tangan cepat",
+    "Rana terbuka sesaat: bersiaplah",
+    "Setengah dalam bayangan: sisi bergerbang menjaga irama",
+    "Nyalakan matahari selagi bulan padat",
+    "Angin bertiup satu arah: tunggangi sampai ke inti",
+    "Tirai cahaya: sapu dengan {icon:multi} Multibola",
+    "Setiap pita terikat pada gerbang: putuskan kedua bagiannya",
+    "Malam yang panjang: bidik dengan cahaya yang kamu bawa",
+    "Masuk lewat pintu, naik ke jendela mawar",
+    "Semua sekaligus: awasi intinya",
+    "Pukul cincin saat gerbang menjadi padat",
     "Orbit terakhir: manfaatkan setiap celah",
 ];

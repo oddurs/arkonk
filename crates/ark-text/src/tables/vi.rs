@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "BÌNH MINH",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "BUỔI SÁNG",
+            Chapter::Zenith => "THIÊN ĐỈNH",
+            Chapter::GoldenHour => "GIỜ VÀNG",
             Chapter::Afterlight => "HOÀNG HÔN",
             Chapter::BlueHour => "GIỜ XANH",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "NHẬT THỰC",
+            Chapter::Aurora => "CỰC QUANG",
         },
         PowerName(p) => match p {
             Power::Wide => "RỘNG",
@@ -151,202 +151,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Tia sáng đầu",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Trôi dạt",
+    "Chân trời",
+    "Le lói",
+    "Chim sơn ca",
+    "Đèn lồng",
+    "Thủy triều",
+    "Mặt trời mọc",
     "Vệ tinh",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Điểm sương",
+    "Khẩu độ",
+    "Tu viện",
+    "Đá đỉnh vòm",
+    "Đồng hồ mặt trời",
+    "Lỗ kim",
+    "Hoa gió",
     "Luồng gió",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Dây tóc",
+    "Kinh tuyến",
+    "Thác",
     "Chuyển cảnh",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Ngoằn ngoèo",
+    "Chí điểm",
     "Cộng hưởng",
     "Lăng kính",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Tổ ong",
+    "Bọt sóng",
     "Dòng ngầm",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Mùa gặt",
+    "Kính vạn hoa",
+    "Thảm thêu",
+    "Bóng dài",
     "Ánh tà",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Nhộng",
+    "Geode",
     "Thị sai",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Thành trì",
+    "Ốc anh vũ",
+    "Kinh chiều",
     "Siêu tân tinh",
     "Trăng lên",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Chập choạng",
+    "Ánh đèn",
+    "Đom đóm",
+    "Hải đăng",
+    "Dạ khúc",
+    "Trường sâu",
+    "Chòm sao",
+    "Bán ảnh",
+    "Máy nhịp",
+    "Nhật hoa",
+    "Syzygy",
+    "Sao xung",
+    "Cửa chớp",
+    "Bóng tối",
+    "Toàn phần",
+    "Gió mặt trời",
+    "Cực quang bắc",
+    "Dải lụa",
+    "Đêm vùng cực",
+    "Thánh đường",
+    "Lấp lánh",
+    "Điểm kỳ dị",
     "Trở về",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Tia sáng đầu",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Trôi",
+    "Chân trời",
+    "Le lói",
+    "Chim sơn ca",
+    "Đèn lồng",
+    "Thủy triều",
+    "Mặt trời",
     "Vệ tinh",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Sương",
+    "Khẩu độ",
+    "Tu viện",
+    "Đá đỉnh",
+    "Đồng hồ",
+    "Lỗ kim",
+    "Hoa gió",
     "Luồng gió",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Dây tóc",
+    "Kinh tuyến",
+    "Thác",
     "Chuyển cảnh",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Ngoằn ngoèo",
+    "Chí điểm",
     "Cộng hưởng",
     "Lăng kính",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Tổ ong",
+    "Bọt sóng",
     "Dòng ngầm",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Mùa gặt",
+    "Vạn hoa",
+    "Thảm thêu",
+    "Bóng dài",
     "Ánh tà",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Nhộng",
+    "Geode",
     "Thị sai",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Thành trì",
+    "Anh vũ",
+    "Kinh chiều",
     "Siêu tân tinh",
     "Trăng lên",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Chập choạng",
+    "Ánh đèn",
+    "Đom đóm",
+    "Hải đăng",
+    "Dạ khúc",
+    "Trường sâu",
+    "Chòm sao",
+    "Bán ảnh",
+    "Máy nhịp",
+    "Nhật hoa",
+    "Syzygy",
+    "Sao xung",
+    "Chớp",
+    "Bóng tối",
+    "Toàn phần",
+    "Gió",
+    "Cực quang",
+    "Dải lụa",
+    "Đêm cực",
+    "Thánh đường",
+    "Lấp lánh",
+    "Điểm kỳ dị",
     "Trở về",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Rộng: bắt viên nang đang rơi",
+    "{icon:slow} Chậm: bắt nó và quả bóng sẽ chậm lại",
+    "Điều hướng: hai mép thanh đỡ đẩy bóng ra rộng",
+    "Những tia lửa lẻ: săn từng tia một",
+    "Đưa bóng lên qua hai cánh mở",
+    "Dọn từng đèn lồng từ bên dưới",
+    "Cưỡi con sóng: đánh dội từ tường hai bên",
+    "Đẽo mặt trời từ bên dưới, từng hàng một",
     "{icon:anchor} Neo: bắt bóng, ngắm, rồi thả ra",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Gạch bọc giáp chịu hai cú đánh: để ý các mép",
+    "{icon:anchor} Ngắm qua khe hở trên tường",
+    "Chỉ một cửa: đưa bóng vào sân trong",
+    "Phá đá đỉnh vòm và mái vòm sẽ mở ra",
+    "Đọc các góc: mỗi bóng đổ là một cú đánh",
+    "{icon:anchor} Một lỗ kim hẹp: giữ, ngắm, thả",
+    "Mọi hướng la bàn đều dẫn về trung tâm",
     "Lõi hổ phách: mỗi vụ nổ lan tới bốn ô lân cận",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Chạm vào dây tóc ở bất kỳ đâu: nó cháy về hai phía",
+    "Chia sân theo đường kinh tuyến",
+    "Khởi động thác từ một trong hai đầu",
     "Mở đường xuyên qua hai tuyến tiếp sóng",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Ba tuyến tiếp sóng: mỗi tuyến một cú đánh gọn",
+    "Vòng cháy trọn vẹn: tìm đường tới mép của nó",
     "Các lõi kề nhau truyền tiếp phản ứng",
     "{icon:multi} Đa bóng: ba quả bóng, một lối mở",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Mỗi ô một lõi: hãy phá chúng ra",
+    "Bọt sóng khắp nơi: thả ba quả bóng",
     "Phá vào các hốc phía sau lớp giáp",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Sân đầy: {icon:multi} Đa bóng dọn rất nhanh",
+    "Gương khắp nơi: phá một bên, rồi bên song sinh",
+    "Kéo một sợi chỉ và tấm thêu sẽ bung ra",
+    "Phá xuyên sàn và châm ngòi dài",
     "{icon:phase} Pha: ba lần chạm gạch mà không nảy",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Pha lướt xuyên lớp vỏ tới tận lõi",
+    "Bẻ một hốc tinh thể và các tinh thể sẽ sáng lên",
     "Xuyên thủng lớp vỏ, rồi kích nổ tuyến bên trong",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Vào qua cổng, hoặc xuyên tường bằng {icon:phase} Pha",
+    "Xoắn vào trong: vòng ngoài cùng sáng trước",
+    "Ba chiếc chuông: gõ từng chiếc từ bên dưới",
     "Bắt bóng quay về trong khi các bóng khác vẫn bay",
     "Đi theo tuyến tiếp sóng quanh vùng trung tâm trống",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Ánh sáng đang tắt: hãy học sân khi còn kịp",
+    "Trong bóng tối, bóng và thanh đỡ mang theo ánh sáng",
+    "Đom đóm: các lõi vẫn phát sáng trong bóng tối",
+    "Quét ánh sáng của thanh đỡ qua bờ biển",
+    "Nhiều bóng hơn, nhiều sáng hơn: {icon:multi} Đa bóng",
+    "Trường sâu: mỗi đốm mờ là một viên gạch",
+    "Nối các vì sao: những ngôi sáng là lõi",
+    "Cổng mờ dần theo nhịp: chờ khoảng trống",
+    "Tích tắc: các cổng giữ nhịp",
+    "Nhật hoa mở theo nhịp: đánh vào trong",
+    "Cổng ma gạt vụ nổ đi: canh đúng lúc tia lửa",
+    "Một sao xung: nhịp nhanh, tay nhanh",
+    "Cửa chớp chỉ mở trong chốc lát: hãy sẵn sàng",
+    "Nửa trong bóng tối: phía có cổng giữ nhịp",
+    "Đốt mặt trời khi mặt trăng còn đặc",
+    "Gió chỉ thổi một hướng: cưỡi nó tới các lõi",
+    "Những tấm màn sáng: quét chúng bằng {icon:multi} Đa bóng",
+    "Mỗi dải lụa buộc vào một cổng: cắt cả hai nửa",
+    "Đêm dài: ngắm theo ánh sáng bạn mang",
+    "Vào qua các cửa, lên cửa sổ hoa hồng",
+    "Mọi thứ cùng lúc: để ý các lõi",
+    "Đánh vào vòng khi các cổng đặc lại",
     "Vòng quỹ đạo cuối: tận dụng mọi lối mở",
 ];
