@@ -81,13 +81,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "รุ่ง\u{200b}อรุณ",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "ยาม\u{200b}เช้า",
+            Chapter::Zenith => "เซนิธ",
+            Chapter::GoldenHour => "ชั่วโมง\u{200b}ทอง",
             Chapter::Afterlight => "สนธยา",
             Chapter::BlueHour => "บลู\u{200b}อาวร์",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "คราส",
+            Chapter::Aurora => "ออโรรา",
         },
         PowerName(p) => match p {
             Power::Wide => "ขยาย",
@@ -155,202 +155,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "แสง\u{200b}แรก",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "ล่อง\u{200b}ลอย",
+    "ขอบ\u{200b}ฟ้า",
+    "ริบ\u{200b}หรี่",
+    "นก\u{200b}ลาร์ก",
+    "โคม\u{200b}ไฟ",
+    "น้ำ\u{200b}ขึ้น\u{200b}น้ำ\u{200b}ลง",
+    "อาทิตย์\u{200b}อุทัย",
     "ดาวเทียม",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "จุด\u{200b}น้ำ\u{200b}ค้าง",
+    "ช่อง\u{200b}รับ\u{200b}แสง",
+    "ระเบียง\u{200b}อาราม",
+    "ศิลา\u{200b}ยอด\u{200b}โค้ง",
+    "นาฬิกา\u{200b}แดด",
+    "รู\u{200b}เข็ม",
+    "กุหลาบ\u{200b}ลม",
     "กระแส\u{200b}ลม",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "ไส้\u{200b}หลอด",
+    "เมริเดียน",
+    "น้ำตก",
     "ครอส\u{200b}เฟด",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "ทาง\u{200b}คด\u{200b}เคี้ยว",
+    "อายัน",
     "การ\u{200b}สั่น\u{200b}พ้อง",
     "ปริซึม",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "รวง\u{200b}ผึ้ง",
+    "ละออง\u{200b}คลื่น",
     "คลื่น\u{200b}ใต้\u{200b}น้ำ",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "เก็บ\u{200b}เกี่ยว",
+    "กล้อง\u{200b}คาไลโดสโคป",
+    "พรม\u{200b}ทอ\u{200b}ผนัง",
+    "เงา\u{200b}ทอด\u{200b}ยาว",
     "แสง\u{200b}สนธยา",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "ดัก\u{200b}แด้",
+    "จีโอด",
     "พารัล\u{200b}แลกซ์",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "ป้อม\u{200b}ปราการ",
+    "หอย\u{200b}งวง\u{200b}ช้าง",
+    "สวด\u{200b}ยาม\u{200b}เย็น",
     "ซูเปอร์\u{200b}โนวา",
     "จันทร์\u{200b}ขึ้น",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "ย่ำ\u{200b}ค่ำ",
+    "แสง\u{200b}ตะเกียง",
+    "หิ่ง\u{200b}ห้อย",
+    "ประภาคาร",
+    "น็อกเทิร์น",
+    "ห้วง\u{200b}ลึก",
+    "กลุ่ม\u{200b}ดาว",
+    "เงา\u{200b}มัว",
+    "เมโทรนอม",
+    "โคโรนา",
+    "ซิซิจี",
+    "พัลซาร์",
+    "ชัตเตอร์",
+    "เงา\u{200b}มืด",
+    "เต็ม\u{200b}ดวง",
+    "ลม\u{200b}สุริยะ",
+    "แสง\u{200b}เหนือ",
+    "ริบบิ้น",
+    "คืน\u{200b}ขั้ว\u{200b}โลก",
+    "มหา\u{200b}วิหาร",
+    "ระยิบ\u{200b}ระยับ",
+    "เอกฐาน",
     "กลับ\u{200b}บ้าน",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "แสง\u{200b}แรก",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "ล่อง\u{200b}ลอย",
+    "ขอบ\u{200b}ฟ้า",
+    "ริบ\u{200b}หรี่",
+    "นก\u{200b}ลาร์ก",
+    "โคม\u{200b}ไฟ",
+    "น้ำ\u{200b}ขึ้น",
+    "อุทัย",
     "ดาวเทียม",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "น้ำ\u{200b}ค้าง",
+    "ช่อง\u{200b}แสง",
+    "อาราม",
+    "ศิลา\u{200b}ยอด",
+    "นาฬิกา\u{200b}แดด",
+    "รู\u{200b}เข็ม",
+    "กุหลาบ\u{200b}ลม",
     "กระแส\u{200b}ลม",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "ไส้\u{200b}หลอด",
+    "เมริเดียน",
+    "น้ำตก",
     "ครอส\u{200b}เฟด",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "ทาง\u{200b}คด",
+    "อายัน",
     "สั่น\u{200b}พ้อง",
     "ปริซึม",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "รวง\u{200b}ผึ้ง",
+    "ละออง",
     "คลื่น",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "เก็บ\u{200b}เกี่ยว",
+    "คาไลโดสโคป",
+    "พรม\u{200b}ทอ",
+    "เงา\u{200b}ยาว",
     "แสง\u{200b}สนธยา",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "ดัก\u{200b}แด้",
+    "จีโอด",
     "พารัล\u{200b}แลกซ์",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "ป้อม",
+    "หอย\u{200b}งวง\u{200b}ช้าง",
+    "สวด\u{200b}ยาม\u{200b}เย็น",
     "ซูเปอร์\u{200b}โนวา",
     "จันทร์\u{200b}ขึ้น",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "ย่ำ\u{200b}ค่ำ",
+    "ตะเกียง",
+    "หิ่ง\u{200b}ห้อย",
+    "ประภาคาร",
+    "น็อกเทิร์น",
+    "ห้วง\u{200b}ลึก",
+    "กลุ่ม\u{200b}ดาว",
+    "เงา\u{200b}มัว",
+    "เมโทรนอม",
+    "โคโรนา",
+    "ซิซิจี",
+    "พัลซาร์",
+    "ชัตเตอร์",
+    "เงา\u{200b}มืด",
+    "เต็ม\u{200b}ดวง",
+    "ลม\u{200b}สุริยะ",
+    "แสง\u{200b}เหนือ",
+    "ริบบิ้น",
+    "ขั้ว\u{200b}โลก",
+    "มหา\u{200b}วิหาร",
+    "ระยิบ\u{200b}ระยับ",
+    "เอกฐาน",
     "กลับ\u{200b}บ้าน",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} ขยาย: รับ\u{200b}แคปซูล\u{200b}ที่\u{200b}ร่วง\u{200b}ลง\u{200b}มา",
+    "{icon:slow} ช้า: รับ\u{200b}ไว้ แล้ว\u{200b}ลูก\u{200b}บอล\u{200b}จะ\u{200b}ช้า\u{200b}ลง",
+    "บังคับ\u{200b}ทิศ: ขอบ\u{200b}แป้น\u{200b}ส่ง\u{200b}ลูก\u{200b}บอล\u{200b}ออก\u{200b}กว้าง",
+    "ประกาย\u{200b}ไฟ\u{200b}โดด\u{200b}เดี่ยว: ไล่\u{200b}ล่า\u{200b}ให้\u{200b}ครบ",
+    "ส่ง\u{200b}ลูก\u{200b}บอล\u{200b}ขึ้น\u{200b}ตาม\u{200b}ปีก\u{200b}ที่\u{200b}เปิด\u{200b}โล่ง",
+    "เก็บ\u{200b}โคม\u{200b}ไฟ\u{200b}ทุก\u{200b}ดวง\u{200b}จาก\u{200b}ด้าน\u{200b}ล่าง",
+    "ขี่\u{200b}คลื่น: เด้ง\u{200b}ลูก\u{200b}จาก\u{200b}ผนัง\u{200b}ด้าน\u{200b}ข้าง",
+    "สกัด\u{200b}ดวง\u{200b}อาทิตย์\u{200b}จาก\u{200b}ด้าน\u{200b}ล่าง ทีละ\u{200b}แถว",
     "{icon:anchor} สมอ: รับ\u{200b}ลูก\u{200b}บอล เล็ง แล้ว\u{200b}ปล่อย",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "อิฐ\u{200b}หุ้ม\u{200b}เกราะ\u{200b}ต้อง\u{200b}โดน\u{200b}สอง\u{200b}ครั้ง: ดู\u{200b}ที่\u{200b}ขอบ",
+    "{icon:anchor} เล็ง\u{200b}ผ่าน\u{200b}ช่อง\u{200b}ใน\u{200b}กำแพง",
+    "มี\u{200b}ประตู\u{200b}เดียว: ส่ง\u{200b}ลูก\u{200b}บอล\u{200b}เข้า\u{200b}ลาน\u{200b}ใน",
+    "ทลาย\u{200b}ศิลา\u{200b}ยอด\u{200b}โค้ง แล้ว\u{200b}ซุ้ม\u{200b}โค้ง\u{200b}จะ\u{200b}เปิด",
+    "อ่าน\u{200b}มุม: เงา\u{200b}แต่ละ\u{200b}เงา\u{200b}คือ\u{200b}หนึ่ง\u{200b}ช็อต",
+    "{icon:anchor} รู\u{200b}เข็ม\u{200b}แคบ\u{200b}รู\u{200b}เดียว: ค้าง เล็ง แล้ว\u{200b}ปล่อย",
+    "ทุก\u{200b}ทิศ\u{200b}นำ\u{200b}ไป\u{200b}สู่\u{200b}หัวใจ",
     "แกน\u{200b}อำพัน: ทุก\u{200b}การ\u{200b}ระเบิด\u{200b}ส่ง\u{200b}ผล\u{200b}ถึง\u{200b}สี่\u{200b}ช่อง\u{200b}ข้าง\u{200b}เคียง",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "แตะ\u{200b}ไส้\u{200b}หลอด\u{200b}ตรง\u{200b}ไหน\u{200b}ก็\u{200b}ได้: ลาม\u{200b}ไป\u{200b}ทั้ง\u{200b}สอง\u{200b}ทาง",
+    "แบ่ง\u{200b}สนาม\u{200b}ตาม\u{200b}แนว\u{200b}เมริเดียน",
+    "จุด\u{200b}น้ำตก\u{200b}จาก\u{200b}ปลาย\u{200b}ด้าน\u{200b}ไหน\u{200b}ก็\u{200b}ได้",
     "เปิด\u{200b}ทาง\u{200b}ผ่าน\u{200b}สอง\u{200b}แนว\u{200b}รีเลย์",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "รีเลย์\u{200b}สาม\u{200b}แนว: ยิง\u{200b}ให้\u{200b}สะอาด\u{200b}แนว\u{200b}ละ\u{200b}นัด",
+    "วง\u{200b}แหวน\u{200b}ไหม้\u{200b}ทั้ง\u{200b}วง: หา\u{200b}ทาง\u{200b}ไป\u{200b}ถึง\u{200b}ขอบ",
     "แกน\u{200b}ที่\u{200b}อยู่\u{200b}ติด\u{200b}กัน\u{200b}ส่ง\u{200b}ต่อ\u{200b}ปฏิกิริยา",
     "{icon:multi} หลาย\u{200b}ลูก: สาม\u{200b}ลูก หนึ่ง\u{200b}ช่อง\u{200b}ว่าง",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "แกน\u{200b}อยู่\u{200b}ทุก\u{200b}ช่อง: ทุบ\u{200b}ให้\u{200b}แตก",
+    "ละออง\u{200b}กระจาย\u{200b}ทุก\u{200b}ที่: ปล่อย\u{200b}ลูก\u{200b}บอล\u{200b}สาม\u{200b}ลูก",
     "ทะลวง\u{200b}เข้า\u{200b}ช่อง\u{200b}หลัง\u{200b}เกราะ",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "สนาม\u{200b}เต็ม: {icon:multi} หลาย\u{200b}ลูก\u{200b}กวาด\u{200b}ได้\u{200b}เร็ว",
+    "กระจก\u{200b}ทุก\u{200b}ที่: ทุบ\u{200b}ด้าน\u{200b}หนึ่ง แล้ว\u{200b}ฝาแฝด",
+    "ดึง\u{200b}ด้าย\u{200b}เส้น\u{200b}เดียว แล้ว\u{200b}ผืน\u{200b}ผ้า\u{200b}จะ\u{200b}หลุด",
+    "ทะลุ\u{200b}พื้น แล้ว\u{200b}จุด\u{200b}ชนวน\u{200b}ยาว",
     "{icon:phase} เฟส: ชน\u{200b}อิฐ\u{200b}สาม\u{200b}ครั้ง\u{200b}โดย\u{200b}ไม่\u{200b}เด้ง",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} เฟส: ลอด\u{200b}เปลือก\u{200b}ไป\u{200b}ถึง\u{200b}แกน",
+    "ทุบ\u{200b}จีโอด แล้ว\u{200b}ผลึก\u{200b}จะ\u{200b}เรือง\u{200b}แสง",
     "เจาะ\u{200b}เปลือก แล้ว\u{200b}จุด\u{200b}ชนวน\u{200b}เส้น\u{200b}ทาง\u{200b}ด้าน\u{200b}ใน",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "เข้า\u{200b}ทาง\u{200b}ประตู หรือ\u{200b}ทะลุ\u{200b}กำแพง\u{200b}ด้วย {icon:phase} เฟส",
+    "วน\u{200b}เข้า\u{200b}ใน: ขด\u{200b}นอก\u{200b}สุด\u{200b}สว่าง\u{200b}ก่อน",
+    "ระฆัง\u{200b}สาม\u{200b}ใบ: ตี\u{200b}ทีละ\u{200b}ใบ\u{200b}จาก\u{200b}ด้าน\u{200b}ล่าง",
     "รับ\u{200b}ลูก\u{200b}ที่\u{200b}กลับ\u{200b}มา\u{200b}ขณะ\u{200b}ที่\u{200b}ลูก\u{200b}อื่น\u{200b}ยัง\u{200b}ลอย\u{200b}อยู่",
     "ตาม\u{200b}รีเลย์\u{200b}รอบ\u{200b}ใจ\u{200b}กลาง\u{200b}ที่\u{200b}เปิด\u{200b}โล่ง",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "แสง\u{200b}กำลัง\u{200b}จาง: จำ\u{200b}สนาม\u{200b}ให้\u{200b}ได้\u{200b}ขณะ\u{200b}ยัง\u{200b}ทัน",
+    "ใน\u{200b}ความ\u{200b}มืด ลูก\u{200b}บอล\u{200b}และ\u{200b}แป้น\u{200b}นำ\u{200b}แสง",
+    "หิ่ง\u{200b}ห้อย: แกน\u{200b}เรือง\u{200b}แสง\u{200b}แม้\u{200b}ใน\u{200b}ความ\u{200b}มืด",
+    "กวาด\u{200b}แสง\u{200b}จาก\u{200b}แป้น\u{200b}ไป\u{200b}ทั่ว\u{200b}ชายฝั่ง",
+    "ลูก\u{200b}มาก\u{200b}แสง\u{200b}มาก: {icon:multi} หลาย\u{200b}ลูก",
+    "ห้วง\u{200b}ลึก: จุด\u{200b}จาง\u{200b}ทุก\u{200b}จุด\u{200b}คือ\u{200b}อิฐ",
+    "ต่อ\u{200b}ดาว\u{200b}เข้า\u{200b}ด้วย\u{200b}กัน: ดวง\u{200b}สว่าง\u{200b}คือ\u{200b}แกน",
+    "ประตู\u{200b}จาง\u{200b}ตาม\u{200b}จังหวะ: รอ\u{200b}ช่วง\u{200b}ว่าง",
+    "ติ๊ก ต็อก: ประตู\u{200b}นับ\u{200b}จังหวะ",
+    "โคโรนา\u{200b}เปิด\u{200b}ตาม\u{200b}จังหวะ: ยิง\u{200b}เข้า\u{200b}ไป\u{200b}ข้าง\u{200b}ใน",
+    "ประตู\u{200b}ผี\u{200b}ไม่\u{200b}สะทก\u{200b}ต่อ\u{200b}การ\u{200b}ระเบิด: จับ\u{200b}จังหวะ\u{200b}ประกาย",
+    "พัลซาร์: จังหวะ\u{200b}ไว มือ\u{200b}ต้อง\u{200b}ไว",
+    "ชัตเตอร์\u{200b}เปิด\u{200b}เพียง\u{200b}ครู่: เตรียม\u{200b}ให้\u{200b}พร้อม",
+    "ครึ่ง\u{200b}หนึ่ง\u{200b}อยู่\u{200b}ใน\u{200b}เงา: ฝั่ง\u{200b}ประตู\u{200b}คุม\u{200b}จังหวะ",
+    "จุด\u{200b}ไฟ\u{200b}ดวง\u{200b}อาทิตย์\u{200b}ขณะ\u{200b}ที่\u{200b}ดวง\u{200b}จันทร์\u{200b}ทึบ",
+    "ลม\u{200b}พัด\u{200b}ทาง\u{200b}เดียว: ขี่\u{200b}ลม\u{200b}ไป\u{200b}หา\u{200b}แกน",
+    "ม่าน\u{200b}แสง: กวาด\u{200b}ด้วย {icon:multi} หลาย\u{200b}ลูก",
+    "ริบบิ้น\u{200b}แต่ละ\u{200b}เส้น\u{200b}ผูก\u{200b}กับ\u{200b}ประตู: ตัด\u{200b}ทั้ง\u{200b}สอง\u{200b}ซีก",
+    "คืน\u{200b}อัน\u{200b}ยาว\u{200b}นาน: เล็ง\u{200b}ตาม\u{200b}แสง\u{200b}ที่\u{200b}พก\u{200b}ไป",
+    "เข้า\u{200b}ทาง\u{200b}ประตู ขึ้น\u{200b}ไป\u{200b}ที่\u{200b}หน้าต่าง\u{200b}กุหลาบ",
+    "ทุก\u{200b}อย่าง\u{200b}พร้อม\u{200b}กัน: ระวัง\u{200b}แกน",
+    "ตี\u{200b}วง\u{200b}แหวน\u{200b}เมื่อ\u{200b}ประตู\u{200b}ทึบ\u{200b}ขึ้น",
     "วง\u{200b}โคจร\u{200b}สุด\u{200b}ท้าย: ใช้\u{200b}ทุก\u{200b}ช่อง\u{200b}ว่าง\u{200b}ให้\u{200b}คุ้ม",
 ];

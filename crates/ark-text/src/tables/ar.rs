@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "الفجر",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "الصباح",
+            Chapter::Zenith => "السمت",
+            Chapter::GoldenHour => "الساعة الذهبية",
             Chapter::Afterlight => "الشفق",
             Chapter::BlueHour => "الساعة الزرقاء",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "الكسوف",
+            Chapter::Aurora => "أورورا",
         },
         PowerName(p) => match p {
             Power::Wide => "عريض",
@@ -150,202 +150,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "الضوء الأول",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "انجراف",
+    "الأفق",
+    "بصيص",
+    "القبرة",
+    "فوانيس",
+    "المد والجزر",
+    "شروق الشمس",
     "أقمار صناعية",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "نقطة الندى",
+    "فتحة العدسة",
+    "الدير",
+    "حجر العقد",
+    "المزولة",
+    "ثقب الدبوس",
+    "وردة الرياح",
     "انسياب",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "الفتيل",
+    "خط الزوال",
+    "الشلال",
     "تداخل",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "منعطفات",
+    "الانقلاب الشمسي",
     "رنين",
     "منشور",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "خلية النحل",
+    "رذاذ الموج",
     "التيار الساحب",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "الحصاد",
+    "المشكال",
+    "نسيج",
+    "الظلال الطويلة",
     "وهج الغروب",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "الخادرة",
+    "الجيود",
     "اختلاف المنظر",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "القلعة",
+    "النوتلس",
+    "صلاة الغروب",
     "مستعر أعظم",
     "طلوع القمر",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "الغسق",
+    "ضوء المصباح",
+    "اليراعات",
+    "المنارة",
+    "نوكتورن",
+    "المجال العميق",
+    "كوكبة",
+    "شبه الظل",
+    "المترونوم",
+    "الإكليل",
+    "الاقتران",
+    "النجم النابض",
+    "الغالق",
+    "الظل الكامل",
+    "الكسوف الكلي",
+    "الرياح الشمسية",
+    "الشفق الشمالي",
+    "الأشرطة",
+    "الليل القطبي",
+    "الكاتدرائية",
+    "التلألؤ",
+    "التفرد",
     "العودة",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "الضوء الأول",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "انجراف",
+    "الأفق",
+    "بصيص",
+    "القبرة",
+    "فوانيس",
+    "المد",
+    "الشروق",
     "أقمار",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "الندى",
+    "الفتحة",
+    "الدير",
+    "العقد",
+    "المزولة",
+    "الثقب",
+    "الوردة",
     "انسياب",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "الفتيل",
+    "الزوال",
+    "الشلال",
     "تداخل",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "منعطفات",
+    "الانقلاب",
     "رنين",
     "منشور",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "الخلية",
+    "الرذاذ",
     "التيار",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "الحصاد",
+    "المشكال",
+    "نسيج",
+    "الظلال",
     "الوهج",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "الخادرة",
+    "الجيود",
     "المنظر",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "القلعة",
+    "النوتلس",
+    "الغروب",
     "مستعر أعظم",
     "القمر",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "الغسق",
+    "المصباح",
+    "اليراعات",
+    "المنارة",
+    "نوكتورن",
+    "العميق",
+    "كوكبة",
+    "شبه الظل",
+    "المترونوم",
+    "الإكليل",
+    "الاقتران",
+    "النابض",
+    "الغالق",
+    "الظل",
+    "الكلي",
+    "الرياح",
+    "الشمالي",
+    "الأشرطة",
+    "الليل",
+    "الكاتدرائية",
+    "التلألؤ",
+    "التفرد",
     "العودة",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} عريض: التقط الكبسولة الساقطة",
+    "{icon:slow} بطيء: التقطها وتهدأ الكرة",
+    "وجه الكرة: حواف المضرب ترسلها بعيدا",
+    "شرارات منفردة: طارد كل واحدة",
+    "أرسل الكرة إلى الأعلى عبر الجناحين المفتوحين",
+    "أزل كل فانوس من الأسفل",
+    "اركب الموجة: ارتد عن الجدران الجانبية",
+    "انحت الشمس من الأسفل صفا بعد صف",
     "{icon:anchor} مرساة: التقط الكرة، صوب، ثم أطلقها",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "الطوب المدرع يحتمل ضربتين: راقب الحواف",
+    "{icon:anchor} صوب عبر الفجوة في الجدار",
+    "باب واحد فقط: أرسل الكرة إلى الفناء",
+    "اهدم حجر العقد فينفتح القوس",
+    "اقرأ الزوايا: كل ظل تسديدة",
+    "{icon:anchor} ثقب ضيق واحد: أمسك، صوب، أطلق",
+    "كل اتجاه يقود إلى القلب",
     "النوى الكهرمانية: كل انفجار يصل إلى جيرانه الأربعة",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "المس الفتيل في أي موضع: يحترق في الاتجاهين",
+    "اقسم الميدان على امتداد خط الزوال",
+    "ابدأ الشلال من أي طرف",
     "افتح طريقا عبر خطي المرحلات",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "ثلاثة خطوط مرحلات: تسديدة نظيفة لكل خط",
+    "الحلقة تحترق كاملة: ابحث عن طريق إلى حافتها",
     "النوى المتجاورة تنقل التفاعل",
     "{icon:multi} كرات متعددة: ثلاث كرات، فتحة واحدة",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "نواة في كل خلية: حطمها",
+    "الرذاذ في كل مكان: أطلق ثلاث كرات",
     "اخترق الجيوب خلف الدروع",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "ميدان ممتلئ: {icon:multi} كرات متعددة تنظفه بسرعة",
+    "مرايا في كل مكان: اكسر جانبا ثم توأمه",
+    "اسحب خيطا واحدا ينحل النسيج",
+    "اخترق الأرضية وأشعل الفتيل الطويل",
     "{icon:phase} طور: ثلاث ملامسات للطوب بلا ارتداد",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} طور: يمر عبر القشرة إلى النواة",
+    "حطم جيودا فتضيء بلوراتها",
     "اخترق القشرة ثم أشعل المسار الداخلي",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "ادخل من البوابة، أو اخترق الجدار مع {icon:phase} طور",
+    "التف نحو الداخل: اللفة الخارجية تضيء أولا",
+    "ثلاثة أجراس: اقرع كل جرس من أسفله",
     "التقط كرة عائدة بينما تواصل الكرات الأخرى",
     "اتبع المرحل حول المركز المفتوح",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "الضوء يرحل: تعلم الميدان ما دمت تستطيع",
+    "في الظلام تحمل الكرة والمضرب الضوء",
+    "اليراعات: النوى تتوهج حتى في الظلام",
+    "امسح الساحل بضوء المضرب",
+    "كرات أكثر وضوء أكثر: {icon:multi} كرات متعددة",
+    "المجال العميق: كل نقطة خافتة هي طوبة",
+    "صل بين النجوم: اللامعة هي النوى",
+    "البوابات تخفت على الإيقاع: انتظر الفجوة",
+    "تك تك: البوابات تحفظ الوقت",
+    "الإكليل ينفتح على الإيقاع: اضرب في الداخل",
+    "بوابة شبحية تتجاهل الانفجار: اختر لحظة الشرارة",
+    "نجم نابض: إيقاع سريع، يد سريعة",
+    "الغالق ينفتح لحظة واحدة: كن مستعدا",
+    "نصف في الظل: جانب البوابات يحفظ الإيقاع",
+    "أشعل الشمس ما دام القمر صلبا",
+    "الريح تهب في اتجاه واحد: اركبها إلى النوى",
+    "ستائر الضوء: اكنسها باستخدام {icon:multi} كرات متعددة",
+    "كل شريط معقود ببوابة: اقطع النصفين",
+    "الليل الطويل: صوب بالضوء الذي تحمله",
+    "ادخل من الأبواب واصعد إلى النافذة الوردية",
+    "كل شيء دفعة واحدة: راقب النوى",
+    "اضرب الحلقة عندما تصبح البوابات صلبة",
     "مدار أخير: اجعل كل فتحة مهمة",
 ];
