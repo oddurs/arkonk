@@ -192,7 +192,7 @@ impl Sweep {
             contact = Contact::Paddle(hit.normal);
         }
         for cell in swept_cells(ball.pos, ball.pos + delta, BALL_RADIUS) {
-            if board.hp(cell) > 0
+            if board.is_solid(cell)
                 && !ball.phased.contains(cell)
                 && let Some(hit) = sweep_circle_rect(ball.pos, delta, BALL_RADIUS, cell_rect(cell))
                 && hit.t <= first

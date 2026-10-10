@@ -42,6 +42,12 @@ impl<'a> Sandbox<'a> {
         self.game.board.set(cell, hp, core);
     }
 
+    /// Makes `cell` a gate, or no longer one; its hit points stay. Gates
+    /// keep the sector's beat, and never ghost in a sector without one.
+    pub fn set_gate(&mut self, cell: Cell, gate: bool) {
+        self.game.board.set_gate(cell, gate);
+    }
+
     /// Puts the ball in `slot` in play at `pos`, moving at `velocity`, and
     /// out of Anchor's hold. A ball already in play keeps its Phase charges;
     /// an empty slot gets a fresh ball.
@@ -88,6 +94,7 @@ impl<'a> Sandbox<'a> {
         if game.stage == Stage::Playing {
             game.sector_ticks = game.sector_ticks.saturating_add(ticks);
             game.run_ticks = game.run_ticks.saturating_add(ticks);
+            game.keep_beat();
         }
     }
 

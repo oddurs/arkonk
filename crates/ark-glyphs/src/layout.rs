@@ -10,7 +10,7 @@ use crate::{
     script,
     spec::{self, Weight},
 };
-use ark_text::Script;
+use ark_text::{Locale, Script};
 
 /// The faces a locale draws with: Noto Sans for everything, and the
 /// locale's own script font (Noto Sans CJK, Thai or Arabic UI) for the
@@ -20,6 +20,9 @@ pub struct Fonts {
     pub latin: Font,
     pub local: Option<Font>,
     pub script: Script,
+    /// The locale these fonts draw; Noto Sans holds glyphs for every
+    /// locale, and an atlas packs only this one's ([`Face::serves`]).
+    pub locale: Locale,
 }
 
 /// Which font a glyph comes from.

@@ -1,0 +1,22 @@
+---
+source: crates/ark/tests/replay.rs
+expression: gate_sessions()
+---
+totality gates, seed 30
+  1024  sector 56 playing   score    175  lives 3  bricks 57  83830419a297d185
+  2048  sector 56 playing   score    350  lives 3  bricks 56  08f342a05e6cf0d6
+  3072  sector 56 playing   score   8525  lives 3  bricks 26  77b4f09494828a32
+  4096  sector 56 playing   score   8850  lives 3  bricks 24  c1349c432129b5f7
+  5120  sector 56 playing   score   9050  lives 3  bricks 23  f1175ad4f348c78c
+  6144  sector 56 playing   score   9375  lives 3  bricks 21  8a9188b5ae0f21fe
+  7168  sector 56 playing   score   9625  lives 2  bricks 19  4ba347414a1fad82
+  8192  sector 56 playing   score   9950  lives 2  bricks 17  e5d07cb9213a9044
+singularity gates, seed 31
+  1024  sector 63 playing   score    175  lives 3  bricks 55  3bd4bcadf861f1c9
+  2048  sector 63 playing   score   3825  lives 3  bricks 40  ca6612d26071d68f
+  3072  sector 63 playing   score   4500  lives 3  bricks 37  d5e2b92e22e2da8d
+  4096  sector 63 playing   score   4675  lives 3  bricks 36  4ea1c1c87d8863f9
+  5120  sector 63 playing   score   4975  lives 3  bricks 34  b1ae03ebbf8dc5fc
+  6144  sector 63 playing   score   5400  lives 3  bricks 31  c50509c6f423167b
+  7168  sector 63 playing   score   5975  lives 3  bricks 27  c1cda9b9e64b8f39
+  8192  sector 63 playing   score   6125  lives 2  bricks 26  6b98fd07a91725c6

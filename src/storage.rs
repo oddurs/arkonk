@@ -20,7 +20,8 @@ pub struct Profile {
 }
 
 impl Profile {
-    /// `None` when `file` is not a version-1 save.
+    /// `None` when `file` is not a save. A version-1 save is mapped onto
+    /// the 64-sector journey; the next save writes version 2.
     pub fn decode(file: &[u8]) -> Option<Self> {
         Some(Self {
             progress: Progress::decode(file)?,
@@ -48,7 +49,7 @@ impl Profile {
         };
         let main = read(path);
         if let Read::Valid(p) = main {
-            loaded.profile = p;
+            loaded.profile = *p;
             loaded.origin = Origin::Saved;
             return loaded;
         }
@@ -57,7 +58,7 @@ impl Profile {
         }
         match read(&backup) {
             Read::Valid(p) => {
-                loaded.profile = p;
+                loaded.profile = *p;
                 loaded.origin = Origin::Backup;
             }
             Read::Invalid(why) => loaded.quarantine(&backup, why),
@@ -132,7 +133,8 @@ const READ_LIMIT: u64 = 64 * 1024;
 
 enum Read {
     Missing,
-    Valid(Profile),
+    // Boxed: 64 sector records make a profile large beside the other cases.
+    Valid(Box<Profile>),
     Invalid(String),
 }
 
@@ -152,8 +154,8 @@ fn read(path: &Path) -> Read {
     }
     // Invalid UTF-8 only spoils the lines it touches; decode skips those.
     match Profile::decode(&bytes) {
-        Some(p) => Read::Valid(p),
-        None => Read::Invalid("not an ARKONK 1 profile".into()),
+        Some(p) => Read::Valid(Box::new(p)),
+        None => Read::Invalid("not an ARKONK profile".into()),
     }
 }
 
@@ -188,16 +190,15 @@ mod tests {
         file.replace('\n', "\\n\n")
     }
 
-    // The version-1 file, byte for byte: players' existing files must keep
-    // loading and be rewritten exactly as before. These snapshots were
-    // recorded before the codec moved into `ark`.
+    // The version-2 file, byte for byte. Version 1's layout is kept, with
+    // only earned records written.
 
     #[test]
     fn encoded_layout() {
         // Out of order on purpose: the layout comes from the encoder.
         let p = profile(
-            "ARKONK 1\ncheckpoint 6 31250 4 99000\nrecord 5 3 30001\nsettings 1 3\n\
-             display 1\nrecord 0 7 15400\nunlocked 7\nbest 24600\n",
+            "ARKONK 2\ncheckpoint 6 31250 4 99000\nrecord 5 3 30001\nsettings 1 3\n\
+             display 1\nrecord 0 7 15400\nunlocked 7\nbest 24600\nrecord 40 0 0\n",
         );
         insta::assert_snapshot!(visible(&p.encode()));
     }
@@ -212,7 +213,7 @@ mod tests {
     /// clamped.
     #[test]
     fn damaged_file_rewritten() {
-        let file: &[u8] = b"ARKONK 1\r\n\
+        let file: &[u8] = b"ARKONK 2\r\n\
             best 100\r\n\
             best\xc2\xa05\n\
             best 24600\n\
@@ -220,7 +221,7 @@ mod tests {
             settings 1 0 4\n\
             display 1\n\
             record 3 255 7000\n\
-            record 12 7 1\n\
+            record 64 7 1\n\
             record 0 7 1 2\n\
             record 1 \xff 9\n\
             record 2 3 +40\n\
@@ -233,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn a_save_from_before_languages_loads_and_rewrites_unchanged() {
+    fn a_save_from_before_languages_still_loads() {
         let file = "ARKONK 1\nbest 24600\nunlocked 3\nsettings 1 4\ndisplay 1\n\
                     record 0 7 15400\nrecord 1 3 0\nrecord 2 0 0\nrecord 3 0 0\n\
                     record 4 0 0\nrecord 5 0 0\nrecord 6 0 0\nrecord 7 0 0\n\
@@ -241,12 +242,63 @@ mod tests {
                     checkpoint 2 3100 3 9000\n";
         let p = profile(file);
         assert_eq!(p.settings.locale, None);
-        assert_eq!(p.encode(), file);
+        assert_eq!((p.settings.muted, p.settings.volume), (true, 4));
+        assert_eq!(
+            p.encode(),
+            "ARKONK 2\nbest 24600\nunlocked 17\nsettings 1 4\ndisplay 1\n\
+             record 0 7 15400\nrecord 8 3 0\ncheckpoint 16 3100 3 9000\n"
+        );
+    }
+
+    /// A save the last 12-sector build wrote (`tests/fixtures`): a German
+    /// player six sectors into a journey, with reduced effects. Everything
+    /// moves with its sector's slug, and the settings are untouched.
+    #[test]
+    fn a_real_version_1_save_moves_onto_the_journey() {
+        use ark::{Medals, progress::V1_SECTORS};
+        let file = include_bytes!("../tests/fixtures/progress-v1.txt");
+        let old = std::str::from_utf8(file).unwrap();
+        assert!(old.starts_with("ARKONK 1\n"));
+        let p = Profile::decode(file).unwrap();
+        let s = &p.settings;
+        assert_eq!((s.volume, s.locale), (7, Some(ark_text::Locale::De)));
+        assert!(s.reduced_effects && !s.high_contrast);
+        let progress = &p.progress;
+        assert_eq!(progress.best_score(), 60800);
+        for (old, slug) in V1_SECTORS.iter().enumerate().take(6) {
+            let line = old_line(old_text(file), old);
+            let id = SectorId::from_slug(slug).unwrap();
+            let record = progress.record(id);
+            assert_eq!(record.medals, Medals::ALL, "{slug}");
+            assert_eq!(line, format!("record {old} 7 {}", record.best_ticks));
+        }
+        // The seventh old sector, Undertow, holds the checkpoint; it is now
+        // sector 28, and everything up to it is open.
+        let undertow = SectorId::from_slug("undertow").unwrap();
+        let checkpoint = progress.checkpoint().unwrap();
+        assert_eq!(checkpoint.sector, undertow);
+        assert_eq!((checkpoint.score, checkpoint.lives), (60800, 4));
+        assert_eq!(progress.unlocked_count(), undertow.index() + 1);
+        assert_eq!(progress.medal_count(), 18);
+        let rewritten = p.encode();
+        insta::assert_snapshot!(visible(&rewritten));
+        assert_eq!(Profile::decode(rewritten.as_bytes()), Some(p));
+    }
+    fn old_text(file: &[u8]) -> &str {
+        std::str::from_utf8(file).unwrap()
+    }
+    /// The `record` line for version-1 sector `old`.
+    fn old_line(text: &str, old: usize) -> String {
+        let key = format!("record {old} ");
+        text.lines()
+            .find(|l| l.starts_with(&key))
+            .unwrap()
+            .to_owned()
     }
 
     #[test]
     fn progress_and_settings_round_trip() {
-        let mut p = profile("ARKONK 1\nbest 24600\nunlocked 7\nrecord 5 7 15400\n");
+        let mut p = profile("ARKONK 2\nbest 24600\nunlocked 7\nrecord 5 7 15400\n");
         p.settings = Settings {
             muted: true,
             volume: 3,
@@ -267,7 +319,7 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         dir.join("progress.txt")
     }
-    const SAMPLE: &str = "ARKONK 1\nbest 24600\nunlocked 5\nrecord 0 7 0\nrecord 3 1 0\n";
+    const SAMPLE: &str = "ARKONK 2\nbest 24600\nunlocked 5\nrecord 0 7 0\nrecord 3 1 0\n";
     fn sample() -> Profile {
         profile(SAMPLE)
     }
@@ -310,7 +362,7 @@ mod tests {
     }
     fn read_valid(path: &Path) -> Profile {
         match read(path) {
-            Read::Valid(p) => p,
+            Read::Valid(p) => *p,
             _ => panic!("{} is not a valid profile", path.display()),
         }
     }

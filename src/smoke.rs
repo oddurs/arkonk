@@ -14,10 +14,13 @@ use ark::{
         cell_rect,
     },
     geom::V2,
-    sectors::SectorId,
+    sectors::{Chapter, SectorId},
     tuning::{ADVANCE_DELAY_TICKS, MAX_BALLS, MAX_CAPSULES},
 };
 use macroquad::prelude::{request_new_screen_size, screen_dpi_scale, screen_height, screen_width};
+/// The flow's practice sector, Afterglow: Phase meets a relay core there.
+const PRACTICE: usize = 32;
+
 pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls {
     let mut keys = Controls::default();
     let none = Presses::default();
@@ -104,7 +107,7 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         40 => {
             assert!(!game.balls()[0].held);
             assert_eq!(game.balls()[0].phase_charges, 3);
-            *game = Game::start(SectorId::clamped(8), Mode::Practice);
+            *game = Game::start(SectorId::clamped(PRACTICE), Mode::Practice);
             game.step(Input {
                 launch: true,
                 ..Input::default()
@@ -147,7 +150,7 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         56 | 58 => {
             assert!(ui.screen == Screen::Play && !ui.paused);
             assert_eq!(game.stage(), Stage::Ready);
-            assert!(game.sector().index() == 8 && game.mode() == Mode::Practice);
+            assert!(game.sector().index() == PRACTICE && game.mode() == Mode::Practice);
             if frame == 56 {
                 keys = pad_controls(start, None, false);
             } else {
@@ -176,7 +179,7 @@ pub fn flow(frame: u32, game: &mut Game, ui: &Ui, profile: &Profile) -> Controls
         69 => {
             assert!(ui.screen == Screen::Play && !ui.paused);
             assert_eq!(game.stage(), Stage::Ready);
-            assert!(game.sector().index() == 8 && game.mode() == Mode::Practice);
+            assert!(game.sector().index() == PRACTICE && game.mode() == Mode::Practice);
             println!("Results flow passed: game over focuses Retry, A retries");
             keys.pause = true;
         }
@@ -264,32 +267,80 @@ pub fn effects(game: &mut Game, frame: u32) {
     }
 }
 
-/// A player partway through: four sectors open, a mix of medals and best
-/// times, and a journey saved in sector 03. The smoke run starts from an
-/// empty profile, so without this its captures would never show a saved
-/// journey, earned medals or a locked selection.
+/// A player partway through: Daybreak and Morning cleared, Zenith begun,
+/// a mix of medals and best times, and a journey saved in sector 19. The
+/// smoke run starts from an empty profile, so without this its captures
+/// would never show a saved journey, earned medals or a locked selection.
 pub fn showcase() -> Profile {
-    const SAVE: &str = "ARKONK 1\nbest 18450\nunlocked 4\n\
-        record 0 7 21840\nrecord 1 3 30960\nrecord 2 1 41520\n\
-        checkpoint 2 2450 3 0\n";
-    Profile::decode(SAVE.as_bytes()).expect("a fixed version-1 save decodes")
+    use std::fmt::Write;
+    let mut save = String::from("ARKONK 2\nbest 48200\nunlocked 19\n");
+    for i in 0..18_u32 {
+        let medals = [7, 7, 3, 7, 1, 7, 3, 7, 7, 3, 1, 3, 7, 1, 3, 7, 3, 1][i as usize];
+        let _ = writeln!(save, "record {i} {medals} {}", 21840 + i * 977);
+    }
+    save.push_str("checkpoint 18 48200 4 0\n");
+    Profile::decode(save.as_bytes()).expect("a fixed version-2 save decodes")
 }
 
 /// Smoke frames drawn with [`showcase`] progress, the screen and sector to
 /// show, and where the capture goes.
 pub const SHOWCASE: [(u32, Screen, usize, bool, &str); 5] = [
     (300, Screen::Title, 0, false, "target/attract-saved.png"),
-    (310, Screen::Sectors, 1, false, "target/sectors-medals.png"),
-    (320, Screen::Sectors, 6, false, "target/sectors-locked.png"),
+    (310, Screen::Sectors, 9, false, "target/sectors-medals.png"),
+    (320, Screen::Sectors, 21, false, "target/sectors-locked.png"),
     (330, Screen::Title, 0, true, "target/attract-saved-pad.png"),
     (
         340,
         Screen::Sectors,
-        6,
+        21,
         true,
         "target/sectors-locked-pad.png",
     ),
 ];
+
+/// Sector select's pages for three chapters, and the title, drawn with
+/// [`showcase`] progress in every layout class: a cleared chapter, the one
+/// under way, and one not reached.
+pub struct Page {
+    pub class: &'static str,
+    pub size: (u32, u32),
+    pub screen: Screen,
+    pub sector: usize,
+    pub name: &'static str,
+}
+const fn page(class: &'static str, screen: Screen, sector: usize, name: &'static str) -> Page {
+    Page {
+        class,
+        size: class_size(class),
+        screen,
+        sector,
+        name,
+    }
+}
+pub const PAGES: [Page; 12] = [
+    page("regular", Screen::Sectors, 3, "sectors-daybreak"),
+    page("regular", Screen::Sectors, 18, "sectors-zenith"),
+    page("regular", Screen::Sectors, 60, "sectors-aurora"),
+    page("regular", Screen::Title, 0, "title"),
+    page("small", Screen::Sectors, 3, "sectors-daybreak"),
+    page("small", Screen::Sectors, 18, "sectors-zenith"),
+    page("small", Screen::Sectors, 60, "sectors-aurora"),
+    page("small", Screen::Title, 0, "title"),
+    page("compact", Screen::Sectors, 3, "sectors-daybreak"),
+    page("compact", Screen::Sectors, 18, "sectors-zenith"),
+    page("compact", Screen::Sectors, 60, "sectors-aurora"),
+    page("compact", Screen::Title, 0, "title"),
+];
+
+/// The screen size each layout class is captured at.
+const fn class_size(class: &str) -> (u32, u32) {
+    match class.as_bytes()[0] {
+        // A 960 × 900 window at 2x, as on a Mac.
+        b'r' => (1920, 1800),
+        b's' => (480, 450),
+        _ => (240, 240),
+    }
+}
 
 /// Physical sizes rendered offscreen after the main smoke run: Steam Deck,
 /// 1080p, 1440p, ultrawide, 4:3, the smallest desktop window (Small), and
@@ -347,38 +398,52 @@ pub struct Shot {
     pub screen: &'static str,
 }
 const fn shot(class: &'static str, variant: &'static str, screen: &'static str) -> Shot {
-    let size = match class.as_bytes()[0] {
-        // A 960 × 900 window at 2x, as on a Mac.
-        b'r' => (1920, 1800),
-        b's' => (480, 450),
-        _ => (240, 240),
-    };
     Shot {
         class,
-        size,
+        size: class_size(class),
         variant,
         screen,
     }
 }
-/// Every kind of piece in every look: the three chapters' glass, the
-/// busiest sector with every capsule and both drains, Anchor holding, a
-/// relay chain going off, and hits, a break and a wall bounce.
-pub const SHOTS: [Shot; 15] = [
+/// Every kind of piece in every look: each chapter's glass, the busiest
+/// sector with every capsule and both drains, Anchor holding, a relay
+/// chain going off, hits, a break and a wall bounce; then a sector of each
+/// chapter in play, Blue Hour's darkness, and Eclipse's gates mid-beat.
+pub const SHOTS: [Shot; 34] = [
     shot("regular", "standard", "play"),
     shot("regular", "standard", "anchor"),
     shot("regular", "standard", "relay"),
     shot("regular", "standard", "hits"),
     shot("regular", "standard", "daybreak"),
-    shot("regular", "standard", "bluehour"),
+    shot("regular", "standard", "morning"),
+    shot("regular", "standard", "zenith"),
+    shot("regular", "standard", "goldenhour"),
     shot("regular", "standard", "afterlight"),
+    shot("regular", "standard", "bluehour"),
+    shot("regular", "standard", "eclipse"),
+    shot("regular", "standard", "aurora"),
     shot("regular", "reduced", "play"),
     shot("regular", "reduced", "relay"),
     shot("regular", "contrast", "play"),
     shot("regular", "contrast", "relay"),
+    shot("regular", "contrast", "aurora"),
     shot("small", "standard", "play"),
     shot("small", "standard", "anchor"),
     shot("compact", "standard", "play"),
     shot("compact", "standard", "anchor"),
+    shot("regular", "standard", "sector-08"),
+    shot("regular", "standard", "sector-16"),
+    shot("regular", "standard", "sector-23"),
+    shot("regular", "standard", "sector-31"),
+    shot("regular", "standard", "sector-38"),
+    shot("regular", "standard", "sector-43"),
+    shot("regular", "standard", "sector-51"),
+    shot("regular", "standard", "sector-62"),
+    shot("regular", "standard", "darkness"),
+    shot("regular", "contrast", "darkness"),
+    shot("regular", "standard", "gate-ghost"),
+    shot("regular", "standard", "gate-solid"),
+    shot("compact", "standard", "gate-ghost"),
 ];
 
 /// Steps `game` `ticks` times without input, handing each tick to `record`.
@@ -402,6 +467,10 @@ fn run_until(
             return;
         }
     }
+}
+/// The sector with `slug`, wherever the journey puts it.
+fn named(slug: &str) -> usize {
+    SectorId::from_slug(slug).map_or(0, SectorId::index)
 }
 /// `sector` in play, its ball just served.
 fn serve(sector: usize, record: &mut impl FnMut(&Game, Events)) -> Game {
@@ -437,14 +506,14 @@ pub fn stage(screen: &str, mut record: impl FnMut(&Game, Events)) -> Game {
     let record = &mut record;
     match screen {
         "anchor" => {
-            let mut game = serve(1, record);
+            let mut game = serve(named("satellites"), record);
             hold(&mut game, record);
             game.sandbox().grant(Power::Wide);
             run(&mut game, 30, record);
             game
         }
         "relay" => {
-            let mut game = serve(5, record);
+            let mut game = serve(named("crossfade"), record);
             let core = Cell::all().find(|&c| game.board().is_core(c));
             if let Some(core) = core {
                 let r = cell_rect(core);
@@ -461,7 +530,7 @@ pub fn stage(screen: &str, mut record: impl FnMut(&Game, Events)) -> Game {
             game
         }
         "hits" => {
-            let mut game = serve(6, record);
+            let mut game = serve(named("undertow"), record);
             let below = |c: Cell| {
                 let r = cell_rect(c);
                 V2::new(r.x + r.w / 2.0, r.y + r.h + RADIUS + 2.0)
@@ -483,13 +552,28 @@ pub fn stage(screen: &str, mut record: impl FnMut(&Game, Events)) -> Game {
             run(&mut game, 14, record);
             game
         }
-        "daybreak" | "bluehour" | "afterlight" => {
-            let sector = match screen {
-                "daybreak" => 0,
-                "bluehour" => 4,
-                _ => 8,
-            };
-            let mut game = serve(sector, record);
+        "daybreak" | "morning" | "zenith" | "goldenhour" | "afterlight" | "bluehour"
+        | "eclipse" | "aurora" => {
+            let chapter = [
+                "daybreak",
+                "morning",
+                "zenith",
+                "goldenhour",
+                "afterlight",
+                "bluehour",
+                "eclipse",
+                "aurora",
+            ]
+            .iter()
+            .position(|&c| c == screen)
+            .and_then(Chapter::new)
+            .unwrap_or(Chapter::Daybreak);
+            // A lit sector of the chapter, so its hues read as they are.
+            let lit = chapter
+                .sectors()
+                .find(|s| s.sector().darkness == 0)
+                .unwrap_or(chapter.first_sector());
+            let mut game = serve(lit.index(), record);
             let mut sandbox = game.sandbox();
             sandbox.fill_board(1, CellSet::EMPTY);
             // The bottom row shows armour and cores in the chapter's light.
@@ -507,11 +591,47 @@ pub fn stage(screen: &str, mut record: impl FnMut(&Game, Events)) -> Game {
             run(&mut game, 10, record);
             game
         }
+        // A sector as it is first played, its ball on the way up.
+        sector if sector.starts_with("sector-") => {
+            let number: usize = sector["sector-".len()..].parse().unwrap_or(1);
+            let mut game = serve(number.saturating_sub(1), record);
+            run(&mut game, TICK_HZ / 2, record);
+            game
+        }
+        // Blue Hour at its darkest: one ball among the stars, the keel
+        // lighting the column above the paddle.
+        "darkness" => {
+            let mut game = serve(named("constellation"), record);
+            game.sandbox()
+                .place_ball(0, V2::new(330.0, 420.0), V2::new(-260.0, -380.0));
+            run(&mut game, 6, record);
+            game
+        }
+        // Eclipse's set piece mid-beat: the gates halfway through their
+        // ghost half or their solid half.
+        "gate-ghost" | "gate-solid" => {
+            let mut game = serve(named("totality"), record);
+            let beat = game
+                .sector()
+                .sector()
+                .beat
+                .unwrap_or(ark::sectors::Beat { solid: 1, ghost: 1 });
+            let at = if screen == "gate-ghost" {
+                beat.solid + beat.ghost / 2
+            } else {
+                beat.solid / 2
+            };
+            game.sandbox()
+                .place_ball(0, V2::new(250.0, 600.0), V2::new(-260.0, -380.0));
+            game.sandbox().elapse(at.saturating_sub(4));
+            run(&mut game, 4, record);
+            game
+        }
         // The busiest authored sector with three balls, one phased, every
         // capsule falling, both drains with Slow running out, and Anchor
         // charges in the seam.
         _ => {
-            let mut game = serve(9, record);
+            let mut game = serve(named("parallax"), record);
             hold(&mut game, record);
             game.sandbox().grant(Power::Slow);
             // Slow runs on while the ball is held, into its last 2 s.

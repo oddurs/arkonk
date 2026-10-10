@@ -1,9 +1,9 @@
 ---
-source: tests/replay.rs
+source: crates/ark/tests/replay.rs
 expression: r.out
 ---
 full board of relay cores
-  1024  sector 02 playing   score  26625  lives 3  bricks 35  9b29da9e6e233105
-  2048  sector 02 playing   score  26750  lives 3  bricks 34  1c4face12d7dbb9b
-  3072  sector 02 playing   score  27025  lives 3  bricks 32  b81ce2126e090e0e
-  4096  sector 02 playing   score  27150  lives 3  bricks 31  5e778028a59d2e30
+  1024  sector 02 playing   score  26950  lives 3  bricks 21  3be75da689f378d9
+  2048  sector 02 playing   score  29400  lives 3  bricks 12  a221eb1fb3190c84
+  3072  sector 02 playing   score  30125  lives 3  bricks  9  65a640e579aad5ec
+  4096  sector 02 playing   score  30775  lives 3  bricks  5  3838b41354d75953

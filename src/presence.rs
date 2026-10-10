@@ -96,12 +96,13 @@ mod tests {
 
     #[test]
     fn menus_and_sectors_read_naturally() {
-        let mut game = Game::start(SectorId::clamped(2), Mode::Journey);
+        let slipstream = SectorId::from_slug("slipstream").unwrap();
+        let mut game = Game::start(slipstream, Mode::Journey);
         assert_eq!(Presence::of(false, &game), Presence::Menus);
         assert_eq!(Presence::Menus.sector(), None);
         let journey = Presence::of(true, &game);
-        assert_eq!(journey, Presence::Journey(SectorId::clamped(2)));
-        assert_eq!(journey.sector(), Some(("03".into(), "slipstream")));
+        assert_eq!(journey, Presence::Journey(slipstream));
+        assert_eq!(journey.sector(), Some(("17".into(), "slipstream")));
         game = Game::start(SectorId::FIRST, Mode::Practice);
         let practice = Presence::of(true, &game);
         assert_eq!(practice, Presence::Practice(SectorId::FIRST));

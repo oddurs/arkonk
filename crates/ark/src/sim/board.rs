@@ -1,4 +1,5 @@
-//! The bricks: hit points, relay cores and the blasts they have pending.
+//! The bricks: hit points, relay cores, gates and the blasts they have
+//! pending.
 use crate::{
     field::{CELLS, Cell, CellSet},
     sectors::Layout,
@@ -24,6 +25,10 @@ pub struct Board {
     hp: [u8; CELLS],
     /// Relay cores, intact or destroyed.
     cores: CellSet,
+    /// Gates, which are ghosts while `ghosts` is set.
+    gates: CellSet,
+    /// Whether the gates are ghosts now: no collision, no damage.
+    ghosts: bool,
     /// Ticks until a destroyed core's blast; zero when none is pending.
     relays: [u8; CELLS],
     /// Bricks with hit points left.
@@ -38,11 +43,14 @@ impl Board {
         let mut board = Self {
             hp: [0; CELLS],
             cores: CellSet::EMPTY,
+            gates: CellSet::EMPTY,
+            ghosts: false,
             relays: [0; CELLS],
             remaining: 0,
             initial: 0,
         };
         board.reset(layout.hp, layout.cores);
+        board.gates = layout.gates;
         board
     }
 
@@ -53,6 +61,19 @@ impl Board {
     /// Whether `cell` is a relay core, intact or destroyed.
     pub fn is_core(&self, cell: Cell) -> bool {
         self.cores.contains(cell)
+    }
+    /// Whether `cell` is a gate, intact or broken.
+    pub fn is_gate(&self, cell: Cell) -> bool {
+        self.gates.contains(cell)
+    }
+    /// Whether the gates are ghosts now, letting balls and blasts through.
+    pub fn gates_are_ghosts(&self) -> bool {
+        self.ghosts
+    }
+    /// Whether a ball meets a brick in `cell`: it has hit points and is not
+    /// a ghost gate.
+    pub fn is_solid(&self, cell: Cell) -> bool {
+        self.hp[cell.index()] > 0 && !(self.ghosts && self.gates.contains(cell))
     }
     /// Ticks until the destroyed core in `cell` blasts its neighbours; zero
     /// when no blast is pending there.
@@ -74,10 +95,12 @@ impl Board {
     }
 
     /// Replaces every brick, as if the sector had started with `hp` and
-    /// `cores`. Pending blasts are cancelled.
+    /// `cores` and no gates. Pending blasts are cancelled.
     pub fn reset(&mut self, hp: [u8; CELLS], cores: CellSet) {
         self.hp = hp;
         self.cores = cores;
+        self.gates = CellSet::EMPTY;
+        self.ghosts = false;
         self.relays = [0; CELLS];
         self.remaining = hp.iter().filter(|&&hp| hp > 0).count();
         self.initial = self.remaining;
@@ -95,12 +118,27 @@ impl Board {
         self.remaining = self.remaining + usize::from(hp > 0) - usize::from(before);
     }
 
-    /// Takes one hit point from the brick in `cell`.
+    /// Makes `cell` a gate or an ordinary brick, keeping its hit points.
+    pub fn set_gate(&mut self, cell: Cell, gate: bool) {
+        if gate {
+            self.gates.insert(cell);
+        } else {
+            self.gates.remove(cell);
+        }
+    }
+
+    /// Turns every gate solid or ghost.
+    pub(crate) fn set_ghosts(&mut self, ghosts: bool) {
+        self.ghosts = ghosts;
+    }
+
+    /// Takes one hit point from the brick in `cell`. A ghost gate takes
+    /// none.
     pub(crate) fn damage(&mut self, cell: Cell) -> Damage {
-        let hp = &mut self.hp[cell.index()];
-        if *hp == 0 {
+        if !self.is_solid(cell) {
             return Damage::Missed;
         }
+        let hp = &mut self.hp[cell.index()];
         *hp -= 1;
         if *hp > 0 {
             return Damage::Chipped;

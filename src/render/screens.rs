@@ -71,33 +71,47 @@ pub(super) fn title(v: &Scene, ui: &Ui, profile: &Profile) {
     }
 }
 
-/// Where a sector's card sits: chapters in columns, sectors down them.
-/// A Small screen shows one chapter, its cards in one narrower, shorter
-/// column, so the detail fits under it.
+/// Where a sector's card sits on its chapter's page: a grid of four by
+/// two on a Regular screen, two by four on a Small one, which keeps room
+/// for the detail under it.
 pub(super) fn card_rect(v: &Scene, id: SectorId) -> Rect {
-    let (chapter, row) = (id.index() / 4, id.index() % 4);
+    let i = id.chapter_index();
     if v.class == Class::Small {
-        let r = SMALL_CARD;
-        let h = v.at_least(r.h, 32.0);
+        let (row, col) = (i / 2, i % 2);
+        let h = v.at_least(SMALL_CARD.h, 32.0);
         let gap = v.at_least(4.0, 2.0);
         let (mid, chip) = pager(v);
         let top = mid + chip / 2.0 + S8;
-        return Rect::new(r.x, top + row as f32 * (h + gap), r.w, h);
+        let w = (SMALL_CARD.w - S16) / 2.0;
+        let x = SMALL_CARD.x + col as f32 * (w + S16);
+        return Rect::new(x, top + row as f32 * (h + gap), w, h);
     }
+    let (row, col) = (i / 4, i % 4);
     Rect::new(
-        80.0 + chapter as f32 * 272.0,
-        176.0 + row as f32 * 104.0,
-        256.0,
-        88.0,
+        GRID.x + col as f32 * (CARD.0 + S16),
+        GRID.y + row as f32 * (CARD.1 + S16),
+        CARD.0,
+        CARD.1,
     )
 }
-/// A Small screen's chapter column; its cards start under the pager.
+/// A Regular page's card grid: its top-left corner and the size of a card.
+const GRID: Vec2 = Vec2::new(80.0, 212.0);
+const CARD: (f32, f32) = (188.0, 172.0);
+/// A Small page: two columns of short cards across this span.
 const SMALL_CARD: Rect = Rect {
-    x: WIDTH / 2.0 - 200.0,
+    x: 80.0,
     y: TOP,
-    w: 400.0,
+    w: 800.0,
     h: 64.0,
 };
+/// The chapter tabs over a Regular page: eight in a row from the left.
+const TABS: Rect = Rect {
+    x: 80.0,
+    y: 156.0,
+    w: 44.0,
+    h: 36.0,
+};
+const TAB_GAP: f32 = S8;
 
 /// The middle of a Small screen's pager row and its glyphs' size. The
 /// glyphs keep their 18-pixel floor, which on the smallest Small frame
@@ -108,9 +122,10 @@ pub(super) fn pager(v: &Scene) -> (f32, f32) {
     (TOP + S8 + chip / 2.0, chip)
 }
 
-/// The sector map: chapter columns of cards, and the selected sector's
-/// detail docked under them with its Play action. A Small screen pages
-/// through the chapters; a Compact one through the sectors.
+/// Sector select, a chapter a page: the chapters' tabs, the page's cards,
+/// and the selected sector's detail docked under them with its Play
+/// action. A Small screen turns pages with a pager instead of tabs; a
+/// Compact one shows a sector a page.
 pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
     frame::band_sectors(v, profile, ui.notice > 0.0);
     if v.class == Class::Compact {
@@ -120,28 +135,14 @@ pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
     frame::field_region(v, 0);
     let page = ui.sector.sector().chapter;
     let small = v.class == Class::Small;
-    for chapter in Chapter::ALL {
-        if small && chapter != page {
-            continue;
-        }
-        let colour = sector_color(0, chapter);
-        if small {
-            chapter_pager(v, chapter);
-        } else {
-            let at = v.baseline(Role::Label, 152.0);
-            let x = 84.0 + chapter.first_sector().index() as f32 / 4.0 * 272.0;
-            v.say(
-                TextId::ChapterName(chapter),
-                &[],
-                Role::Label,
-                v.lead((x, 252.0), Slot::left(x, 252.0, at)),
-                colour,
-            );
-        }
+    if small {
+        chapter_pager(v, page);
+    } else {
+        tabs(v, page, profile);
     }
     v.hits.borrow_mut().begin(List::Sectors);
     for id in SectorId::all() {
-        if small && id.sector().chapter != page {
+        if id.sector().chapter != page {
             // Off the page: an empty area keeps each card's index.
             v.hits.borrow_mut().push(Rect::default());
             continue;
@@ -150,12 +151,70 @@ pub(super) fn sectors(v: &Scene, ui: &Ui, profile: &Profile) {
         v.hits.borrow_mut().push(card_rect(v, id));
     }
     let top = if small {
-        card_rect(v, SectorId::clamped(3)).bottom() + S16
+        let last = page.sectors().last().unwrap_or(SectorId::FIRST);
+        card_rect(v, last).bottom() + S16
     } else {
         DETAIL.y
     };
     frame::field_region(v, 0);
     detail(v, ui.sector, profile, top);
+}
+
+/// A chapter's tab. The tabs run left to right in every language, as the
+/// arrows that turn them do.
+fn tab_rect(chapter: Chapter) -> Rect {
+    let x = TABS.x + chapter.index() as f32 * (TABS.w + TAB_GAP);
+    Rect::new(x, TABS.y, TABS.w, TABS.h)
+}
+
+/// The chapters as a row of tabs, each numbered in its hue; the page's
+/// tab is lit glass, and a chapter not yet reached shows a padlock. The
+/// page's name stands at the row's other end.
+fn tabs(v: &Scene, page: Chapter, profile: &Profile) {
+    for chapter in Chapter::ALL {
+        let r = v.snap_rect(tab_rect(chapter));
+        let hue = sector_color(0, chapter);
+        let open = profile.progress.is_unlocked(chapter.first_sector());
+        let lit = chapter == page;
+        if lit {
+            v.halo(
+                Rect::new(r.x + 4.0, r.y + 8.0, r.w - 8.0, r.h - 6.0),
+                10.0,
+                12.0,
+                opacity(hue, 0.18),
+            );
+            let over = |k: f32| mix(pieces::FIELD, hue, k);
+            v.shape(r, [10.0; 4], Fill::ramp(over(0.24), over(0.10)));
+            v.outline(r, 10.0, v.thick(1.5), hue);
+        } else {
+            card_glass(v, r);
+            let bar = v.snap_rect(Rect::new(r.x + 12.0, r.y + r.h - 6.0, r.w - 24.0, 2.0));
+            let k = if open { 0.7 } else { 0.25 };
+            v.rect(bar.x, bar.y, bar.w, bar.h, opacity(hue, k));
+        }
+        let c = r.center();
+        if open {
+            let number = Figures::count(v.locale, chapter.index() as u32 + 1);
+            let style = Style::from(Role::Label);
+            let at = v.snap(c.y + v.cap(style) / 2.0);
+            let ink = if lit { INK } else { DIM };
+            v.put(number.as_str(), style, Slot::centered(c.x, r.w, at), ink);
+        } else {
+            v.padlock(c.x, c.y - 1.0, MUTED);
+        }
+        v.hits.borrow_mut().tabs[chapter.index()] = Some(r);
+    }
+    let row_end = tab_rect(Chapter::Aurora).right();
+    let right = DETAIL.x + DETAIL.w;
+    let at = v.snap(TABS.y + TABS.h / 2.0 + v.cap(Role::Label) / 2.0);
+    let slot = Slot::right(right, right - row_end - S24, at);
+    v.say(
+        TextId::ChapterName(page),
+        &[],
+        Role::Label,
+        slot,
+        sector_color(0, page),
+    );
 }
 
 /// A Small screen's chapter heading, between the glyphs that page to the
@@ -190,6 +249,40 @@ fn card_glass(v: &Scene, r: Rect) {
         Fill::ramp(hex(0x131722), hex(0x0f121a)),
     );
     v.rect(r.x + 12.0, inner.y, r.w - 24.0, hair, opacity(WHITE, 0.05));
+}
+
+/// The bricks of `level` in miniature from (`x`, `y`), a cell every
+/// `pitch` with bricks of `brick`: cores amber, gates faint, the rest in
+/// their rows' hues, or all dim while the sector is closed.
+fn mini_board(
+    v: &Scene,
+    level: &ark::sectors::Sector,
+    open: bool,
+    (x, y): (f32, f32),
+    pitch: (f32, f32),
+) {
+    let brick = (pitch.0 - 2.0, pitch.1 - 2.0);
+    for cell in FieldCell::all() {
+        if level.layout.hp[cell.index()] == 0 {
+            continue;
+        }
+        let colour = if !open {
+            opacity(hex(0x2a3142), 0.6)
+        } else if level.layout.cores.contains(cell) {
+            AMBER
+        } else if level.layout.gates.contains(cell) {
+            opacity(sector_color(cell.row(), level.chapter), 0.35)
+        } else {
+            opacity(sector_color(cell.row(), level.chapter), 0.8)
+        };
+        v.rect(
+            x + cell.col() as f32 * pitch.0,
+            y + cell.row() as f32 * pitch.1,
+            brick.0,
+            brick.1,
+            colour,
+        );
+    }
 }
 
 /// A card: the name, the layout in miniature, and a pip per medal, or a
@@ -231,33 +324,17 @@ fn card(v: &Scene, id: SectorId, selected: bool, profile: &Profile) {
         v.lead(span, Slot::left(x, w, name)),
         if open { INK } else { MUTED },
     );
-    // The bricks at their field proportions, bottom-left, or right on a
-    // short card.
+    // The bricks at their field proportions: across a tall card's middle,
+    // or at a short card's right end.
     let bottom = r.y + r.h - 14.0;
-    let (bx, top) = if short {
-        (r.x + r.w - S16 - board, r.y + (r.h - 27.0) / 2.0)
+    if short {
+        let (bx, top) = (r.x + r.w - S16 - board, r.y + (r.h - 27.0) / 2.0);
+        let bx = v.mirror(span, bx, board);
+        mini_board(v, level, open, (bx, top), (9.0, 4.0));
     } else {
-        (x, bottom - 7.0 * 4.0 + 1.0)
-    };
-    let bx = v.mirror(span, bx, board);
-    for cell in FieldCell::all() {
-        if level.layout.hp[cell.index()] == 0 {
-            continue;
-        }
-        let colour = if !open {
-            opacity(hex(0x2a3142), 0.6)
-        } else if level.layout.cores.contains(cell) {
-            AMBER
-        } else {
-            opacity(sector_color(cell.row(), level.chapter), 0.8)
-        };
-        v.rect(
-            bx + cell.col() as f32 * 9.0,
-            top + cell.row() as f32 * 4.0,
-            7.0,
-            3.0,
-            colour,
-        );
+        let wide = 12.0 * 13.0;
+        let bx = v.snap(r.x + (r.w - wide) / 2.0);
+        mini_board(v, level, open, (bx, v.snap(r.y + 70.0)), (13.0, 6.0));
     }
     // Medals bottom-right, or under the name on a short card.
     let right = if short {
@@ -275,12 +352,12 @@ fn card(v: &Scene, id: SectorId, selected: bool, profile: &Profile) {
         }
     } else {
         let (cx, cy) = if short {
+            let bx = v.mirror(span, r.x + r.w - S16 - board, board);
             // Beside the board, on the side towards the name.
-            let lx = bx - S12 - LOCK_W / 2.0;
             let lx = if v.rtl() {
                 bx + board + S12 + LOCK_W / 2.0
             } else {
-                lx
+                bx - S12 - LOCK_W / 2.0
             };
             (lx, r.y + r.h / 2.0)
         } else {

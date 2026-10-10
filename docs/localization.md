@@ -71,7 +71,7 @@ For a language picker: `Locale::ALL` minus `Locale::Pseudo`,
 `ark_glyphs::supports(locale)` to hide what the build cannot draw. To apply a
 choice, set `profile.settings.locale = Some(locale)`, mark the profile dirty,
 and call `Renderer::set_locale(locale)`, which rebuilds the glyph atlas in a
-few milliseconds. `None` returns to following Steam or the system.
+few milliseconds (see [The atlas at run time](#the-atlas-at-run-time)). `None` returns to following Steam or the system.
 
 ## Writing and reviewing strings
 
@@ -113,10 +113,13 @@ fixed-length arrays for the same reason. `es-419` deliberately falls back to
   form is never longer than the full one.
   A short form may leave a slot out (the Continue button's caption drops the
   sector number and keeps the name); it never adds one.
-- **Quoted strings.** A slot filled with another string (`Arg::Text`) sets
-  that string in the quoting string's role. Sector names are quoted in a
-  caption, so `TextId::also` tells the baker to bake them at caption sizes
-  too; a new quotation in a new role needs an entry there.
+- **Roles.** A string's glyphs are baked only in the roles it is set in:
+  its own (`TextId::role`) and those `TextId::also` names. Setting a string
+  in another role, or quoting it through an `Arg::Text` slot in another
+  role, needs an entry in `also`: sector names are the ready card's hero
+  line (Display), the detail sheet's title, a card's name (Body) and part
+  of the Continue button's caption. The layout test fails on any glyph the
+  atlas lacks. Rich presence is never drawn, so it bakes nothing.
 - **Precomposed text only.** Strings must be NFC with no combining marks:
   the atlases hold whole glyphs and do no mark positioning. Vietnamese has a
   precomposed form for every letter it uses. The baker refuses anything else,
@@ -143,9 +146,9 @@ fixed-length arrays for the same reason. `es-419` deliberately falls back to
   lives in every language: it is an instrument, read at a glance during
   play, and one layout means a player switching languages, or watching a
   stream in another one, finds the score where it always is. The sector
-  grid keeps its chapters left to right, because the arrows move across it
-  in that direction; a bricks miniature is a map of the field and never
-  flips.
+  grid and its chapter tabs keep their order left to right, because the
+  arrows and shoulder buttons move across them in that direction; a bricks
+  miniature is a map of the field and never flips.
 - **No tracking** for Chinese, Japanese, Thai or Arabic: spacing would break
   the joins, the clusters or the even character grid.
 
@@ -279,7 +282,8 @@ The baker downloads the pinned font files with `curl` into
 figures, extracts kerning, renders hinted glyphs with `swash`, quantizes
 coverage to 16 levels and deflates each strike. Only characters the tables
 use are baked, and each size gets only the characters of the roles drawn at
-it. It bakes twice in one run and fails if the two differ; CI runs `--check`
+it. `latin.bin` serves every locale, so it marks which locales use each of
+its glyphs; the game packs only the current locale's. It bakes twice in one run and fails if the two differ; CI runs `--check`
 on macOS and Linux, so the committed bytes must match a fresh bake.
 
 To update a font, change its URL and hash in `sources.rs`, rebake, and
@@ -293,31 +297,94 @@ macOS arm64 release binary, symbols kept, measured side by side:
 | Build | Bytes |
 | --- | ---: |
 | Twelve languages (`main` before this change, `cjk` on) | 3,977,840 |
-| All thirty languages (default, `scripts` on) | 5,333,376 |
-| All thirty languages without `scripts` (Latin, Greek, Cyrillic only) | 2,971,648 |
+| All thirty languages (`scripts` on), before the journey | 5,333,376 |
+| All thirty languages without `scripts` (Latin, Greek, Cyrillic only), before the journey | 2,971,648 |
+| All thirty languages with the journey (default, `scripts` on) | 8,526,800 |
+| All thirty languages with the journey, without `scripts` | 3,374,432 |
 
-| Atlas file | Holds | Twelve languages | Thirty |
-| --- | --- | ---: | ---: |
-| `latin.bin` | Latin, Greek, Cyrillic, Vietnamese, figures, in the Regular, Medium and Display cuts | 363,750 | 622,864 |
-| `zh.bin` | Simplified Chinese | 537,712 | 538,238 |
-| `tw.bin` | Traditional Chinese | – | 578,329 |
-| `ja.bin` | Japanese | 498,762 | 498,765 |
-| `ko.bin` | Korean | 335,605 | 335,608 |
-| `th.bin` | Thai clusters | – | 174,535 |
-| `ar.bin` | Arabic letter forms | – | 204,298 |
+| Atlas file | Holds | Thirty languages | Journey, every string as body text too | Journey, each string in its roles |
+| --- | --- | ---: | ---: | ---: |
+| `latin.bin` | Latin, Greek, Cyrillic, Vietnamese, figures, in the Regular, Medium and Display cuts, with each glyph's locales | 624,597 | 762,899 | 749,392 |
+| `zh.bin` | Simplified Chinese | 548,101 | 1,355,219 | 1,323,203 |
+| `tw.bin` | Traditional Chinese | 586,338 | 1,443,440 | 1,409,671 |
+| `ja.bin` | Japanese | 508,273 | 1,183,262 | 1,156,231 |
+| `ko.bin` | Korean | 339,767 | 672,953 | 656,995 |
+| `th.bin` | Thai clusters | 174,596 | 296,386 | 293,708 |
+| `ar.bin` | Arabic letter forms | 204,543 | 282,068 | 280,498 |
 
-Latin grew most: Greek, Vietnamese's precomposed letters and the extra
-Cyrillic and Latin letters are baked in three cuts at every size up to the
-96 px Display strike. `fontbake` prints the deflated bytes of every strike;
-the largest single costs are the CJK body sizes at 40 and 48 px (50 to
-65 KB each) and Latin Display at 96 px (49 KB).
+The journey's tips and names doubled the Chinese, Japanese and Korean
+atlases: Simplified Chinese went from about 218 distinct characters to
+about 437, each baked at every size of every role that sets it. Baking
+each string only in the roles it is set in, rather than also as body text
+everywhere, saves 1.7 to 2.3 %: the tips hold most of the characters and
+are set both as body text and as captions, so they still fill every
+Regular size. `fontbake` prints the deflated bytes of every strike; the
+largest single costs are the Chinese and Japanese body sizes at 40 and
+48 px (79 to 121 KB each) and their Display sizes at 80 and 96 px (55 to
+70 KB).
 
 Every non-Latin script atlas sits behind the cargo feature `scripts`, on by
 default, so every package ships all thirty languages. Building without it
-saves 2,329,773 bytes of atlas; those locales then fall back to the next
+saves 5,120,306 bytes of atlas; those locales then fall back to the next
 preference. The desktop size budget is measured without `scripts` (as Steam
 is measured separately): the Steam and desktop packages carry every
 language, while portable and minimal builds hold the size line.
+
+## The atlas at run time
+
+The game draws from one texture, 2048 pixels wide: the 5×7 pixel font, the
+pieces' glow and pictograms, and the glyphs the screen needs now. One scale
+factor maps the scene to the screen, so at any density each role is set at
+a few known sizes: its own, the sizes a few places set it at (`SIZED` in
+`src/render.rs`), and the baked size below each that the fit chain steps
+down to, plus body text's strong cut at its own size. The atlas packs only
+those strikes (`render::strikes_at`), and only the current locale's glyphs
+of Noto Sans. It is packed again when the language changes, and before a
+frame whose density needs other strikes: a resize, a move to another
+display, or an offscreen capture at another size. A density between the
+same baked sizes keeps its atlas, and nothing is packed while a frame is
+drawn. The pictograms are rasterized once, so packing again only inflates
+and places strikes.
+
+Packing every strike of every density needed up to 7,040 rows. Rows now,
+from `cargo test --bin arkonk report_atlas_heights -- --ignored --nocapture`:
+
+| Locale | Every strike (before) | 1.0 | 1.2 (1080p) | 2.0 (Retina) | 2.4 (4K) | Tallest at any density |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Chinese (Simplified) | 6,976 | 1,088 | 1,344 | 2,688 | 3,328 | 3,456 |
+| Chinese (Traditional) | 7,040 | 1,088 | 1,344 | 2,752 | 3,392 | 3,456 |
+| Japanese | 6,656 | 1,024 | 1,280 | 2,560 | 3,136 | 3,200 |
+| Korean | 6,144 | 896 | 1,152 | 2,240 | 2,816 | 2,880 |
+| Thai | 4,352 | 512 | 640 | 1,216 | 1,536 | 1,600 |
+| Arabic | 4,032 | 448 | 576 | 1,024 | 1,344 | 1,344 |
+| Russian, Ukrainian, Bulgarian | 3,072 | 384 | 448 | 768 | 960–1,024 | 1,024 |
+| Greek, Vietnamese | 3,072 | 384 | 448 | 832 | 1,024 | 1,024–1,088 |
+| English | 3,072 | 256 | 320 | 512 | 640 | 640 |
+| Other Latin-script languages | 3,072 | 256–320 | 320 | 512–576 | 640–768 | 640–768 |
+| Pseudo | 3,072 | 320 | 384 | 640 | 768 | 768 |
+
+The tallest atlas comes just under 2.4, where Display text has reached its
+96 px strike but the headings set smaller have not reached theirs.
+
+Two tests in `src/atlas.rs` hold this. One packs every locale at one
+density inside each span where the packed strikes stay the same, and keeps
+the atlas within 2048 rows up to 1080p, a square texture that GLES2-class
+GPUs on small machines accept, and within 4096 rows on denser screens. The
+other walks every string of every locale in every role it is set in and
+fails if any of its glyphs is missing from the atlas, at every size the
+renderer sets that role at, at every one of those densities.
+
+## The 64-sector journey text
+
+The journey (`docs/journey.md`) added 5 chapter names, 52 sector names with
+short forms and 53 sector tips (`first_light` was reworded to teach Wide
+alone). Every table carries them as drafts like the rest: written from the
+English by the same rules, reusing each table's own words for powers, bricks
+and cores, and awaiting native review. `es-419` inherits them from `es`;
+pseudo is generated from English. The sector names are evocative rather than
+literal, so a reviewer should judge them as names. The rich presence files in
+`docs/steam/rich_presence/` come from the tables: rerun
+`ARKONK_WRITE_PRESENCE=1 cargo test presence` after changing any of them.
 
 ## Known gaps
 

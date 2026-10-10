@@ -1,5 +1,5 @@
 use crate::{
-    atlas::{Atlas, Cell},
+    atlas::{Atlas, Cell, Strikes},
     input::Device,
     perf::Perf,
     pixel_font,
@@ -14,7 +14,7 @@ use ark::{
         TOP, cell_rect,
     },
     geom::V2,
-    sectors::{Chapter, SECTOR_COUNT, SectorId},
+    sectors::{CHAPTER_SECTORS, Chapter, SECTOR_COUNT, SectorId},
     tuning::{ANCHOR_CHARGES, MAX_BALLS, PADDLE_HEIGHT, SLOW_SECONDS, WIDE_SECONDS},
 };
 use ark_glyphs::{Fonts, ICON_EM, spec, spec::Weight};
@@ -50,8 +50,21 @@ const EMBER: Color = hex(0xff7d38);
 const MINT: Color = hex(0x59f099);
 const INDIGO: Color = hex(0x7d82ff);
 const ORCHID: Color = hex(0xf263c7);
-/// The chapter hues, in the order the sector rows index them.
-const PALETTE: [Color; 7] = [RED, EMBER, AMBER, MINT, CYAN, INDIGO, ORCHID];
+// Brick hues for the later chapters. None is cyan, amber or red, which
+// mean the player, cores and medals, and the drain.
+const LIME: Color = hex(0xb5ea4f);
+const SEAFOAM: Color = hex(0x8ff0c8);
+const AZURE: Color = hex(0x5b9dff);
+const PERIWINKLE: Color = hex(0x9fb0ff);
+const PEACH: Color = hex(0xffa27a);
+const VIOLET: Color = hex(0xb06bff);
+const LILAC: Color = hex(0xd9a6ff);
+/// Every brick hue, in the order the chapters' rows index them. The first
+/// seven are the first chapter's rainbow, which predates the rule above.
+const PALETTE: [Color; 14] = [
+    RED, EMBER, AMBER, MINT, CYAN, INDIGO, ORCHID, LIME, SEAFOAM, AZURE, PERIWINKLE, PEACH, VIOLET,
+    LILAC,
+];
 
 /// The spacing scale, in scene units (4, 8, 12, 16, 24, 32, 48, 64).
 /// Layouts step by these and nothing in between, so related things always
@@ -123,6 +136,59 @@ impl Style {
             spec::style(self.role).1
         }
     }
+}
+
+/// The sizes, in scene units, that text is set at besides each role's own:
+/// the places [`Style::sized`] is called, and a chip's key label beside
+/// body text and beside captions ([`chips::size`]). The atlas packs only
+/// the strikes these need at the screen's density, so a new size belongs
+/// here; the layout tests report any glyph the atlas then lacks.
+const SIZED: [(Role, f32); 9] = [
+    (Role::Display, 26.0),
+    (Role::Figure, 28.0),
+    (Role::Figure, 24.0),
+    (Role::Body, 18.0),
+    (Role::Caption, 18.0),
+    (Role::Caption, 15.0),
+    (Role::Caption, 13.0),
+    (Role::Label, chips::label_size(28.0)),
+    (Role::Label, chips::label_size(22.0)),
+];
+
+/// Every role with every size it is set at, in scene units.
+#[cfg(test)]
+pub(crate) fn sizes() -> impl Iterator<Item = (Role, f32)> {
+    spec::ROLES
+        .into_iter()
+        .map(|r| (r, spec::style(r).0))
+        .chain(SIZED)
+}
+
+/// Each role, cut and baked size text can be set in at `density`: every
+/// size the role is set at and the size below it the fit chain steps to,
+/// in the role's cut, and at the role's own size in its strong cut too
+/// (emphasis is only ever given to body text at its own size).
+pub(crate) fn rungs_at(density: f32) -> impl Iterator<Item = (Role, Weight, u8)> {
+    let own = spec::ROLES.into_iter().map(|r| (r, spec::style(r).0, true));
+    let sized = SIZED.into_iter().map(|(r, size)| (r, size, false));
+    own.chain(sized).flat_map(move |(role, size, own)| {
+        let ppem = spec::ppem_px(role, size * density);
+        let cuts = [Some(spec::style(role).1), own.then(|| spec::strong(role))];
+        [Some(ppem), spec::step_down(role, ppem)]
+            .into_iter()
+            .flatten()
+            .flat_map(move |ppem| cuts.into_iter().flatten().map(move |w| (role, w, ppem)))
+    })
+}
+
+/// The strikes an atlas needs at `density`: every cut and size of
+/// [`rungs_at`].
+pub(crate) fn strikes_at(density: f32) -> Strikes {
+    let mut out = Strikes::default();
+    for (_, weight, ppem) in rungs_at(density) {
+        out.add(weight, ppem);
+    }
+    out
 }
 
 /// Side margin for full-width text, and the widest a centred line may be.
@@ -1525,14 +1591,15 @@ impl Fx {
     }
 }
 
-/// The type for one locale: its fonts and the atlas built from them.
+/// The type for one locale: its fonts and the atlas built from them for
+/// one density.
 struct Type {
     locale: Locale,
     fonts: Fonts,
     atlas: Atlas,
 }
 impl Type {
-    fn new(locale: Locale) -> Self {
+    fn new(locale: Locale, strikes: Strikes) -> Self {
         // A locale this build cannot draw falls back to English. The linked
         // atlases are unpacked by the ark-glyphs tests, so English failing
         // too would mean a corrupt binary, with nothing left to draw with.
@@ -1548,18 +1615,22 @@ impl Type {
                 )
             }
         };
-        let atlas =
-            Atlas::build(&fonts).expect("linked atlases inflate; the tests unpack every strike");
         Self {
             locale,
+            atlas: pack(&fonts, strikes),
             fonts,
-            atlas,
         }
     }
 }
 
+fn pack(fonts: &Fonts, strikes: Strikes) -> Atlas {
+    Atlas::build(fonts, strikes).expect("linked atlases inflate; the tests unpack every strike")
+}
+
 pub struct Renderer {
     kind: Type,
+    /// The density the atlas was last fitted to.
+    density: f32,
     texture: Option<Texture2D>,
     /// `None` if the driver rejected the shader; frames then keep blended alpha.
     opaque: Option<Material>,
@@ -1576,8 +1647,10 @@ impl Renderer {
         // Rounded shapes use about 2.5 indices per vertex; the default 5,000
         // indices would split a dense frame long before its 10,000 vertices.
         macroquad::window::gl_set_drawcall_buffer_capacity(BATCH_VERTICES, BATCH_INDICES);
+        let density = View::current().map_or(1.0, |v| v.density);
         let mut renderer = Self {
-            kind: Type::new(locale),
+            kind: Type::new(locale, strikes_at(density)),
+            density,
             texture: None,
             opaque: opaque_material(metal),
             metal,
@@ -1600,8 +1673,28 @@ impl Renderer {
     /// Switches language, rebuilding the atlas for its scripts.
     pub fn set_locale(&mut self, locale: Locale) {
         if locale != self.kind.locale {
-            self.kind = Type::new(locale);
+            self.kind = Type::new(locale, self.kind.atlas.strikes());
             self.upload();
+        }
+    }
+    /// Repacks the atlas when the screen's density needs other strikes: on
+    /// a resize, a move to another display, or an offscreen capture at
+    /// another size. Called before a frame is drawn, and a density
+    /// between the same baked sizes keeps the atlas it has.
+    fn fit(&mut self, density: f32) {
+        if density == self.density {
+            return;
+        }
+        self.density = density;
+        let strikes = strikes_at(density);
+        if strikes != self.kind.atlas.strikes() {
+            self.kind.atlas = pack(&self.kind.fonts, strikes);
+            self.upload();
+            let atlas = &self.kind.atlas;
+            crate::diagnostics::info(format_args!(
+                "Glyph atlas {}x{} for density {density:.3}",
+                atlas.width, atlas.height
+            ));
         }
     }
     pub fn locale(&self) -> Locale {
@@ -1654,6 +1747,7 @@ impl Renderer {
         let Some(view) = View::current() else {
             return;
         };
+        self.fit(view.density);
         set_camera(&view.camera(screen_width(), screen_height()));
         self.frame(view, game, ui, profile, alpha, perf);
     }
@@ -1672,6 +1766,7 @@ impl Renderer {
         if self.metal {
             return;
         }
+        self.fit(view.density);
         let target = render_target(width, height);
         let mut camera = view.camera(width as f32, height as f32);
         camera.render_target = Some(target.clone());
@@ -1944,14 +2039,28 @@ fn hp_grid(game: &Game) -> [u8; CELLS] {
     hp
 }
 
+/// A chapter's brick hue in grid `row`: each chapter is a set of hues,
+/// top row first, indexing [`PALETTE`].
 fn sector_color(row: usize, chapter: Chapter) -> Color {
-    const BLUE: [usize; 7] = [4, 4, 5, 5, 6, 5, 4];
-    const DUSK: [usize; 7] = [6, 0, 1, 2, 1, 0, 6];
-    PALETTE[match chapter {
-        Chapter::Daybreak => row % 7,
-        Chapter::BlueHour => BLUE[row % 7],
-        Chapter::Afterlight => DUSK[row % 7],
-    }]
+    const ROWS: [[usize; 7]; 8] = [
+        // Daybreak: the full rainbow, the sun not yet sorted from the sky.
+        [0, 1, 2, 3, 4, 5, 6],
+        // Morning: seafoam overhead to fresh lime, a little peach low down.
+        [8, 8, 3, 3, 7, 7, 11],
+        // Zenith: the high, blue noon, mint at its heart.
+        [10, 9, 9, 3, 9, 9, 10],
+        // Golden Hour: warm light, ember and peach around orchid.
+        [1, 11, 11, 6, 11, 11, 1],
+        // Afterlight: orchid and ember with the last red.
+        [6, 0, 1, 2, 1, 0, 6],
+        // Blue Hour: cyan and indigo.
+        [4, 4, 5, 5, 6, 5, 4],
+        // Eclipse: violets, the light at the edge of a shadow.
+        [12, 13, 5, 12, 5, 13, 12],
+        // Aurora: green low, violet and orchid high, as auroras are.
+        [6, 12, 13, 8, 3, 3, 7],
+    ];
+    PALETTE[ROWS[chapter.index()][row % 7]]
 }
 /// A power's hue: never amber, which is the cores' and the medals'.
 fn power_color(power: Power) -> Color {

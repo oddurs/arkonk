@@ -14,6 +14,7 @@ use crate::pictogram;
 use ark::{
     Ball, Capsule,
     field::{CellSet, ROWS},
+    sectors::BeatPhase,
     tuning::PHASE_CONTACTS,
 };
 
@@ -114,12 +115,87 @@ impl Glass {
     }
 }
 
+impl Glass {
+    /// This glass sunk toward the field by `k`, as darkness leaves it: the
+    /// body and marks all the way, the rim only by [`RIM_KEPT`]'s complement,
+    /// so a rim always shows.
+    fn shaded(&self, k: f32) -> Self {
+        let sink = |c: Color| mix(c, FIELD, k);
+        Self {
+            hue: self.hue,
+            rim: toward(self.rim, FIELD, k * (1.0 - RIM_KEPT)),
+            body: toward(self.body, FIELD, k),
+            hit: self.hit,
+            pane: sink(self.pane),
+            rim2: sink(self.rim2),
+            rim3: sink(self.rim3),
+            lit: self.lit,
+            mark: sink(self.mark),
+        }
+    }
+}
+
+/// The share of a rim darkness never takes, so the board is never lost.
+const RIM_KEPT: f32 = 0.3;
+
+/// Blue Hour's darkness this frame: how dark the sector is drawn, and
+/// where its light comes from. Each ball lights the bricks near it, and the
+/// paddle's keel shines straight up. Reduced effects and high contrast
+/// halve the dark.
+struct Night {
+    dark: f32,
+    balls: [Option<V2>; MAX_BALLS],
+    /// The keel's centre and half its width.
+    keel: (f32, f32),
+}
+impl Night {
+    /// A ball lights fully this near, and not at all this far.
+    const BALL: (f32, f32) = (72.0, 200.0);
+    /// The keel's light fades this far past the paddle's ends.
+    const KEEL_REACH: f32 = 96.0;
+    /// The most the keel lights a brick.
+    const KEEL_LIGHT: f32 = 0.65;
+
+    fn of(v: &Scene, game: &Game) -> Option<Self> {
+        let darkness = game.sector().sector().darkness;
+        if darkness == 0 {
+            return None;
+        }
+        let look = v.look.get();
+        let soften = if look.reduced || look.high { 0.5 } else { 1.0 };
+        let mut balls = [None; MAX_BALLS];
+        for (slot, ball) in balls.iter_mut().zip(game.balls()) {
+            *slot = ball.active.then_some(ball.pos);
+        }
+        let paddle = game.paddle();
+        Some(Self {
+            dark: f32::from(darkness.min(100)) / 100.0 * soften,
+            balls,
+            keel: (paddle.x, paddle.width / 2.0),
+        })
+    }
+    /// How far the brick centred at `at` sinks into the field, 0 to 1.
+    /// Relay cores carry their own light and never sink past half.
+    fn shade(&self, at: V2, core: bool) -> f32 {
+        let fade = |near: f32, far: f32, d: f32| 1.0 - ((d - near) / (far - near)).clamp(0.0, 1.0);
+        let (x, half) = self.keel;
+        let mut light = Self::KEEL_LIGHT * fade(half, half + Self::KEEL_REACH, (at.x - x).abs());
+        for ball in self.balls.iter().flatten() {
+            let d = (*ball - at).length();
+            light = light.max(fade(Self::BALL.0, Self::BALL.1, d));
+        }
+        let shade = self.dark * (1.0 - light);
+        if core { shade.min(0.5) } else { shade }
+    }
+}
+
 /// How much of a brick hue its glass body takes, top and bottom. Measured
 /// on OpenGL captures, red, indigo and orchid glass at the shared 26 %
 /// came out 6 to 9 L* darker than the other hues and read muddy, so they
-/// take the most the design allows at the top.
+/// take the most the design allows at the top; violet and azure, as dark,
+/// join them.
 fn brick_body(hue: Color) -> (f32, f32) {
-    if hue == INDIGO || hue == RED || hue == ORCHID {
+    if [INDIGO, RED, ORCHID, VIOLET, AZURE].contains(&hue) {
         (BODY_DIM_TOP, 11.0)
     } else {
         (26.0, 11.0)
@@ -261,6 +337,11 @@ fn filaments(v: &Scene, game: &Game) {
     let board = game.board();
     let live = |c: FieldCell| board.is_core(c) && board.hp(c) > 0;
     let flat = v.style() == PieceStyle::Flat;
+    // In the dark the cores' own light carries, at half strength.
+    let dim = |c: Color| {
+        let dark = Night::of(v, game).map_or(0.0, |n| n.dark);
+        mix(c, FIELD, 0.5 * dark)
+    };
     for cell in FieldCell::all().filter(|&c| live(c)) {
         let from = cell_box(cell).center();
         let [_, right, _, down] = cell.neighbors();
@@ -268,9 +349,9 @@ fn filaments(v: &Scene, game: &Game) {
             let to = cell_box(other).center();
             let (a, b) = (V2::new(from.x, from.y), V2::new(to.x, to.y));
             if !flat {
-                v.line(a, b, 3.0, opacity(AMBER, 0.25));
+                v.line(a, b, 3.0, opacity(dim(AMBER), 0.25));
             }
-            v.line(a, b, v.thick(1.0), AMBER);
+            v.line(a, b, v.thick(1.0), dim(AMBER));
         }
     }
 }
@@ -287,14 +368,22 @@ fn bricks(v: &Scene, fx: &Fx, game: &Game, palette: &Palette) {
             phased.insert(cell);
         }
     }
+    let night = Night::of(v, game);
+    let beat = game.beat();
     for cell in FieldCell::all() {
         let i = cell.index();
         let (hp, core) = (board.hp(cell), board.is_core(cell));
-        let glass = if core {
+        let lit = if core {
             &palette.core
         } else {
             &palette.rows[cell.row()]
         };
+        let centre = cell_box(cell).center();
+        let shade = night
+            .as_ref()
+            .map_or(0.0, |n| n.shade(V2::new(centre.x, centre.y), core));
+        let shaded = (shade > 0.0).then(|| lit.shaded(shade));
+        let glass = shaded.as_ref().unwrap_or(lit);
         let r = v.snap_rect(cell_box(cell));
         let age = fx.brick_age[i];
         if hp == 0 {
@@ -309,11 +398,15 @@ fn bricks(v: &Scene, fx: &Fx, game: &Game, palette: &Palette) {
         // The rim a hit just took, when armour lost one.
         let lost = (hit > 0.0 && fx.brick_was[i] > hp).then_some(fx.brick_was[i]);
         let rim = if phased.contains(cell) {
-            palette.power(Power::Phase).rim
+            toward(
+                palette.power(Power::Phase).rim,
+                FIELD,
+                shade * (1.0 - RIM_KEPT),
+            )
         } else {
             glass.rim
         };
-        let glow = if core { breath } else { 0.30 };
+        let glow = if core { breath } else { 0.30 } * (1.0 - shade);
         let brick = Brick {
             r,
             glass,
@@ -324,11 +417,89 @@ fn bricks(v: &Scene, fx: &Fx, game: &Game, palette: &Palette) {
             lost,
             glow,
         };
-        match v.style() {
-            PieceStyle::Glass => glass_brick(v, &brick),
-            PieceStyle::Flat => flat_brick(v, &brick),
+        match beat.filter(|_| board.is_gate(cell)) {
+            Some(beat) => gate(v, &brick, beat),
+            None => any_brick(v, &brick),
         }
     }
+}
+
+/// A brick in the screen's piece style.
+fn any_brick(v: &Scene, b: &Brick) {
+    match v.style() {
+        PieceStyle::Glass => glass_brick(v, b),
+        PieceStyle::Flat => flat_brick(v, b),
+    }
+}
+
+/// A gate on its beat. Solid, it is a brick with a line along its foot
+/// draining toward the centre until it ghosts; a ghost, it is a dotted
+/// outline draining until it returns, its glass fading back in over the
+/// last quarter second. It never has armour's nested rims.
+fn gate(v: &Scene, b: &Brick, beat: BeatPhase) {
+    const RETURN: f32 = 0.25;
+    let look = v.look.get();
+    let flat = v.style() == PieceStyle::Flat;
+    let px = 1.0 / v.density;
+    let r = b.r;
+    let left = beat.left as f32 * DT;
+    let share = beat.left as f32 / beat.length.max(1) as f32;
+    let returning = if beat.solid || look.reduced {
+        0.0
+    } else {
+        1.0 - (left / RETURN).min(1.0)
+    };
+    if beat.solid {
+        any_brick(v, b);
+    } else {
+        if returning > 0.0 {
+            let glass = b.glass.shaded(1.0 - returning);
+            let rim = toward(b.rim, FIELD, 1.0 - returning);
+            let glow = b.glow * returning;
+            any_brick(
+                v,
+                &Brick {
+                    glass: &glass,
+                    rim,
+                    glow,
+                    ..*b
+                },
+            );
+        }
+        // Dashes round the edge, where the rim was.
+        let (dash, t) = if flat {
+            (2.0 * px, px)
+        } else {
+            (4.0, v.thick(1.0))
+        };
+        let colour = opacity(b.rim.at(0.45), 0.6 * (1.0 - returning));
+        let mut x = r.x + dash;
+        while x + dash <= r.x + r.w - dash {
+            v.rect(v.snap(x), r.y, dash, t, colour);
+            v.rect(v.snap(x), r.y + r.h - t, dash, t, colour);
+            x += 2.0 * dash;
+        }
+        let mut y = r.y + dash;
+        while y + dash <= r.y + r.h - dash {
+            v.rect(r.x, v.snap(y), t, dash, colour);
+            v.rect(r.x + r.w - t, v.snap(y), t, dash, colour);
+            y += 2.0 * dash;
+        }
+    }
+    // The beat, a drain: what is left of this half, centred on the foot.
+    let full = r.w - if flat { 4.0 * px } else { 16.0 };
+    let w = v.snap((full * share).max(px));
+    let (t, y) = if flat {
+        (px, r.y + r.h - 2.0 * px)
+    } else {
+        (v.thick(1.0), v.snap(r.y + r.h - 5.0))
+    };
+    let colour = if beat.solid {
+        opacity(b.glass.mark, 0.9)
+    } else {
+        opacity(b.rim.at(0.45), 0.55)
+    };
+    v.rect(v.snap(r.x + (r.w - w) / 2.0), y, w, t, colour);
 }
 
 /// One live brick, as the frame finds it.

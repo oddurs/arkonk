@@ -1,5 +1,5 @@
 ---
-source: tests/replay.rs
+source: crates/ark/tests/replay.rs
 expression: out
 ---
 sector 01 Journey seed 1
@@ -17,156 +17,884 @@ sector 01 Practice seed 2
   5120  sector 01 playing   score   2525  lives 3  bricks 20  51695d519ba738f5
   6144  sector 01 playing   score   2650  lives 3  bricks 19  d2c5c02a3c960346
 sector 02 Journey seed 1
-  1024  sector 02 playing   score    400  lives 3  bricks 33  9b4c49294e8b9a94
-  2048  sector 02 playing   score    525  lives 3  bricks 32  55dc7ad4b9a279f0
-  3072  sector 02 playing   score    675  lives 3  bricks 31  777b5b98e3e2f797
-  4096  sector 02 playing   score   1075  lives 3  bricks 28  d8e194d3a56c7435
-  5120  sector 02 playing   score   1350  lives 3  bricks 26  7f9c91a85720c600
-  6144  sector 02 playing   score   1600  lives 3  bricks 24  ead4dc4f59f01dd9
+  1024  sector 02 playing   score    775  lives 2  bricks 19  d5a5acc0ef49360a
+  2048  sector 02 playing   score    900  lives 2  bricks 18  c255eb2422ddcc27
+  3072  sector 02 playing   score   2300  lives 2  bricks 11  f7aa9af3e8fb0296
+  4096  sector 02 playing   score   2950  lives 2  bricks  7  254587ca5732400c
+  5120  sector 02 playing   score   3400  lives 2  bricks  4  339ea4271c604e67
+  6144  sector 02 playing   score   3525  lives 2  bricks  3  8e98961330d6eb1a
 sector 02 Practice seed 2
-  1024  sector 02 playing   score    400  lives 3  bricks 33  fb88acffb95d93e4
-  2048  sector 02 playing   score    650  lives 3  bricks 31  1016fec077c6d765
-  3072  sector 02 playing   score    775  lives 3  bricks 30  757108fd62adb279
-  4096  sector 02 playing   score   1025  lives 3  bricks 28  b099069983fdd056
-  5120  sector 02 playing   score   1675  lives 2  bricks 24  fe124892464b0b9f
-  6144  sector 02 playing   score   1675  lives 2  bricks 24  3dfce8393c792446
+  1024  sector 02 playing   score    575  lives 3  bricks 20  403120aaa9f3b43b
+  2048  sector 02 playing   score   1000  lives 3  bricks 18  f358afe899623798
+  3072  sector 02 playing   score   1125  lives 3  bricks 17  312084175088bd23
+  4096  sector 02 playing   score   1775  lives 3  bricks 13  362cfa10e5a84f39
+  5120  sector 02 playing   score   2825  lives 3  bricks  9  452afd3bd3b65f63
+  6144  sector 02 playing   score   3125  lives 3  bricks  8  76dcf48909e9f1be
 sector 03 Journey seed 1
-  1024  sector 03 playing   score    400  lives 3  bricks 33  0f94a4a63c683d5d
-  2048  sector 03 playing   score    650  lives 3  bricks 31  8cf4053549cfb818
-  3072  sector 03 playing   score   1225  lives 3  bricks 27  e0f2e3f1a6836761
-  4096  sector 03 playing   score   1350  lives 3  bricks 26  6a00710d0ca97e2d
-  5120  sector 03 playing   score   1475  lives 3  bricks 25  a6ace150e5d84af3
-  6144  sector 03 playing   score   1725  lives 3  bricks 23  50dd494c1b68db71
+  1024  sector 03 playing   score    250  lives 3  bricks 28  19bddd1161ab9ef8
+  2048  sector 03 playing   score    525  lives 3  bricks 26  f7e5b7105db1bea2
+  3072  sector 03 playing   score   2525  lives 3  bricks 17  c0a6fd7058ec9cd3
+  4096  sector 03 playing   score   2775  lives 3  bricks 15  402508039a7c2619
+  5120  sector 03 playing   score   2900  lives 3  bricks 14  4a8b06d3ce1d8d20
+  6144  sector 03 playing   score   3150  lives 3  bricks 12  1916b3aa484a1328
 sector 03 Practice seed 2
-  1024  sector 03 playing   score    250  lives 2  bricks 34  49e2d962f39a383b
-  2048  sector 03 playing   score    375  lives 2  bricks 33  713d7e5894db33c7
-  3072  sector 03 playing   score    625  lives 2  bricks 31  4a1c739a48e18637
-  4096  sector 03 playing   score    875  lives 2  bricks 29  bced01237108787d
-  5120  sector 03 playing   score   1275  lives 2  bricks 26  6900108980b17053
-  6144  sector 03 playing   score   1400  lives 1  bricks 25  ce98779dc1fea838
+  1024  sector 03 playing   score    250  lives 3  bricks 28  e34d739ce8b80b50
+  2048  sector 03 playing   score    500  lives 3  bricks 26  46cf72dba3c14d33
+  3072  sector 03 playing   score   1275  lives 3  bricks 21  84fcaa6e654eeb27
+  4096  sector 03 playing   score   1525  lives 2  bricks 19  82719a8ae7239229
+  5120  sector 03 playing   score   1775  lives 2  bricks 17  aae264291225a8f5
+  6144  sector 03 playing   score   2050  lives 1  bricks 15  971400e82fcd5c6c
 sector 04 Journey seed 1
-  1024  sector 04 playing   score    250  lives 3  bricks 40  138ba9121e835eb4
-  2048  sector 04 playing   score    650  lives 3  bricks 37  bb36ae08c801dcb9
-  3072  sector 04 playing   score    925  lives 3  bricks 35  c4542e8b17877f85
-  4096  sector 04 playing   score   1200  lives 2  bricks 33  2a5e08a23f04c19b
-  5120  sector 04 playing   score   1200  lives 2  bricks 33  65557d51431f2a7e
-  6144  sector 04 playing   score   1600  lives 2  bricks 30  9fabd8d1c19d4d5e
+  1024  sector 04 playing   score    250  lives 3  bricks 23  982d4166db21fe8a
+  2048  sector 04 playing   score    500  lives 3  bricks 21  40541a94eaba93d8
+  3072  sector 04 playing   score    625  lives 3  bricks 20  5f6dd6fbbc296fe3
+  4096  sector 04 playing   score   1275  lives 3  bricks 16  bcf6d7f9d7e926d9
+  5120  sector 04 playing   score   1400  lives 3  bricks 15  61bb416862f79691
+  6144  sector 04 playing   score   2050  lives 3  bricks 11  ff6016cdd4675284
 sector 04 Practice seed 2
-  1024  sector 04 playing   score    375  lives 3  bricks 39  af3f7d89fab7d55e
-  2048  sector 04 playing   score    625  lives 3  bricks 37  cffbb5b20aed2b4c
-  3072  sector 04 playing   score    900  lives 3  bricks 35  54d67ad6b54e26f3
-  4096  sector 04 playing   score    900  lives 3  bricks 35  1a8b1d76387d3e8e
-  5120  sector 04 playing   score   1150  lives 3  bricks 33  0d69d49427264384
-  6144  sector 04 playing   score   1600  lives 3  bricks 30  45a89a4ea4c166a3
+  1024  sector 04 playing   score    250  lives 3  bricks 23  8bdf8b1a686a6016
+  2048  sector 04 playing   score    825  lives 3  bricks 19  01710a50f8cfae52
+  3072  sector 04 playing   score   1100  lives 3  bricks 17  c59f84ab9ef68b28
+  4096  sector 04 playing   score   1975  lives 3  bricks 12  249b4ba3cf503b4a
+  5120  sector 04 playing   score   1975  lives 3  bricks 12  2c627c6f3bb713dd
+  6144  sector 04 playing   score   2100  lives 3  bricks 11  f28ea75385763657
 sector 05 Journey seed 1
-  1024  sector 05 playing   score    250  lives 3  bricks 50  9087da89a0e27eb5
-  2048  sector 05 playing   score    700  lives 3  bricks 47  690f427e85193dd3
-  3072  sector 05 playing   score   1100  lives 2  bricks 44  8a0771042c111d7d
-  4096  sector 05 playing   score   1975  lives 2  bricks 39  0bac4d8811bdbe98
-  5120  sector 05 playing   score   2825  lives 2  bricks 36  4f8830eaf2d6ee02
-  6144  sector 05 playing   score   2850  lives 2  bricks 36  65aa9c7dd01b41d5
+  1024  sector 05 playing   score    250  lives 3  bricks 22  8a713fe53418b3f8
+  2048  sector 05 playing   score    650  lives 3  bricks 19  2f992bb08ba41824
+  3072  sector 05 playing   score   1300  lives 3  bricks 15  6a66baba405bcb02
+  4096  sector 05 playing   score   2650  lives 3  bricks 10  ffaacc32df73996a
+  5120  sector 05 playing   score   2775  lives 3  bricks  9  e5bfb2911005223d
+  6144  sector 05 playing   score   3300  lives 3  bricks  6  8cf7d9a8129aa4a0
 sector 05 Practice seed 2
-  1024  sector 05 playing   score    250  lives 3  bricks 50  f04a104bc7c92bfd
-  2048  sector 05 playing   score    675  lives 3  bricks 47  ed2883609667819f
-  3072  sector 05 playing   score   5150  lives 3  bricks 29  5256d39ae7fcee9d
-  4096  sector 05 playing   score   5275  lives 3  bricks 28  8a682fe844c125ee
-  5120  sector 05 playing   score   5400  lives 3  bricks 27  a22455d434100ecf
-  6144  sector 05 playing   score   5575  lives 3  bricks 26  cd2d3f9eb7094225
+  1024  sector 05 playing   score    250  lives 3  bricks 22  b3673acb20f61665
+  2048  sector 05 playing   score   1650  lives 3  bricks 15  5c4c11618be43e06
+  3072  sector 05 playing   score   1925  lives 3  bricks 13  1017d77f4030a41f
+  4096  sector 05 playing   score   2775  lives 3  bricks  9  57f04daf9a3de53d
+  5120  sector 05 playing   score   2900  lives 3  bricks  8  513002810a432a42
+  6144  sector 05 playing   score   2900  lives 3  bricks  8  4c30ce59ace7b1fb
 sector 06 Journey seed 1
-  1024  sector 06 playing   score    250  lives 3  bricks 52  e9cc704fc2893827
-  2048  sector 06 playing   score    525  lives 3  bricks 50  5f6c27d658d8f8e0
-  3072  sector 06 playing   score  10550  lives 3  bricks 14  04704a4e7e267f51
-  4096  sector 06 playing   score  10800  lives 2  bricks 12  e48e3f8999aea500
-  5120  sector 06 playing   score  11050  lives 2  bricks 10  ee7151aed1d722b0
-  6144  sector 06 playing   score  11175  lives 2  bricks  9  bf926fcf47e8719d
+  1024  sector 06 playing   score    250  lives 3  bricks 34  d0e11d057554b825
+  2048  sector 06 playing   score   1125  lives 3  bricks 29  0767fb81d8c05fc9
+  3072  sector 06 playing   score   1375  lives 3  bricks 27  90687af450f874d3
+  4096  sector 06 playing   score   1625  lives 3  bricks 25  876e24dff2ba61eb
+  5120  sector 06 playing   score   1750  lives 3  bricks 24  4a72351aed83f3eb
+  6144  sector 06 playing   score   1875  lives 3  bricks 23  ac4870362327e8be
 sector 06 Practice seed 2
-  1024  sector 06 playing   score    250  lives 3  bricks 52  8d416656248a0aa4
-  2048  sector 06 playing   score    500  lives 3  bricks 50  cebf32d7771393df
-  3072  sector 06 playing   score  10350  lives 3  bricks 14  f556e239479c6b92
-  4096  sector 06 playing   score  11275  lives 3  bricks  9  2224f69e5e6761f5
-  5120  sector 06 playing   score  11525  lives 3  bricks  7  bedac3a7c39705ac
-  6144  sector 06 playing   score  11650  lives 3  bricks  6  fa9a8b73d9f6ce0e
+  1024  sector 06 playing   score    250  lives 3  bricks 34  16beb02aa3007234
+  2048  sector 06 playing   score    500  lives 3  bricks 32  37139f6ad5347979
+  3072  sector 06 playing   score    750  lives 3  bricks 30  6b5fb5f8fb907e46
+  4096  sector 06 playing   score   1000  lives 3  bricks 28  efa216955af47b75
+  5120  sector 06 playing   score   1250  lives 3  bricks 26  ab94216de9af837a
+  6144  sector 06 playing   score   1700  lives 3  bricks 23  9ecd1e321aa3b61b
 sector 07 Journey seed 1
-  1024  sector 07 playing   score    425  lives 3  bricks 61  3c1b9775a68bd8ef
-  2048  sector 07 playing   score    700  lives 3  bricks 59  217960b73d0a7d6c
-  3072  sector 07 playing   score    950  lives 3  bricks 57  cb1e772982277fd5
-  4096  sector 07 playing   score   1350  lives 3  bricks 54  e2cf94dc4de953b0
-  5120  sector 07 playing   score   1650  lives 3  bricks 52  184a71ea2b41d0fb
-  6144  sector 07 playing   score   5700  lives 3  bricks 35  38c92ed07d2ac164
+  1024  sector 07 playing   score   1250  lives 3  bricks 25  4eb141503c61caac
+  2048  sector 07 playing   score   2550  lives 3  bricks 20  5e915cf561413dc6
+  3072  sector 07 playing   score   2550  lives 3  bricks 20  ecb3f09446de4f52
+  4096  sector 07 playing   score   3075  lives 3  bricks 16  a694f84ae05578a8
+  5120  sector 07 playing   score   3350  lives 3  bricks 14  7cff33d9813e51ed
+  6144  sector 07 playing   score   3475  lives 3  bricks 13  12d634d6a96f983b
 sector 07 Practice seed 2
-  1024  sector 07 playing   score    275  lives 2  bricks 62  ccbd3fd0e067eca8
-  2048  sector 07 playing   score    525  lives 2  bricks 60  f84d834925583261
-  3072  sector 07 playing   score   1050  lives 2  bricks 56  c0dc93581616aacc
-  4096  sector 07 playing   score   1225  lives 2  bricks 55  02d998d6fdeda24a
-  5120  sector 07 playing   score   1500  lives 2  bricks 53  0bbc674fa54c3536
-  6144  sector 07 playing   score   1750  lives 2  bricks 51  2f39473c80cbcd7f
+  1024  sector 07 playing   score    375  lives 3  bricks 29  0fa19ecc0d7eea80
+  2048  sector 07 playing   score    775  lives 3  bricks 26  84206a54b471bbb7
+  3072  sector 07 playing   score    900  lives 3  bricks 25  5839df1950ae5ee3
+  4096  sector 07 playing   score   1025  lives 3  bricks 24  2188281e01dc34ff
+  5120  sector 07 playing   score   1425  lives 2  bricks 21  78cb84b975c86b51
+  6144  sector 07 playing   score   1700  lives 2  bricks 19  349dbebe9fe9858c
 sector 08 Journey seed 1
-  1024  sector 08 playing   score   6725  lives 3  bricks 25  455c99eced4d4df6
-  2048  sector 08 playing   score   7000  lives 2  bricks 23  108776b97a5e0324
-  3072  sector 08 playing   score   7450  lives 2  bricks 20  e8e0ae24ce5f7793
-  4096  sector 08 playing   score   7825  lives 2  bricks 17  a8f08ecc3b37d1ba
-  5120  sector 08 playing   score   8225  lives 1  bricks 14  c33d156b68498130
-  6144  sector 08 playing   score   8375  lives 1  bricks 13  bb078deb42879f66
+  1024  sector 08 playing   score    375  lives 3  bricks 41  951871941e46946d
+  2048  sector 08 playing   score   1500  lives 3  bricks 35  bb4ba18b83cdf028
+  3072  sector 08 playing   score   1625  lives 3  bricks 34  574f948e1618e141
+  4096  sector 08 playing   score   2025  lives 3  bricks 31  6eb3260e569710e2
+  5120  sector 08 playing   score   2275  lives 2  bricks 29  ab2d745c4fff6262
+  6144  sector 08 playing   score   2525  lives 2  bricks 27  7c1198b44e61b2b0
 sector 08 Practice seed 2
-  1024  sector 08 playing   score   1950  lives 2  bricks 40  2e96bb1cb0d6edc4
-  2048  sector 08 playing   score   7450  lives 2  bricks 22  708825bcac29fcd6
-  3072  sector 08 playing   score   7600  lives 2  bricks 21  bf032ef673662681
-  4096  sector 08 playing   score   8075  lives 2  bricks 18  323453835626675c
-  5120  sector 08 playing   score   8350  lives 2  bricks 16  34a9d7ff879c3ede
-  6144  sector 08 playing   score   8750  lives 2  bricks 13  449b6ee6be46c82f
+  1024  sector 08 playing   score    250  lives 2  bricks 42  7379ef5a28e332d7
+  2048  sector 08 playing   score    775  lives 2  bricks 38  32fb97f43e726065
+  3072  sector 08 playing   score   1025  lives 2  bricks 36  ed0ec20a8d31943f
+  4096  sector 08 playing   score   1275  lives 1  bricks 34  82b02b9675c91304
+  5120  sector 08 game over score   1525  lives 0  bricks 32  3a6c7be663bcce83
+  6144  sector 08 game over score   1525  lives 0  bricks 32  eac1697f63d2ba87
 sector 09 Journey seed 1
-  1024  sector 09 playing   score    375  lives 3  bricks 55  0cd9df734e0b9d5e
-  2048  sector 09 playing   score    650  lives 3  bricks 53  e83a98905819a5fc
-  3072  sector 09 playing   score    900  lives 2  bricks 51  a156f012068e91c6
-  4096  sector 09 playing   score   1275  lives 2  bricks 48  42c2d41d66ded3a6
-  5120  sector 09 playing   score   1550  lives 2  bricks 46  56040bfc7046c325
-  6144  sector 09 playing   score   1675  lives 2  bricks 45  ded939cf67efce48
+  1024  sector 09 playing   score    250  lives 3  bricks 34  23052e59b5f6bcd6
+  2048  sector 09 playing   score    500  lives 3  bricks 32  cb949f0f390ed208
+  3072  sector 09 playing   score   1075  lives 3  bricks 28  e42ea717daf2ac97
+  4096  sector 09 playing   score   1650  lives 3  bricks 24  4d075e2e8d4add98
+  5120  sector 09 playing   score   2600  lives 3  bricks 20  205600683c201d08
+  6144  sector 09 playing   score   2725  lives 3  bricks 19  25a862c25af4a3ac
 sector 09 Practice seed 2
-  1024  sector 09 playing   score    575  lives 3  bricks 54  570e20d571db1e7a
-  2048  sector 09 playing   score    950  lives 3  bricks 51  e867cf0f31164fe5
-  3072  sector 09 playing   score   1325  lives 3  bricks 48  0cdd2f82174721bf
-  4096  sector 09 playing   score   5800  lives 3  bricks 31  b991ac4ae00308f1
-  5120  sector 09 playing   score   5925  lives 3  bricks 30  66fc3c407943caeb
-  6144  sector 09 playing   score   6450  lives 2  bricks 26  0e7ae8a2dcdbe07e
+  1024  sector 09 playing   score    250  lives 3  bricks 34  c492900d82113e5d
+  2048  sector 09 playing   score    650  lives 3  bricks 31  69e7667b30c4e708
+  3072  sector 09 playing   score    650  lives 3  bricks 31  6782fc6ced703283
+  4096  sector 09 playing   score    900  lives 2  bricks 29  09b7df6dd9280cb5
+  5120  sector 09 playing   score   1150  lives 2  bricks 27  1409b2208e8911de
+  6144  sector 09 playing   score   1400  lives 2  bricks 25  2ca09aeeed1a457f
 sector 10 Journey seed 1
-  1024  sector 10 playing   score    375  lives 2  bricks 69  b7f2dd6d1ed4caac
-  2048  sector 10 playing   score   1775  lives 2  bricks 62  99e0f5e1dced34dd
-  3072  sector 10 playing   score   2150  lives 2  bricks 59  aa2bc22cd163e3ab
-  4096  sector 10 playing   score   2675  lives 2  bricks 55  7afba24f04f9a91e
-  5120  sector 10 playing   score   3850  lives 2  bricks 49  2c9cb9f7a6deee96
-  6144  sector 10 playing   score   3875  lives 2  bricks 49  e2e1d4bf28347724
+  1024  sector 10 playing   score    150  lives 3  bricks 27  6d3fee8bf65304dd
+  2048  sector 10 playing   score    175  lives 3  bricks 27  2b44ee8d35669b2e
+  3072  sector 10 playing   score    325  lives 3  bricks 26  80557c6f5ba77a18
+  4096  sector 10 playing   score    575  lives 3  bricks 24  d66b4ceb72ee1905
+  5120  sector 10 playing   score   2275  lives 3  bricks 16  ba43f55d99c67816
+  6144  sector 10 playing   score   2275  lives 3  bricks 16  7830687f4d078c46
 sector 10 Practice seed 2
-  1024  sector 10 playing   score    375  lives 3  bricks 69  f131c7318b2d0947
-  2048  sector 10 playing   score    750  lives 3  bricks 66  b940052d62f7e683
-  3072  sector 10 playing   score   1150  lives 3  bricks 63  2127c7926d12d9b1
-  4096  sector 10 playing   score   1325  lives 3  bricks 62  3212bb106b79cb38
-  5120  sector 10 playing   score   1475  lives 3  bricks 61  eb507713a178a33c
-  6144  sector 10 playing   score   1625  lives 2  bricks 60  aa14cf1a4263156a
+  1024  sector 10 playing   score     50  lives 3  bricks 28  bd2ae3190a6ac8c2
+  2048  sector 10 playing   score    450  lives 3  bricks 25  644a82da013ecc3e
+  3072  sector 10 playing   score    600  lives 3  bricks 24  e4de5bbb44e753fc
+  4096  sector 10 playing   score    850  lives 3  bricks 22  438d0d3da7056089
+  5120  sector 10 playing   score   1000  lives 3  bricks 21  4aaa82b9e7c3fe93
+  6144  sector 10 playing   score   1250  lives 3  bricks 19  451212f1c7a16d44
 sector 11 Journey seed 1
-  1024  sector 11 playing   score   4250  lives 3  bricks 31  f5e7861cd1bcf970
-  2048  sector 11 playing   score   8000  lives 3  bricks 16  f0e8b25f35a27fb9
-  3072  sector 11 playing   score   8275  lives 2  bricks 14  1ee946b35e3da5f5
-  4096  sector 11 playing   score   8525  lives 2  bricks 12  3f4fbcf132d82bf3
-  5120  sector 11 playing   score   8775  lives 1  bricks 10  913e4e7d15a32050
-  6144  sector 11 playing   score   9525  lives 1  bricks  6  e0f19b84c9e7b565
+  1024  sector 11 playing   score    150  lives 3  bricks 33  733650fa6946afcb
+  2048  sector 11 playing   score    300  lives 3  bricks 32  7e40bceb61bae081
+  3072  sector 11 playing   score    350  lives 3  bricks 32  38e4dcdc057879a6
+  4096  sector 11 playing   score    500  lives 3  bricks 31  19505b77a59c1f9d
+  5120  sector 11 playing   score    525  lives 3  bricks 31  73b37fb98a8d8d08
+  6144  sector 11 playing   score    700  lives 3  bricks 30  d2719187ecd157d6
 sector 11 Practice seed 2
-  1024  sector 11 playing   score   7000  lives 3  bricks 22  bf91b3477cc60181
-  2048  sector 11 playing   score   7375  lives 3  bricks 19  09bf5e17047b32d5
-  3072  sector 11 playing   score   7625  lives 3  bricks 17  b2846f1de62a8181
-  4096  sector 11 playing   score   8150  lives 3  bricks 13  09aeda5a5c7c5c68
-  5120  sector 11 playing   score   9550  lives 3  bricks  6  1b7a662b8eac197b
-  6144  sector 11 playing   score   9800  lives 3  bricks  4  4e85a48b39944127
+  1024  sector 11 playing   score    250  lives 3  bricks 32  cc2af393dd42a5d1
+  2048  sector 11 playing   score    425  lives 3  bricks 31  6a4ce3c581cdd904
+  3072  sector 11 playing   score    575  lives 3  bricks 30  c7f0b4eff639cfc6
+  4096  sector 11 playing   score    725  lives 3  bricks 29  40612f956a90347b
+  5120  sector 11 playing   score    775  lives 3  bricks 29  352c15471ef56d9c
+  6144  sector 11 playing   score    825  lives 3  bricks 29  6cb6923f32506207
 sector 12 Journey seed 1
-  1024  sector 12 playing   score    375  lives 3  bricks 55  ddde2472b9fd168a
-  2048  sector 12 playing   score    650  lives 3  bricks 53  07d25bb494254ee2
-  3072  sector 12 playing   score    900  lives 3  bricks 51  fa89e9d27a30c27c
-  4096  sector 12 playing   score   1175  lives 3  bricks 49  04ec114cc0ed4b2c
-  5120  sector 12 playing   score   1425  lives 3  bricks 47  354cb76068b271cd
-  6144  sector 12 playing   score   2350  lives 3  bricks 42  c5efa7515c0b1fe0
+  1024  sector 12 playing   score    250  lives 3  bricks 34  2d87f082ac564042
+  2048  sector 12 playing   score    500  lives 3  bricks 32  471af78bd2b13626
+  3072  sector 12 playing   score   1075  lives 3  bricks 28  9dce3dac23d57fc2
+  4096  sector 12 playing   score   1775  lives 3  bricks 24  e2cab9c1ec929fcb
+  5120  sector 12 playing   score   1900  lives 3  bricks 23  a4740a6aa5f76235
+  6144  sector 12 playing   score   2150  lives 3  bricks 21  fcbdfeec48816554
 sector 12 Practice seed 2
-  1024  sector 12 playing   score    525  lives 3  bricks 54  a1cc933816819cf2
-  2048  sector 12 playing   score    800  lives 3  bricks 52  4a42bc615862eda3
-  3072  sector 12 playing   score   1175  lives 3  bricks 49  292c05c40f05f50d
-  4096  sector 12 playing   score   1450  lives 3  bricks 47  0f1f5cd1bf6b972c
-  5120  sector 12 playing   score   1950  lives 3  bricks 44  3da032028e0dbdb5
-  6144  sector 12 playing   score   2075  lives 3  bricks 43  010b79b3820a3b92
+  1024  sector 12 playing   score    425  lives 3  bricks 33  ac00547324d223c2
+  2048  sector 12 playing   score   1150  lives 3  bricks 29  d74697689a2b11d5
+  3072  sector 12 playing   score   1400  lives 2  bricks 27  09b33c63a4375023
+  4096  sector 12 playing   score   1550  lives 2  bricks 26  ca310e4cf145c962
+  5120  sector 12 playing   score   1675  lives 2  bricks 25  206fb54bc5e33a4d
+  6144  sector 12 playing   score   1800  lives 2  bricks 24  5c65b5fc65cf7403
+sector 13 Journey seed 1
+  1024  sector 13 playing   score    300  lives 3  bricks 24  7b5103fccf84033d
+  2048  sector 13 playing   score    425  lives 3  bricks 23  940e3d279e1631be
+  3072  sector 13 playing   score    475  lives 3  bricks 23  512b5ee7da68e07b
+  4096  sector 13 playing   score    600  lives 3  bricks 22  b55ddaeb3c445914
+  5120  sector 13 playing   score   1275  lives 3  bricks 18  da3da9353477ca9d
+  6144  sector 13 playing   score   1300  lives 3  bricks 18  7ef00aefc83b3cc5
+sector 13 Practice seed 2
+  1024  sector 13 playing   score    125  lives 3  bricks 25  a8074c46852526a7
+  2048  sector 13 playing   score    175  lives 3  bricks 25  7088a602e6d7aa4f
+  3072  sector 13 playing   score   1075  lives 3  bricks 20  be812b0d94f70700
+  4096  sector 13 playing   score   1325  lives 3  bricks 18  7578a23e0ba641b1
+  5120  sector 13 playing   score   2000  lives 3  bricks 14  a52e01678ffcf07a
+  6144  sector 13 playing   score   2250  lives 3  bricks 12  44594be1e89e163f
+sector 14 Journey seed 1
+  1024  sector 14 playing   score    250  lives 3  bricks 30  3a45cc7dd21e853e
+  2048  sector 14 playing   score    500  lives 3  bricks 28  17e469f95896f5e8
+  3072  sector 14 playing   score    875  lives 3  bricks 25  fd4ae23edc96f4a6
+  4096  sector 14 playing   score   1425  lives 3  bricks 21  09fc6bae7de87151
+  5120  sector 14 playing   score   1900  lives 3  bricks 18  8c5c9bd6e8d02184
+  6144  sector 14 playing   score   2150  lives 3  bricks 17  b2dd9e66c6485ea3
+sector 14 Practice seed 2
+  1024  sector 14 playing   score    250  lives 3  bricks 30  6c6d967eb958506f
+  2048  sector 14 playing   score    500  lives 3  bricks 28  962d1eba8aa0bf0c
+  3072  sector 14 playing   score   1275  lives 3  bricks 23  48e9bff3ab24e774
+  4096  sector 14 playing   score   1825  lives 3  bricks 19  73f0f9840dc0f0cd
+  5120  sector 14 playing   score   2075  lives 3  bricks 17  e74b54779969af73
+  6144  sector 14 playing   score   2225  lives 3  bricks 16  4e3b60bb12a5a796
+sector 15 Journey seed 1
+  1024  sector 15 playing   score     50  lives 3  bricks 41  ccda68cb1a0ce3f8
+  2048  sector 15 playing   score    225  lives 3  bricks 40  dc914ca5895458c7
+  3072  sector 15 playing   score    375  lives 3  bricks 39  1e6d2db5451181bd
+  4096  sector 15 playing   score    525  lives 3  bricks 38  ec9b000dc7781014
+  5120  sector 15 playing   score    675  lives 3  bricks 37  1a4bd7707eedd194
+  6144  sector 15 playing   score   1075  lives 3  bricks 34  3cd1f04552b52d85
+sector 15 Practice seed 2
+  1024  sector 15 playing   score    500  lives 3  bricks 38  5f51bd446963a784
+  2048  sector 15 playing   score    750  lives 3  bricks 36  815813986451b701
+  3072  sector 15 playing   score    800  lives 3  bricks 36  4362c9426e233d6e
+  4096  sector 15 playing   score    975  lives 3  bricks 35  a941daca845cb395
+  5120  sector 15 playing   score   2000  lives 2  bricks 29  8bfc2d062f8ad27e
+  6144  sector 15 playing   score   2150  lives 2  bricks 28  93567f441b61559c
+sector 16 Journey seed 1
+  1024  sector 16 playing   score    400  lives 3  bricks 33  228b6a91dacfeaef
+  2048  sector 16 playing   score    650  lives 3  bricks 31  1d408a1518d858b2
+  3072  sector 16 playing   score    775  lives 3  bricks 30  a33be804b643c876
+  4096  sector 16 playing   score   1300  lives 3  bricks 26  453a1419fc3d1846
+  5120  sector 16 playing   score   1575  lives 3  bricks 24  ec1689d87a8cbc82
+  6144  sector 16 playing   score   1575  lives 2  bricks 24  201d87bba8909ab5
+sector 16 Practice seed 2
+  1024  sector 16 playing   score    375  lives 3  bricks 33  64c952bf2ae1a866
+  2048  sector 16 playing   score    525  lives 2  bricks 32  43bc0a9cc33ea685
+  3072  sector 16 playing   score    775  lives 2  bricks 30  50507405ac55fe9c
+  4096  sector 16 playing   score   1050  lives 2  bricks 28  b61ce38b5ea750aa
+  5120  sector 16 playing   score   1700  lives 2  bricks 24  7c9fc28f90cb7b54
+  6144  sector 16 playing   score   1950  lives 2  bricks 22  f184c9da79039e93
+sector 17 Journey seed 1
+  1024  sector 17 playing   score    400  lives 2  bricks 33  1d13135754662872
+  2048  sector 17 playing   score    775  lives 2  bricks 30  c5a2e6009a7b98ce
+  3072  sector 17 playing   score   1050  lives 2  bricks 28  1c9411104cd3cf31
+  4096  sector 17 playing   score   1325  lives 2  bricks 26  ed4c7ca06bac115a
+  5120  sector 17 playing   score   1975  lives 2  bricks 22  b912ef3cd268a0b7
+  6144  sector 17 playing   score   2200  lives 2  bricks 21  d26fbc4b90edb998
+sector 17 Practice seed 2
+  1024  sector 17 playing   score    400  lives 3  bricks 33  54c389d8629992d9
+  2048  sector 17 playing   score    675  lives 2  bricks 31  ef9a7d8f2fc5cd28
+  3072  sector 17 playing   score    950  lives 2  bricks 29  d943bd3aaad05242
+  4096  sector 17 playing   score   1850  lives 2  bricks 23  ba32938ed602daab
+  5120  sector 17 playing   score   1975  lives 2  bricks 22  2466a7884a4e208e
+  6144  sector 17 playing   score   2425  lives 2  bricks 19  037b8f0fb2a1da25
+sector 18 Journey seed 1
+  1024  sector 18 playing   score    250  lives 3  bricks 40  e90974bfeabf7270
+  2048  sector 18 playing   score   8375  lives 3  bricks 10  e09102234de25a79
+  3072  sector 18 playing   score   8650  lives 3  bricks  8  5d91413afcfbcb4e
+  4096  sector 18 playing   score   8650  lives 3  bricks  8  8634423846a10549
+  5120  sector 18 playing   score   8900  lives 3  bricks  6  a25d3244819e9025
+  6144  sector 18 playing   score   9225  lives 3  bricks  4  f7be2d2a9e920c60
+sector 18 Practice seed 2
+  1024  sector 18 playing   score    250  lives 3  bricks 40  b4a5f9c265e9ed7e
+  2048  sector 18 playing   score    700  lives 3  bricks 37  d82ec8b556a7cb7f
+  3072  sector 18 playing   score   8825  lives 3  bricks  7  2659142b213590e0
+  4096  sector 18 playing   score   8950  lives 3  bricks  6  327d70bbe504f62a
+  5120  sector 18 playing   score   9350  lives 3  bricks  3  3f93d2bba659ceef
+  6144  sector 18 playing   score   9350  lives 3  bricks  3  1342de7e5a7bf107
+sector 19 Journey seed 1
+  1024  sector 19 playing   score    775  lives 3  bricks 31  cd53e45abf47bc94
+  2048  sector 19 playing   score   5700  lives 3  bricks 13  f917adb01a0a6dca
+  3072  sector 19 playing   score   5975  lives 3  bricks 11  7617ba30c9f70e01
+  4096  sector 19 playing   score   6100  lives 3  bricks 10  0e13c41601a1feec
+  5120  sector 19 playing   score   6225  lives 3  bricks  9  a9624af75a8941c4
+  6144  sector 19 playing   score   6350  lives 3  bricks  8  3bf7b9947006373d
+sector 19 Practice seed 2
+  1024  sector 19 playing   score    250  lives 3  bricks 34  62a9a6331bbe77b7
+  2048  sector 19 playing   score    375  lives 3  bricks 33  8dcd26ed9117e6ea
+  3072  sector 19 playing   score   4475  lives 3  bricks 17  262e3b8868747c59
+  4096  sector 19 playing   score   4600  lives 3  bricks 16  1f66324d48d8b736
+  5120  sector 19 playing   score   5000  lives 3  bricks 13  8c94508a38e096d9
+  6144  sector 19 playing   score   5375  lives 3  bricks 10  2486acd90b8e9b90
+sector 20 Journey seed 1
+  1024  sector 20 playing   score   7400  lives 3  bricks  8  e8a04e543b47b699
+  2048  sector 20 playing   score   7650  lives 3  bricks  6  786dfed6a5516131
+  3072  sector 20 playing   score   7900  lives 3  bricks  4  db19ce4561fe4b8b
+  4096  sector 20 playing   score   7900  lives 3  bricks  4  19c8c06045ec2583
+  5120  sector 20 playing   score   7900  lives 3  bricks  4  81794793818fb7e4
+  6144  sector 20 playing   score   7900  lives 2  bricks  4  6c40b2bdda449392
+sector 20 Practice seed 2
+  1024  sector 20 playing   score   8000  lives 3  bricks  6  f87f337525a9e6eb
+  2048  sector 20 playing   score   8125  lives 3  bricks  5  0c7f7377d47bd5e1
+  3072  sector 20 playing   score   8375  lives 3  bricks  3  6ed199b1cdac2354
+  4096  sector 20 playing   score   8500  lives 3  bricks  2  ceb3b48b1e893a59
+  5120  sector 20 cleared   score  10775  lives 3  bricks  0  44b41a458e47a972
+  6144  sector 20 cleared   score  10775  lives 3  bricks  0  97cc7ab8b490f612
+sector 21 Journey seed 1
+  1024  sector 21 playing   score    375  lives 2  bricks 51  28e25f7858a0eab6
+  2048  sector 21 playing   score    525  lives 2  bricks 50  49eb3b540e6ca135
+  3072  sector 21 playing   score    800  lives 2  bricks 48  da32d4d808f4e176
+  4096  sector 21 playing   score    925  lives 2  bricks 47  4b4a4df5891f73e9
+  5120  sector 21 playing   score   1200  lives 1  bricks 45  482097f3e9c88fc8
+  6144  sector 21 playing   score  11450  lives 1  bricks  8  595e56c4a5ca9eb8
+sector 21 Practice seed 2
+  1024  sector 21 playing   score    250  lives 3  bricks 52  d707bb390ccb9f55
+  2048  sector 21 playing   score  10850  lives 3  bricks 13  d0fffea401b131d1
+  3072  sector 21 playing   score  11100  lives 3  bricks 11  55e5e9677b82de1b
+  4096  sector 21 playing   score  11400  lives 3  bricks  9  2ed4e0684d1fdb50
+  5120  sector 21 playing   score  11525  lives 3  bricks  8  8a80bae8fd833f9d
+  6144  sector 21 playing   score  12175  lives 3  bricks  4  451b1b6266129f5a
+sector 22 Journey seed 1
+  1024  sector 22 playing   score    375  lives 3  bricks 61  2771ce98e9348d1f
+  2048  sector 22 playing   score    625  lives 3  bricks 59  6e88329ad48f298f
+  3072  sector 22 playing   score    875  lives 3  bricks 57  7946e72b1439c891
+  4096  sector 22 playing   score  10400  lives 3  bricks 20  a06a3befec398df1
+  5120  sector 22 playing   score  10525  lives 3  bricks 19  faec834c154ee694
+  6144  sector 22 playing   score  10775  lives 3  bricks 17  193a0bb28681d23a
+sector 22 Practice seed 2
+  1024  sector 22 playing   score   6925  lives 3  bricks 38  54373000c1cbd80c
+  2048  sector 22 playing   score  17425  lives 3  bricks  3  e121cf343a22a194
+  3072  sector 22 playing   score  17700  lives 3  bricks  1  66e2c5fb4bcc08af
+  4096  sector 22 playing   score  17700  lives 3  bricks  1  cd7935123bbd4cc1
+  5120  sector 22 playing   score  17700  lives 3  bricks  1  41ab95b1ed3b3e6d
+  6144  sector 22 playing   score  17700  lives 2  bricks  1  ee6531c1d3a47805
+sector 23 Journey seed 1
+  1024  sector 23 playing   score    375  lives 3  bricks 51  241247dd2fdaad14
+  2048  sector 23 playing   score   5075  lives 3  bricks 33  5c2bd48791b44c15
+  3072  sector 23 playing   score   7075  lives 3  bricks 24  036245583c52f4d3
+  4096  sector 23 playing   score   7525  lives 3  bricks 21  148955dd4915f4c0
+  5120  sector 23 playing   score   7650  lives 2  bricks 20  afc0de61e8ab6a29
+  6144  sector 23 playing   score  11575  lives 2  bricks  4  4443be830e1fc6c6
+sector 23 Practice seed 2
+  1024  sector 23 playing   score    375  lives 3  bricks 51  023144d85e1f9c6a
+  2048  sector 23 playing   score    625  lives 3  bricks 49  75a0aa975758f8dc
+  3072  sector 23 playing   score   4425  lives 3  bricks 34  5531a52308da5655
+  4096  sector 23 playing   score   4675  lives 3  bricks 32  b09e0f2753c67c8d
+  5120  sector 23 playing   score   4925  lives 3  bricks 30  fcd662eed3d567fb
+  6144  sector 23 cleared   score  13475  lives 2  bricks  0  efceed08bfe678a9
+sector 24 Journey seed 1
+  1024  sector 24 playing   score    375  lives 3  bricks 39  6dedf35a13006d32
+  2048  sector 24 playing   score    650  lives 3  bricks 37  fccea81db74f6cd9
+  3072  sector 24 playing   score   1325  lives 3  bricks 33  aee300b2cb7bb88c
+  4096  sector 24 playing   score   6625  lives 3  bricks 13  f5b967c781ab3ee9
+  5120  sector 24 playing   score   6875  lives 3  bricks 11  c096ade9db96d0a7
+  6144  sector 24 playing   score   7125  lives 3  bricks  9  81c854c1c659bdd5
+sector 24 Practice seed 2
+  1024  sector 24 playing   score    375  lives 3  bricks 39  9363b22575dfde0f
+  2048  sector 24 playing   score    625  lives 3  bricks 37  8997e8cc9403cb01
+  3072  sector 24 playing   score   6650  lives 3  bricks 14  3fbeb613a4293b14
+  4096  sector 24 playing   score   6650  lives 3  bricks 14  5e05a30cba75bdda
+  5120  sector 24 playing   score   6775  lives 3  bricks 13  3783938d2e31cbca
+  6144  sector 24 playing   score   7375  lives 3  bricks  9  706d98b945133575
+sector 25 Journey seed 1
+  1024  sector 25 playing   score    250  lives 3  bricks 50  1b61da3a32c132b8
+  2048  sector 25 playing   score    975  lives 3  bricks 45  c6ebc0bbd66363dd
+  3072  sector 25 playing   score   6300  lives 3  bricks 23  85e183a3874a7023
+  4096  sector 25 playing   score   9025  lives 3  bricks 12  f3f53d3d8704a60d
+  5120  sector 25 playing   score   9750  lives 3  bricks  9  c0f418354cf42dec
+  6144  sector 25 playing   score  10025  lives 3  bricks  7  4530507fd6560343
+sector 25 Practice seed 2
+  1024  sector 25 playing   score    400  lives 3  bricks 49  fbd00e3ec042de37
+  2048  sector 25 playing   score   1175  lives 2  bricks 44  6fd3f62c94f4d7e4
+  3072  sector 25 playing   score   1350  lives 2  bricks 43  3670361044aeb97b
+  4096  sector 25 playing   score   1750  lives 2  bricks 40  681f50499d67b835
+  5120  sector 25 playing   score   2150  lives 2  bricks 37  9f2036f6b26b0c9d
+  6144  sector 25 playing   score   2325  lives 2  bricks 36  5fb5c62938a728a8
+sector 26 Journey seed 1
+  1024  sector 26 playing   score    250  lives 3  bricks 52  f88d446f6db99946
+  2048  sector 26 playing   score   1175  lives 3  bricks 46  ccf02ae136e60e84
+  3072  sector 26 playing   score   2025  lives 3  bricks 40  c6152a6dcc5bda46
+  4096  sector 26 playing   score   2275  lives 3  bricks 38  0bb51d76559d20d1
+  5120  sector 26 playing   score   2675  lives 3  bricks 35  fb02d5e8cd263f71
+  6144  sector 26 playing   score   2925  lives 3  bricks 33  d686943c54110712
+sector 26 Practice seed 2
+  1024  sector 26 playing   score    725  lives 3  bricks 49  84b13142b7388b18
+  2048  sector 26 playing   score   5275  lives 3  bricks 33  e8bfd1dd2f30681d
+  3072  sector 26 playing   score   6775  lives 3  bricks 28  e890a2da702a97c9
+  4096  sector 26 playing   score   7225  lives 3  bricks 25  7b41c228ddf7bf76
+  5120  sector 26 playing   score   7350  lives 3  bricks 24  a206d0366b548a5c
+  6144  sector 26 playing   score   7600  lives 2  bricks 22  3224654926bf296d
+sector 27 Journey seed 1
+  1024  sector 27 playing   score    525  lives 3  bricks 38  2e6a68d6b990824d
+  2048  sector 27 playing   score    775  lives 3  bricks 36  36b78353dd418cad
+  3072  sector 27 playing   score   1550  lives 3  bricks 31  42d98287d08c1fcc
+  4096  sector 27 playing   score   1800  lives 3  bricks 29  6ec1ad8b8805cef1
+  5120  sector 27 playing   score   2350  lives 3  bricks 25  cfa629ea3b2ca7ae
+  6144  sector 27 playing   score   4100  lives 3  bricks 18  635c5cc855a7ae30
+sector 27 Practice seed 2
+  1024  sector 27 playing   score    250  lives 2  bricks 40  117c62b362eb56be
+  2048  sector 27 playing   score    525  lives 2  bricks 38  ac1a3b9a3c32dc37
+  3072  sector 27 playing   score    925  lives 2  bricks 35  b31d66c77751a102
+  4096  sector 27 playing   score   1075  lives 2  bricks 34  15b1d015af813d29
+  5120  sector 27 playing   score   1475  lives 2  bricks 31  577ea37ee8f1c946
+  6144  sector 27 playing   score   1725  lives 2  bricks 29  d9d5ef45b7f88667
+sector 28 Journey seed 1
+  1024  sector 28 playing   score    275  lives 3  bricks 62  46dbb62284db1f9a
+  2048  sector 28 playing   score   4000  lives 3  bricks 47  ff8f6f3110d8974a
+  3072  sector 28 playing   score   4275  lives 3  bricks 45  43b03ab4120ed158
+  4096  sector 28 playing   score   4725  lives 3  bricks 42  f76a7277bd105976
+  5120  sector 28 playing   score   4975  lives 3  bricks 40  6079b4f2c24319f1
+  6144  sector 28 playing   score   5225  lives 3  bricks 38  d56776bd51716e24
+sector 28 Practice seed 2
+  1024  sector 28 playing   score    250  lives 1  bricks 62  c1a59796f8faab62
+  2048  sector 28 playing   score    550  lives 1  bricks 60  fc9032c1acb139d6
+  3072  sector 28 playing   score   1000  lives 1  bricks 57  7de200b952250e2a
+  4096  sector 28 playing   score   1150  lives 1  bricks 56  98a30b6927674034
+  5120  sector 28 playing   score   1825  lives 1  bricks 52  ece3dd5402b0340e
+  6144  sector 28 playing   score   2100  lives 1  bricks 50  0f8692a9bf6d0ba0
+sector 29 Journey seed 1
+  1024  sector 29 playing   score    900  lives 3  bricks 66  e2f911002db4d48f
+  2048  sector 29 playing   score   2000  lives 3  bricks 59  edbb6c1224107837
+  3072  sector 29 playing   score   3075  lives 3  bricks 55  485c0cdac69b261f
+  4096  sector 29 playing   score   3375  lives 3  bricks 53  d931e70739ea9a0e
+  5120  sector 29 playing   score   3625  lives 2  bricks 51  60cedce2d34ff8f7
+  6144  sector 29 playing   score   3875  lives 2  bricks 49  a349f7b0867a940b
+sector 29 Practice seed 2
+  1024  sector 29 playing   score   1225  lives 3  bricks 64  aed7d70754c09db3
+  2048  sector 29 playing   score   1475  lives 2  bricks 62  37fb3c86197b9d9e
+  3072  sector 29 playing   score   2500  lives 2  bricks 55  00ebb3cdfdb91f91
+  4096  sector 29 playing   score   2650  lives 1  bricks 54  78d31ef48159113a
+  5120  sector 29 playing   score   3025  lives 1  bricks 51  db55674802bc9f90
+  6144  sector 29 game over score   3300  lives 0  bricks 49  9359284d157b32ce
+sector 30 Journey seed 1
+  1024  sector 30 playing   score    175  lives 3  bricks 59  896dc3a330183e57
+  2048  sector 30 playing   score   1325  lives 3  bricks 52  e0f260c8f97d5787
+  3072  sector 30 playing   score   2700  lives 3  bricks 44  ff2f183ad8b90846
+  4096  sector 30 playing   score   3950  lives 2  bricks 37  c7dea8f4307fa935
+  5120  sector 30 playing   score   4350  lives 2  bricks 34  b7bd57194469e5e9
+  6144  sector 30 playing   score   4600  lives 1  bricks 32  8010f24e2a5341be
+sector 30 Practice seed 2
+  1024  sector 30 playing   score    600  lives 3  bricks 56  d38571490baa4b46
+  2048  sector 30 playing   score   1000  lives 3  bricks 53  063d8cf19d2df474
+  3072  sector 30 playing   score   1300  lives 3  bricks 51  d2cddc817aca5533
+  4096  sector 30 playing   score   2425  lives 3  bricks 44  4d0f0bca9ea3b4ed
+  5120  sector 30 playing   score   3675  lives 3  bricks 37  a363a862f6b58a49
+  6144  sector 30 playing   score   4100  lives 3  bricks 34  ad0cf81f15db90ae
+sector 31 Journey seed 1
+  1024  sector 31 playing   score    200  lives 3  bricks 65  a68d6165145f2db4
+  2048  sector 31 playing   score    825  lives 3  bricks 61  b354a41059c88532
+  3072  sector 31 playing   score   1350  lives 3  bricks 57  0302761b43658f89
+  4096  sector 31 playing   score   2650  lives 3  bricks 50  8f6ca3319703415c
+  5120  sector 31 playing   score   3025  lives 3  bricks 47  d5f68a80e2079a21
+  6144  sector 31 playing   score   4050  lives 3  bricks 41  b2ac06d1aec493b3
+sector 31 Practice seed 2
+  1024  sector 31 playing   score    275  lives 3  bricks 64  45fe1356c562fa93
+  2048  sector 31 playing   score   3250  lives 2  bricks 52  9ed4d7673eaa1e13
+  3072  sector 31 playing   score   3825  lives 2  bricks 48  b00b2da68a79eb95
+  4096  sector 31 playing   score   4100  lives 2  bricks 46  d2c24db03192a88b
+  5120  sector 31 playing   score   5450  lives 1  bricks 39  f544926dc6d28b85
+  6144  sector 31 playing   score   6100  lives 1  bricks 35  720c67ed69678731
+sector 32 Journey seed 1
+  1024  sector 32 playing   score    375  lives 3  bricks 51  37e397493b0ea3a9
+  2048  sector 32 playing   score   2350  lives 3  bricks 41  03cb586537305ccc
+  3072  sector 32 playing   score   7825  lives 3  bricks 22  8f2ab0a6fbef33f4
+  4096  sector 32 playing   score   8075  lives 3  bricks 20  927f89accb2c0b31
+  5120  sector 32 playing   score   8475  lives 3  bricks 17  9c1b3f66784e43dc
+  6144  sector 32 playing   score   9050  lives 3  bricks 13  81659409c91b7b53
+sector 32 Practice seed 2
+  1024  sector 32 playing   score    375  lives 3  bricks 51  393ab9b24d60c4e1
+  2048  sector 32 playing   score    825  lives 3  bricks 48  7c03622a2dc0e45d
+  3072  sector 32 playing   score   7600  lives 3  bricks 23  ae99215293c5141e
+  4096  sector 32 playing   score   9300  lives 3  bricks 15  3125d2e27782b9ea
+  5120  sector 32 playing   score   9550  lives 3  bricks 13  245d5ccc21b1ad31
+  6144  sector 32 playing   score   9675  lives 2  bricks 12  c1a7179c038ecc38
+sector 33 Journey seed 1
+  1024  sector 33 playing   score    375  lives 3  bricks 55  7879e3f654b17fc8
+  2048  sector 33 playing   score   2375  lives 3  bricks 46  24c32ce5d3fbf08f
+  3072  sector 33 playing   score   4175  lives 3  bricks 40  e225df45af8f0755
+  4096  sector 33 playing   score   6675  lives 3  bricks 32  0df7f1de806d4ca4
+  5120  sector 33 playing   score   6950  lives 3  bricks 30  f577626607293c5e
+  6144  sector 33 playing   score   7075  lives 3  bricks 29  b0ed3238850d6d62
+sector 33 Practice seed 2
+  1024  sector 33 playing   score    250  lives 3  bricks 56  de5f36e683fc61d4
+  2048  sector 33 playing   score   5075  lives 3  bricks 38  7828d7d97f929405
+  3072  sector 33 playing   score   5200  lives 3  bricks 37  6880a9eec103ea04
+  4096  sector 33 playing   score   5600  lives 3  bricks 34  0cdc47ee3eefb49f
+  5120  sector 33 ready     score   6000  lives 2  bricks 31  9a6fb2c5bb22ccc0
+  6144  sector 33 playing   score   6375  lives 2  bricks 28  9e895740ad7dc133
+sector 34 Journey seed 1
+  1024  sector 34 playing   score    275  lives 3  bricks 28  0858afac51662f10
+  2048  sector 34 playing   score    850  lives 3  bricks 25  181393b1b03791a7
+  3072  sector 34 playing   score   1575  lives 3  bricks 21  4de7b90e72ebdcfe
+  4096  sector 34 playing   score   1750  lives 3  bricks 20  7c60352ef95455b9
+  5120  sector 34 playing   score   1775  lives 3  bricks 20  9748a2019255db61
+  6144  sector 34 playing   score   1925  lives 3  bricks 19  15b5e5db3dcaf473
+sector 34 Practice seed 2
+  1024  sector 34 playing   score    175  lives 3  bricks 29  40f75a3cdbe7188f
+  2048  sector 34 playing   score    300  lives 3  bricks 28  0d323fcf7265e063
+  3072  sector 34 playing   score    550  lives 2  bricks 26  9c31e9a5971d137b
+  4096  sector 34 playing   score    800  lives 2  bricks 24  e54ee6ffe1bc1f1f
+  5120  sector 34 playing   score    850  lives 1  bricks 24  8ebe665fb01c7712
+  6144  sector 34 playing   score   1025  lives 1  bricks 23  a179b6debba7b72e
+sector 35 Journey seed 1
+  1024  sector 35 playing   score   3925  lives 3  bricks 23  02e3439479d63cc1
+  2048  sector 35 playing   score   4250  lives 3  bricks 22  2dc468e0ddc70503
+  3072  sector 35 playing   score   5800  lives 2  bricks 15  c8c0a4a0997135e1
+  4096  sector 35 playing   score   5925  lives 2  bricks 14  f6748555e7a5bbbf
+  5120  sector 35 playing   score   6050  lives 2  bricks 13  105a01c0de36bd9a
+  6144  sector 35 playing   score   6250  lives 2  bricks 12  4908ae55545890fb
+sector 35 Practice seed 2
+  1024  sector 35 playing   score    150  lives 3  bricks 37  63f8a3a3a70565b9
+  2048  sector 35 playing   score    750  lives 3  bricks 33  ed37f043ea84468f
+  3072  sector 35 playing   score   1000  lives 3  bricks 31  8b122fc9868018f6
+  4096  sector 35 playing   score   4300  lives 3  bricks 16  e16fc24dd46ad9dc
+  5120  sector 35 playing   score   5600  lives 3  bricks 10  912f0cb8e1cdb164
+  6144  sector 35 playing   score   5725  lives 3  bricks  9  9dc31ad6117a3672
+sector 36 Journey seed 1
+  1024  sector 36 playing   score    375  lives 3  bricks 69  fb8cca3e95b5e45d
+  2048  sector 36 playing   score    650  lives 3  bricks 67  75e41b5042b66395
+  3072  sector 36 playing   score    900  lives 3  bricks 65  ff796640b9f46cc0
+  4096  sector 36 playing   score   1075  lives 3  bricks 64  1d47f12a4c1b58f4
+  5120  sector 36 playing   score   1325  lives 2  bricks 62  ccd58ca35c7d34b5
+  6144  sector 36 playing   score   1850  lives 1  bricks 58  12df936001da7795
+sector 36 Practice seed 2
+  1024  sector 36 playing   score    375  lives 3  bricks 69  23888f801e78e32b
+  2048  sector 36 playing   score   4800  lives 2  bricks 51  9d769542afdd0665
+  3072  sector 36 playing   score   5500  lives 2  bricks 48  1fd18cac31973578
+  4096  sector 36 playing   score   6925  lives 2  bricks 41  c56d989bee675ddd
+  5120  sector 36 playing   score   7200  lives 2  bricks 39  2c918e07995f8a7b
+  6144  sector 36 playing   score   7625  lives 2  bricks 36  c7bb1b1d4543ebbc
+sector 37 Journey seed 1
+  1024  sector 37 playing   score   5150  lives 3  bricks 38  458134f215ba0baa
+  2048  sector 37 playing   score   5300  lives 3  bricks 37  252bde9cd1e68fef
+  3072  sector 37 playing   score   6400  lives 3  bricks 32  44f759878ebb3c71
+  4096  sector 37 playing   score   8025  lives 3  bricks 25  1c823b81ba80772c
+  5120  sector 37 playing   score   8775  lives 3  bricks 22  35b3c7ef607ec7b1
+  6144  sector 37 playing   score   9000  lives 3  bricks 21  b55f7f68922ab2c9
+sector 37 Practice seed 2
+  1024  sector 37 playing   score    175  lives 2  bricks 57  b7636bf94c20ae00
+  2048  sector 37 playing   score    325  lives 1  bricks 56  fd64de2dfd1f3d32
+  3072  sector 37 playing   score    475  lives 1  bricks 55  0fc9b8143b762b1b
+  4096  sector 37 playing   score    650  lives 1  bricks 54  9148f2a5e8f5dbbb
+  5120  sector 37 playing   score   1275  lives 1  bricks 50  f78962a1ba6ef4a5
+  6144  sector 37 playing   score   1650  lives 1  bricks 47  af654a20ffa2cb5a
+sector 38 Journey seed 1
+  1024  sector 38 playing   score     75  lives 3  bricks 65  adb960d64f47c898
+  2048  sector 38 playing   score    150  lives 2  bricks 65  fb9d3319daf312f9
+  3072  sector 38 playing   score   7300  lives 2  bricks 41  2639fac6d5486e41
+  4096  sector 38 playing   score   7800  lives 2  bricks 38  77c5f739818ff7b5
+  5120  sector 38 playing   score   8300  lives 2  bricks 35  7be21577111782af
+  6144  sector 38 playing   score   8775  lives 2  bricks 32  e552b507457f725b
+sector 38 Practice seed 2
+  1024  sector 38 playing   score     75  lives 3  bricks 65  19ddae4052cc8078
+  2048  sector 38 playing   score    125  lives 3  bricks 65  4e520a8d98b16ce9
+  3072  sector 38 playing   score    200  lives 3  bricks 65  096580727f50a6a3
+  4096  sector 38 playing   score    275  lives 3  bricks 65  fbf02aea9d4d201f
+  5120  sector 38 playing   score    350  lives 3  bricks 65  18ec3ff65e6a08f7
+  6144  sector 38 playing   score   4375  lives 3  bricks 50  b9c0a93d27fe522f
+sector 39 Journey seed 1
+  1024  sector 39 playing   score    275  lives 3  bricks 46  883db55c543bd67e
+  2048  sector 39 playing   score    450  lives 3  bricks 45  e1be0c53d790e406
+  3072  sector 39 playing   score   1000  lives 3  bricks 41  c3c2ad9fd7e10764
+  4096  sector 39 playing   score   2025  lives 2  bricks 36  4b7b8dfd9b4c4455
+  5120  sector 39 playing   score   3575  lives 2  bricks 28  071dd908455813ff
+  6144  sector 39 playing   score   3625  lives 1  bricks 28  cab3c50abc162ee4
+sector 39 Practice seed 2
+  1024  sector 39 playing   score     50  lives 2  bricks 48  a12e16614abfa9bb
+  2048  sector 39 playing   score    550  lives 2  bricks 44  e035c5f784f0ea3a
+  3072  sector 39 playing   score    700  lives 2  bricks 43  c2653a6e6f23c352
+  4096  sector 39 playing   score   1325  lives 2  bricks 39  42656c97fa3b27da
+  5120  sector 39 playing   score   1575  lives 2  bricks 37  1feba397e87cc187
+  6144  sector 39 playing   score   3250  lives 2  bricks 28  a9c80b769ca2b94e
+sector 40 Journey seed 1
+  1024  sector 40 playing   score   7000  lives 3  bricks 22  05dd70e070077309
+  2048  sector 40 playing   score   8700  lives 3  bricks 14  adc8b5629934ae2a
+  3072  sector 40 playing   score   8975  lives 2  bricks 12  18e6f34b56881dac
+  4096  sector 40 playing   score   9425  lives 2  bricks  9  c582f2adcb6f649a
+  5120  sector 40 playing   score   9425  lives 2  bricks  9  5e32c036a0c55f0f
+  6144  sector 40 playing   score   9550  lives 1  bricks  8  01eefe6a06edebe8
+sector 40 Practice seed 2
+  1024  sector 40 playing   score    250  lives 2  bricks 46  e87ffb08d4a8a55c
+  2048  sector 40 playing   score   7425  lives 2  bricks 20  25a53e02ea4bb628
+  3072  sector 40 playing   score   7950  lives 2  bricks 16  21636fe21d48cdef
+  4096  sector 40 playing   score   8950  lives 2  bricks 10  911ba7fc70039bd5
+  5120  sector 40 playing   score   9225  lives 1  bricks  8  01a71e2a6670849a
+  6144  sector 40 game over score   9400  lives 0  bricks  7  dd99363f8f14950f
+sector 41 Journey seed 1
+  1024  sector 41 playing   score   8400  lives 3  bricks 20  6b2eaca378fad34b
+  2048  sector 41 playing   score   9000  lives 3  bricks 17  4200e548a04681cd
+  3072  sector 41 playing   score   9125  lives 3  bricks 16  f40aea5f071cfb65
+  4096  sector 41 playing   score   9525  lives 3  bricks 13  5fea58d192224641
+  5120  sector 41 playing   score   9975  lives 3  bricks 10  de6173c8f01d2060
+  6144  sector 41 playing   score  10100  lives 3  bricks  9  602279cd5f75011e
+sector 41 Practice seed 2
+  1024  sector 41 playing   score   7325  lives 3  bricks 23  857d999219b5a390
+  2048  sector 41 playing   score   8375  lives 3  bricks 18  97ba53d1a9a33db9
+  3072  sector 41 playing   score   8825  lives 3  bricks 15  53cd7567ada1cc27
+  4096  sector 41 playing   score   8950  lives 3  bricks 14  6a94c2915048da64
+  5120  sector 41 playing   score   9250  lives 3  bricks 12  eae05a11e6d81ed1
+  6144  sector 41 playing   score   9675  lives 3  bricks  9  e39817c93798c2ba
+sector 42 Journey seed 1
+  1024  sector 42 playing   score    375  lives 3  bricks 37  00ff57ad219ec635
+  2048  sector 42 playing   score   1800  lives 3  bricks 30  d290ff9980482782
+  3072  sector 42 playing   score   4050  lives 3  bricks 22  3f2c50cf3a29ea7d
+  4096  sector 42 playing   score   4325  lives 3  bricks 20  db80cfabc6f02c60
+  5120  sector 42 playing   score   4575  lives 3  bricks 18  88226195732653f5
+  6144  sector 42 playing   score   4975  lives 2  bricks 15  4fbd79e487794fe8
+sector 42 Practice seed 2
+  1024  sector 42 playing   score    250  lives 2  bricks 38  891e4008e0e3e06e
+  2048  sector 42 playing   score   1250  lives 2  bricks 32  eeaca83ecc6744b2
+  3072  sector 42 playing   score   4850  lives 2  bricks 20  c65d38a88908778a
+  4096  sector 42 playing   score   5775  lives 2  bricks 17  f8aade6b0bc4ca9e
+  5120  sector 42 playing   score   6075  lives 2  bricks 16  bea2b32aef1b5ddb
+  6144  sector 42 playing   score   6350  lives 2  bricks 14  58f8d7d3a36ca531
+sector 43 Journey seed 1
+  1024  sector 43 playing   score    300  lives 3  bricks 40  a7f106396ece237f
+  2048  sector 43 playing   score    575  lives 3  bricks 38  8b8f35ccecfecb10
+  3072  sector 43 playing   score   1250  lives 2  bricks 34  540d3c4bc829fb70
+  4096  sector 43 playing   score   2675  lives 2  bricks 25  9beb521b3ee2862e
+  5120  sector 43 playing   score   2675  lives 2  bricks 25  8c02e48f2d41e214
+  6144  sector 43 playing   score   3550  lives 2  bricks 20  091a8aba0a979dfc
+sector 43 Practice seed 2
+  1024  sector 43 playing   score   2000  lives 2  bricks 33  5708f4e7fd368e40
+  2048  sector 43 playing   score   2250  lives 2  bricks 31  b6501a7b301be261
+  3072  sector 43 playing   score   2925  lives 2  bricks 27  cf441aff49513557
+  4096  sector 43 playing   score   3575  lives 2  bricks 23  39e556fc637a02af
+  5120  sector 43 playing   score   4225  lives 2  bricks 19  15b3d43f35a1de49
+  6144  sector 43 playing   score   5725  lives 2  bricks 13  2fb055429bb4b1e4
+sector 44 Journey seed 1
+  1024  sector 44 playing   score    775  lives 3  bricks 30  58cd3cb991ff8ff3
+  2048  sector 44 playing   score   1150  lives 3  bricks 27  1ba330bdc2c4f32e
+  3072  sector 44 playing   score   1525  lives 2  bricks 24  857587102e437420
+  4096  sector 44 playing   score   1800  lives 2  bricks 22  2c82fa690de7d7bd
+  5120  sector 44 playing   score   2250  lives 2  bricks 19  bad94497983021bd
+  6144  sector 44 playing   score   2250  lives 2  bricks 19  9e3d4ca6914c24a4
+sector 44 Practice seed 2
+  1024  sector 44 playing   score    375  lives 3  bricks 32  6c3ad1105ffb4c25
+  2048  sector 44 playing   score   1775  lives 3  bricks 25  e361b5acf35fe096
+  3072  sector 44 playing   score   2375  lives 3  bricks 23  cc7bccdff6890c21
+  4096  sector 44 playing   score   2650  lives 3  bricks 21  18930a59a497058f
+  5120  sector 44 playing   score   2775  lives 3  bricks 20  c85207d32dcb8fae
+  6144  sector 44 playing   score   4175  lives 3  bricks 13  4bdbb25f692f82db
+sector 45 Journey seed 1
+  1024  sector 45 playing   score    375  lives 3  bricks 39  bbc07312a8edae2f
+  2048  sector 45 playing   score    925  lives 3  bricks 35  47fe8f41c3da2ebb
+  3072  sector 45 playing   score   1175  lives 3  bricks 33  2675220bf96f1c6b
+  4096  sector 45 playing   score   1875  lives 3  bricks 28  e987e510bc1f4294
+  5120  sector 45 playing   score   2150  lives 3  bricks 26  4ee0812cd0b687c8
+  6144  sector 45 playing   score   2150  lives 3  bricks 26  4f933df1169cabad
+sector 45 Practice seed 2
+  1024  sector 45 playing   score    375  lives 2  bricks 39  ea3e61a1d3c3a3ac
+  2048  sector 45 playing   score    750  lives 2  bricks 36  534651af33e414e5
+  3072  sector 45 playing   score   1150  lives 2  bricks 33  9e971bad6e54b41d
+  4096  sector 45 playing   score   1675  lives 2  bricks 29  5905601917c7c677
+  5120  sector 45 playing   score   2100  lives 2  bricks 26  b3d1fdfb7c51975e
+  6144  sector 45 playing   score   2225  lives 2  bricks 25  6d3cfa32054dbdbc
+sector 46 Journey seed 1
+  1024  sector 46 playing   score   1550  lives 3  bricks 33  5e5d9ce8b68d5ec1
+  2048  sector 46 playing   score   3050  lives 3  bricks 27  ae7f76dab7e304e2
+  3072  sector 46 playing   score   3775  lives 3  bricks 22  daec87857e8c4e22
+  4096  sector 46 playing   score   3900  lives 3  bricks 21  f744096872de6fa2
+  5120  sector 46 playing   score   4300  lives 3  bricks 18  546f6b6484ac3e6d
+  6144  sector 46 playing   score   4425  lives 3  bricks 17  850928e3f640a532
+sector 46 Practice seed 2
+  1024  sector 46 playing   score    275  lives 3  bricks 39  352c02f89f142346
+  2048  sector 46 playing   score    650  lives 3  bricks 36  9c2a205527f64cc0
+  3072  sector 46 playing   score    900  lives 3  bricks 34  8c004a73c8244868
+  4096  sector 46 playing   score   1700  lives 3  bricks 29  7f9e7be809a7fda5
+  5120  sector 46 playing   score   2300  lives 3  bricks 25  ba05b801c739ee54
+  6144  sector 46 playing   score   2975  lives 3  bricks 21  f7386248c015594a
+sector 47 Journey seed 1
+  1024  sector 47 playing   score   1600  lives 3  bricks 23  049a0e7bcaac6c56
+  2048  sector 47 playing   score   4000  lives 3  bricks 15  a4ab9d812d7e7199
+  3072  sector 47 playing   score   4775  lives 3  bricks 10  6764ca53499ff15a
+  4096  sector 47 playing   score   4900  lives 3  bricks  9  8389ef4f3d510f1a
+  5120  sector 47 playing   score   5050  lives 3  bricks  8  9a14ce839468936d
+  6144  sector 47 playing   score   5050  lives 3  bricks  8  5851eb26069d77aa
+sector 47 Practice seed 2
+  1024  sector 47 playing   score    375  lives 3  bricks 28  a0b40217565b2025
+  2048  sector 47 playing   score    800  lives 3  bricks 25  9169766607a5ddb6
+  3072  sector 47 playing   score    975  lives 3  bricks 24  6462bfdf7545be90
+  4096  sector 47 playing   score   1400  lives 3  bricks 21  f2679bda7b8a209a
+  5120  sector 47 playing   score   2800  lives 3  bricks 14  f39ef006ac403925
+  6144  sector 47 playing   score   2925  lives 3  bricks 13  9be49eddd456cd9a
+sector 48 Journey seed 1
+  1024  sector 48 playing   score   2575  lives 3  bricks 18  e95c9a887c179cb5
+  2048  sector 48 playing   score   2700  lives 3  bricks 17  6c1c370774658a7f
+  3072  sector 48 playing   score   2850  lives 2  bricks 16  f6dbcd074774b805
+  4096  sector 48 playing   score   3450  lives 2  bricks 12  6088b3849931e420
+  5120  sector 48 playing   score   3725  lives 2  bricks 10  129bbab9e08960a4
+  6144  sector 48 playing   score   3850  lives 1  bricks  9  927e6194ebb0d40b
+sector 48 Practice seed 2
+  1024  sector 48 playing   score   2425  lives 3  bricks 19  428027a55648f351
+  2048  sector 48 playing   score   2800  lives 3  bricks 16  3f36a92dc26ccb49
+  3072  sector 48 playing   score   3775  lives 3  bricks 11  063c016dad11ab8a
+  4096  sector 48 playing   score   4600  lives 3  bricks  8  c8672d360c8815ab
+  5120  sector 48 playing   score   5200  lives 3  bricks  6  5774e0036d0574d7
+  6144  sector 48 playing   score   5475  lives 3  bricks  4  dbebea9752feda68
+sector 49 Journey seed 1
+  1024  sector 49 playing   score    375  lives 3  bricks 33  8a8e4a72e991d954
+  2048  sector 49 playing   score    625  lives 3  bricks 31  465204177d019853
+  3072  sector 49 playing   score   1550  lives 3  bricks 25  03517cd9d07eea0c
+  4096  sector 49 playing   score   2125  lives 3  bricks 21  8fe804d91126b4a8
+  5120  sector 49 playing   score   2400  lives 3  bricks 19  6a797f81cf018a96
+  6144  sector 49 playing   score   2675  lives 3  bricks 17  5eb75a5e3e11575c
+sector 49 Practice seed 2
+  1024  sector 49 playing   score    375  lives 3  bricks 33  2e15f91721204a94
+  2048  sector 49 playing   score    825  lives 2  bricks 30  f7b549cdf93f7534
+  3072  sector 49 playing   score    950  lives 2  bricks 29  3a68b4a6c69e35f1
+  4096  sector 49 playing   score   1325  lives 1  bricks 26  8ba938eea5ce57c9
+  5120  sector 49 playing   score   1575  lives 1  bricks 24  f0ab156d9bd574e9
+  6144  sector 49 playing   score   2150  lives 1  bricks 20  fa79bee67af1ba58
+sector 50 Journey seed 1
+  1024  sector 50 playing   score    250  lives 3  bricks 50  2f452cd78fda75e6
+  2048  sector 50 playing   score    825  lives 3  bricks 46  158408a9c3e95da8
+  3072  sector 50 playing   score   1225  lives 2  bricks 43  fd7edf0d65f228b5
+  4096  sector 50 playing   score   1475  lives 1  bricks 41  e84ed6545db33ea0
+  5120  sector 50 playing   score   2000  lives 1  bricks 37  b3390b130111da1a
+  6144  sector 50 playing   score   2250  lives 1  bricks 35  a7a70ebc07c1c52e
+sector 50 Practice seed 2
+  1024  sector 50 playing   score    375  lives 3  bricks 49  ce5ea5589ec385bd
+  2048  sector 50 playing   score   1150  lives 3  bricks 44  e4a3c55ff96aad6c
+  3072  sector 50 playing   score   3225  lives 3  bricks 36  34dad6db2dc4fa4f
+  4096  sector 50 playing   score   3350  lives 3  bricks 35  0bc916d6b61db41b
+  5120  sector 50 playing   score   3600  lives 2  bricks 33  4bcd2aeae3ced757
+  6144  sector 50 playing   score   5125  lives 2  bricks 25  c93f5be15621119c
+sector 51 Journey seed 1
+  1024  sector 51 playing   score    400  lives 2  bricks 37  b16b5bd4ffcdc993
+  2048  sector 51 playing   score    925  lives 2  bricks 33  cc6a9f06d8185320
+  3072  sector 51 playing   score   1175  lives 2  bricks 31  e82d09d42bfbb23d
+  4096  sector 51 playing   score   1425  lives 2  bricks 29  bd11d56f64ec4877
+  5120  sector 51 playing   score   7275  lives 2  bricks  6  ad110ba3070e4c16
+  6144  sector 51 playing   score   7275  lives 2  bricks  6  503d0db7a733bd43
+sector 51 Practice seed 2
+  1024  sector 51 playing   score    375  lives 3  bricks 37  81a65db9ab365192
+  2048  sector 51 playing   score    925  lives 2  bricks 33  7a03f40c9ec480b7
+  3072  sector 51 playing   score   5925  lives 2  bricks 14  776bf42ed8312d16
+  4096  sector 51 playing   score   6325  lives 1  bricks 11  538547c2270eebed
+  5120  sector 51 playing   score   6450  lives 1  bricks 10  dd6cd4061939b15e
+  6144  sector 51 playing   score   6575  lives 1  bricks  9  d9dda19ed3d3a08a
+sector 52 Journey seed 1
+  1024  sector 52 playing   score    100  lives 3  bricks 39  76717f7fa2a58fc3
+  2048  sector 52 playing   score    150  lives 3  bricks 39  1799d8051bbf52b0
+  3072  sector 52 playing   score   4650  lives 3  bricks 22  4a613b6d252e5587
+  4096  sector 52 playing   score   5850  lives 3  bricks 18  6bb26828e095c3df
+  5120  sector 52 playing   score   6750  lives 3  bricks 15  83037b4d11bca5c0
+  6144  sector 52 playing   score   7075  lives 3  bricks 14  70b0e586bf6da833
+sector 52 Practice seed 2
+  1024  sector 52 playing   score    100  lives 3  bricks 39  42b43648ca27b868
+  2048  sector 52 playing   score    375  lives 3  bricks 37  da6a52ea2b372cb1
+  3072  sector 52 playing   score   5625  lives 3  bricks 18  e2ef9a1870827e11
+  4096  sector 52 playing   score   5650  lives 3  bricks 18  2f685340bf30fe72
+  5120  sector 52 playing   score   6125  lives 3  bricks 15  ffad094de316dcd5
+  6144  sector 52 playing   score   6275  lives 2  bricks 14  8030f78a784af4a5
+sector 53 Journey seed 1
+  1024  sector 53 playing   score    250  lives 2  bricks 36  f1feaca905ec77d5
+  2048  sector 53 playing   score    625  lives 2  bricks 33  c0e73d4c6183ac04
+  3072  sector 53 playing   score   4725  lives 2  bricks 17  35deae7d9b9b6c47
+  4096  sector 53 playing   score   4725  lives 2  bricks 17  075e763f2c8d8378
+  5120  sector 53 playing   score   4850  lives 2  bricks 16  1c8960bd8fda751b
+  6144  sector 53 playing   score   5125  lives 2  bricks 14  b2a1967d125fd9b6
+sector 53 Practice seed 2
+  1024  sector 53 playing   score    875  lives 3  bricks 33  1143e338fb74603c
+  2048  sector 53 playing   score   5550  lives 3  bricks 13  d1b84887c1a5b254
+  3072  sector 53 playing   score   5675  lives 3  bricks 12  e82ea0302ffbff1a
+  4096  sector 53 playing   score   6075  lives 3  bricks  9  58aad92741b5c2f4
+  5120  sector 53 playing   score   6200  lives 3  bricks  8  bf19829047874c5f
+  6144  sector 53 playing   score   6200  lives 3  bricks  8  a020abecc3434d07
+sector 54 Journey seed 1
+  1024  sector 54 playing   score    250  lives 3  bricks 46  dd6cb7861c53df6a
+  2048  sector 54 playing   score   1200  lives 3  bricks 41  54b0ab16c9b8ae7f
+  3072  sector 54 playing   score   1825  lives 3  bricks 37  6672dcc6b32f0eb6
+  4096  sector 54 playing   score   2250  lives 3  bricks 34  1c1abde29441a40c
+  5120  sector 54 playing   score   2425  lives 3  bricks 33  101ef41970277f02
+  6144  sector 54 playing   score   2800  lives 3  bricks 30  3cdbf0f51f94b333
+sector 54 Practice seed 2
+  1024  sector 54 playing   score    275  lives 3  bricks 46  b29788b31ab1d93e
+  2048  sector 54 playing   score    975  lives 3  bricks 42  55a5c74586e3c31b
+  3072  sector 54 playing   score   3625  lives 3  bricks 29  65abef123ba148a6
+  4096  sector 54 playing   score   5425  lives 3  bricks 19  541fcfc5147dd5be
+  5120  sector 54 playing   score   5925  lives 3  bricks 16  72e55811ded46df9
+  6144  sector 54 playing   score   8000  lives 3  bricks  7  2ccad7c6bee86dab
+sector 55 Journey seed 1
+  1024  sector 55 playing   score    375  lives 3  bricks 44  9ee555070010f224
+  2048  sector 55 playing   score   4450  lives 3  bricks 27  acc1666ae75f1b38
+  3072  sector 55 playing   score   5350  lives 3  bricks 21  88465410a2560bcd
+  4096  sector 55 playing   score   5750  lives 3  bricks 18  4acfe5ae84037517
+  5120  sector 55 playing   score   6275  lives 3  bricks 14  a13fa6723af59d4f
+  6144  sector 55 playing   score   6275  lives 3  bricks 14  2cf8626b8c7f4dba
+sector 55 Practice seed 2
+  1024  sector 55 playing   score    250  lives 3  bricks 45  f5bb7575bf84fc3b
+  2048  sector 55 playing   score   1800  lives 3  bricks 37  7d713dcfe73f2e28
+  3072  sector 55 playing   score   3925  lives 3  bricks 30  8dd4f78dc8652a3e
+  4096  sector 55 playing   score   4525  lives 3  bricks 28  68e93155ef57cf5d
+  5120  sector 55 playing   score   5525  lives 3  bricks 22  c9c12be49ce6741d
+  6144  sector 55 playing   score   8450  lives 3  bricks 10  68fc03fca9c186ae
+sector 56 Journey seed 1
+  1024  sector 56 playing   score     50  lives 2  bricks 58  a56c78a7b9f76c32
+  2048  sector 56 playing   score    275  lives 2  bricks 57  4c01bf28418e5437
+  3072  sector 56 playing   score    675  lives 2  bricks 54  ef9790a04d9ded31
+  4096  sector 56 playing   score   5975  lives 2  bricks 33  28fd488f552d9f16
+  5120  sector 56 playing   score   6300  lives 2  bricks 31  80d4777012fb7dae
+  6144  sector 56 playing   score   8700  lives 2  bricks 21  c70e12b817fe8cee
+sector 56 Practice seed 2
+  1024  sector 56 playing   score    175  lives 3  bricks 57  9e228b7531ce2f96
+  2048  sector 56 playing   score    325  lives 3  bricks 56  689b8d2bad623bdf
+  3072  sector 56 playing   score   5775  lives 3  bricks 36  bf5a9edb5695eae7
+  4096  sector 56 playing   score   5950  lives 3  bricks 35  46fec6d9a85098bf
+  5120  sector 56 playing   score   6000  lives 2  bricks 35  0da6bbecb8b3472e
+  6144  sector 56 playing   score   6125  lives 1  bricks 34  7314d34a4d560204
+sector 57 Journey seed 1
+  1024  sector 57 playing   score    500  lives 3  bricks 39  b248bee8f08e5931
+  2048  sector 57 playing   score   1750  lives 3  bricks 32  fdac48c099529e79
+  3072  sector 57 playing   score   2700  lives 3  bricks 28  50fea09198cdaa08
+  4096  sector 57 playing   score   2975  lives 3  bricks 26  e5009326942114c5
+  5120  sector 57 playing   score   3150  lives 3  bricks 25  cb2027da8f2e25ca
+  6144  sector 57 playing   score   3275  lives 3  bricks 24  cd3143402b9f654c
+sector 57 Practice seed 2
+  1024  sector 57 playing   score    850  lives 3  bricks 37  beb9bdb7a3b0b61f
+  2048  sector 57 playing   score   2300  lives 2  bricks 30  d720f903f994e508
+  3072  sector 57 playing   score   2425  lives 2  bricks 29  e8defaa0b5c98530
+  4096  sector 57 playing   score   2575  lives 2  bricks 28  42450f1be39fe296
+  5120  sector 57 playing   score   5575  lives 2  bricks 16  7193701d99b5cf31
+  6144  sector 57 playing   score   6100  lives 2  bricks 12  d6199a654675ade0
+sector 58 Journey seed 1
+  1024  sector 58 playing   score    675  lives 3  bricks 33  3e5d5b1800f9937a
+  2048  sector 58 playing   score   1175  lives 3  bricks 30  7662c259f11b12cb
+  3072  sector 58 playing   score   1325  lives 3  bricks 29  dabc809f23c0f807
+  4096  sector 58 playing   score   1725  lives 3  bricks 26  41f1ac9675038f83
+  5120  sector 58 playing   score   2775  lives 1  bricks 19  3494771314a3f7b8
+  6144  sector 58 playing   score   2900  lives 1  bricks 18  e330e2c3e3e67d4e
+sector 58 Practice seed 2
+  1024  sector 58 playing   score    375  lives 2  bricks 34  f04fbbd85154089e
+  2048  sector 58 playing   score    625  lives 2  bricks 33  f3f099eea3892e5c
+  3072  sector 58 playing   score    925  lives 2  bricks 31  d14aa002c23c4bd3
+  4096  sector 58 playing   score   1825  lives 2  bricks 25  3304f4188c0d5b56
+  5120  sector 58 playing   score   2275  lives 2  bricks 22  9df63318c4befaa0
+  6144  sector 58 playing   score   2875  lives 2  bricks 18  32f7b1b693b9f2b7
+sector 59 Journey seed 1
+  1024  sector 59 playing   score    525  lives 3  bricks 42  49e2c2b94057ad6f
+  2048  sector 59 playing   score   2375  lives 3  bricks 33  0adc9582b82c5697
+  3072  sector 59 playing   score   2950  lives 3  bricks 29  32813658cf64b869
+  4096  sector 59 playing   score   5275  lives 3  bricks 19  cda13a6e124e9369
+  5120  sector 59 playing   score   5275  lives 3  bricks 19  1d2cfa7935a5ad03
+  6144  sector 59 playing   score   6200  lives 3  bricks 13  eebfaaa5916a5781
+sector 59 Practice seed 2
+  1024  sector 59 playing   score    375  lives 3  bricks 43  458cd15257389490
+  2048  sector 59 playing   score    775  lives 3  bricks 40  8edc7f19f4b24ffd
+  3072  sector 59 playing   score   4375  lives 3  bricks 24  aff8b170fdf3d426
+  4096  sector 59 playing   score   4650  lives 3  bricks 22  04abe504e3292b62
+  5120  sector 59 playing   score   5075  lives 1  bricks 19  62749471450adcc1
+  6144  sector 59 playing   score   7275  lives 1  bricks  7  d39af8694dc3c728
+sector 60 Journey seed 1
+  1024  sector 60 playing   score    250  lives 3  bricks 40  9c2f1caed58de04e
+  2048  sector 60 playing   score    425  lives 3  bricks 39  9b9c070ec8eb36f0
+  3072  sector 60 playing   score    700  lives 3  bricks 37  c906763155aaa95b
+  4096  sector 60 playing   score   1425  lives 3  bricks 32  d570ba21f001bbbc
+  5120  sector 60 playing   score   4700  lives 2  bricks 19  e46935db8aae398a
+  6144  sector 60 playing   score   5425  lives 1  bricks 14  19f2f102838c844c
+sector 60 Practice seed 2
+  1024  sector 60 playing   score    375  lives 3  bricks 39  6d39e211503a1ca7
+  2048  sector 60 playing   score    825  lives 2  bricks 36  3b8faf8d85c71225
+  3072  sector 60 playing   score    975  lives 1  bricks 35  e52d8a15746c6f2b
+  4096  sector 60 playing   score   1350  lives 1  bricks 32  6aeead0a5ac9a99b
+  5120  sector 60 game over score   1475  lives 0  bricks 31  4857e7c8fdf88a7f
+  6144  sector 60 game over score   1475  lives 0  bricks 31  8cc8ea474f48cb27
+sector 61 Journey seed 1
+  1024  sector 61 playing   score    250  lives 3  bricks 37  5efb8cbf354a393a
+  2048  sector 61 playing   score    650  lives 3  bricks 35  844d713e6826cc8a
+  3072  sector 61 playing   score   3875  lives 3  bricks 24  c29e51fca63dc26d
+  4096  sector 61 playing   score   4050  lives 3  bricks 23  3801de0b5beae37f
+  5120  sector 61 playing   score   4475  lives 3  bricks 20  3dfc8bfe18944683
+  6144  sector 61 playing   score   5125  lives 3  bricks 16  58572b9c3527aa9b
+sector 61 Practice seed 2
+  1024  sector 61 playing   score   2275  lives 3  bricks 28  0ed2fc3450cf2fe2
+  2048  sector 61 playing   score   2725  lives 3  bricks 26  7a8d542892b486e1
+  3072  sector 61 playing   score   3900  lives 3  bricks 20  f291a751896fec58
+  4096  sector 61 playing   score   4575  lives 3  bricks 18  745b63676e295b47
+  5120  sector 61 playing   score   4950  lives 2  bricks 15  a596ec45c6190d34
+  6144  sector 61 playing   score   5225  lives 2  bricks 13  c1acc507fb18a01f
+sector 62 Journey seed 1
+  1024  sector 62 playing   score    275  lives 3  bricks 52  8b1c048d904b13a2
+  2048  sector 62 playing   score   1000  lives 2  bricks 47  69386fc61bf47495
+  3072  sector 62 ready     score   1125  lives 1  bricks 46  a64ace08b37e6513
+  4096  sector 62 playing   score   1400  lives 1  bricks 44  b182a575e723d4c9
+  5120  sector 62 playing   score   2600  lives 1  bricks 38  a4eb56aa7dfcec25
+  6144  sector 62 game over score   2750  lives 0  bricks 37  22e27fc147f3f455
+sector 62 Practice seed 2
+  1024  sector 62 playing   score    400  lives 3  bricks 51  558d5dbebb3b07e7
+  2048  sector 62 playing   score   1125  lives 3  bricks 46  c4e900348b93e3cf
+  3072  sector 62 playing   score   1975  lives 3  bricks 41  6af4acd5a436af48
+  4096  sector 62 playing   score   2500  lives 3  bricks 37  b6cc336b7fa769cc
+  5120  sector 62 playing   score   3075  lives 3  bricks 33  58265163f927a93b
+  6144  sector 62 playing   score   3925  lives 3  bricks 28  96c8adba5f74d586
+sector 63 Journey seed 1
+  1024  sector 63 playing   score    325  lives 3  bricks 55  575bc1cd578d06d0
+  2048  sector 63 playing   score   6925  lives 3  bricks 31  0f918fa8ec3a6b1e
+  3072  sector 63 playing   score   7575  lives 3  bricks 28  613da5e6da293754
+  4096  sector 63 playing   score   8150  lives 3  bricks 25  69b723c72651b0f9
+  5120  sector 63 playing   score   8625  lives 3  bricks 23  773bdc8190d265bf
+  6144  sector 63 playing   score   8775  lives 3  bricks 22  6a2286e6689569fe
+sector 63 Practice seed 2
+  1024  sector 63 playing   score    175  lives 3  bricks 55  fb64d1545fd3fb58
+  2048  sector 63 playing   score   7025  lives 2  bricks 30  ffb3a9eb2f52d38a
+  3072  sector 63 playing   score   7150  lives 2  bricks 30  fe681931e6fa6e81
+  4096  sector 63 playing   score   7475  lives 2  bricks 28  bec0c8c1fda60088
+  5120  sector 63 playing   score   7625  lives 2  bricks 27  90078254d7d5c687
+  6144  sector 63 playing   score   7775  lives 1  bricks 26  df4442938fd1c4f7
+sector 64 Journey seed 1
+  1024  sector 64 playing   score    375  lives 3  bricks 55  357eaeebe6e2e079
+  2048  sector 64 playing   score    675  lives 2  bricks 53  8b99b0bc57be3f02
+  3072  sector 64 playing   score    850  lives 2  bricks 52  89042ed2a7bab6f1
+  4096  sector 64 playing   score   1225  lives 2  bricks 49  7401669a1a7cff3c
+  5120  sector 64 playing   score   1625  lives 2  bricks 46  76c2ca2db8aae3c6
+  6144  sector 64 playing   score   1925  lives 2  bricks 44  f6a6c651e56451a0
+sector 64 Practice seed 2
+  1024  sector 64 playing   score    375  lives 3  bricks 55  b66217507d637c44
+  2048  sector 64 playing   score    550  lives 3  bricks 54  f00482e68629c57f
+  3072  sector 64 playing   score    925  lives 3  bricks 51  dd5303733ae0e265
+  4096  sector 64 playing   score   1325  lives 3  bricks 48  41e9b42b75f34b33
+  5120  sector 64 playing   score   1475  lives 3  bricks 47  b10d192007b7a043
+  6144  sector 64 playing   score   1900  lives 3  bricks 44  1da294843d38aa33

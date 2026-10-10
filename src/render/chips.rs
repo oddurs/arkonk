@@ -126,7 +126,7 @@ fn bracketed(v: &Scene, face: Face, (x, mid): (f32, f32), ink: Color, draw: bool
 }
 
 /// The chip's label size for a chip `size` tall.
-fn label_size(size: f32) -> f32 {
+pub(super) const fn label_size(size: f32) -> f32 {
     size * 13.0 / 28.0
 }
 

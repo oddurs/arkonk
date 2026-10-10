@@ -129,7 +129,8 @@ text_ids! {
 
 /// Which of the six text roles an id is set in, which decides the glyphs
 /// baked for each size: labels and headings use few characters, so their
-/// sizes carry only those. Any id may also be set as [`Role::Body`].
+/// sizes carry only those. An id set in another role names it in
+/// [`TextId::also`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Role {
     /// The one hero line on a screen, in the Display cut.
@@ -188,24 +189,38 @@ impl TextId {
         }
     }
 
-    /// Other roles this text is set in besides [`Self::role`] and body
-    /// text, including where another string quotes it through an
-    /// [`crate::Arg::Text`] slot: a sector's name is the ready card's hero
-    /// line, the detail sheet's title, and part of the Continue button's
-    /// caption. The atlases bake its characters at those roles' sizes too.
+    /// Other roles this text is set in besides [`Self::role`], including
+    /// where another string quotes it through an [`crate::Arg::Text`]
+    /// slot: a sector's name is the ready card's hero line, the detail
+    /// sheet's title, a sector card's name, and part of the Continue
+    /// button's caption. The atlases bake its characters at those roles'
+    /// sizes too, and only there.
     pub const fn also(self) -> &'static [Role] {
         use TextId::*;
         match self {
-            SectorName(_) => &[Role::Title, Role::Caption],
+            SectorName(_) => &[Role::Title, Role::Body, Role::Caption],
             // The ready card sets a tip as body text, the detail sheet as a caption.
             SectorTip(_) => &[Role::Caption],
             // Results set points as figures; play floats them as captions.
             Plus => &[Role::Figure, Role::Caption],
             Settings => &[Role::Title],
+            // The ready card sets how to serve beside the tip, as body text.
+            ActionServe => &[Role::Body],
             // Keycaps set their names in the Label cut, untracked.
             KeySpace | KeyEsc => &[Role::Label],
             _ => &[],
         }
+    }
+
+    /// Every role the game sets this text in: [`Self::role`] and
+    /// [`Self::also`]. None for rich presence, which Steam shows in its own
+    /// fonts and the game never draws.
+    pub fn roles(self) -> impl Iterator<Item = Role> {
+        use TextId::*;
+        let drawn = !matches!(self, PresenceMenus | PresenceJourney | PresencePractice);
+        core::iter::once(self.role())
+            .chain(self.also().iter().copied())
+            .filter(move |_| drawn)
     }
 
     /// Whether this text may be set emphasised, in its role's strong cut:
@@ -242,6 +257,6 @@ mod tests {
         for (i, id) in all.iter().enumerate() {
             assert!(!all[..i].contains(id), "{id:?} listed twice");
         }
-        assert_eq!(all.len(), TextId::UNITS.len() + 12 + 12 + 3 + 5);
+        assert_eq!(all.len(), TextId::UNITS.len() + 64 + 64 + 8 + 5);
     }
 }

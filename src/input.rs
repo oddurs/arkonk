@@ -118,7 +118,7 @@ pub struct Presses {
     pub east: bool,
     pub west: bool,
     pub start: bool,
-    /// The shoulder buttons page sector select by chapter.
+    /// The shoulder buttons turn sector select's chapters.
     pub lb: bool,
     pub rb: bool,
 }
@@ -133,8 +133,9 @@ pub fn pad_controls(pressed: Presses, step: Option<Dir>, menu_open: bool) -> Con
         restart: pressed.west,
         up: step == Some(Dir::Up),
         down: step == Some(Dir::Down),
-        left: step == Some(Dir::Left) || pressed.lb,
-        right: step == Some(Dir::Right) || pressed.rb,
+        left: step == Some(Dir::Left),
+        right: step == Some(Dir::Right),
+        page: i8::from(pressed.rb) - i8::from(pressed.lb),
         ..Controls::default()
     }
 }
@@ -157,6 +158,7 @@ pub fn merge(a: Controls, b: Controls) -> Controls {
         down: a.down || b.down,
         left: a.left || b.left,
         right: a.right || b.right,
+        page: if a.page != 0 { a.page } else { b.page },
         restart: a.restart || b.restart,
         focus_lost: a.focus_lost || b.focus_lost,
     }
@@ -406,11 +408,11 @@ mod tests {
         let c = pad_controls(none, Some(Dir::Left), false);
         assert!(c.left && !c.right && !c.up && !c.down);
         assert!(!c.click && !c.focus_lost);
-        // The shoulders page left and right.
+        // The shoulders turn chapters, apart from the d-pad's steps.
         let c = pad_controls(Presses { lb: true, ..none }, None, false);
-        assert!(c.left && !c.right);
+        assert!(c.page == -1 && !c.left && !c.right);
         let c = pad_controls(Presses { rb: true, ..none }, None, false);
-        assert!(c.right && !c.left);
+        assert!(c.page == 1 && !c.left && !c.right);
     }
 
     #[test]

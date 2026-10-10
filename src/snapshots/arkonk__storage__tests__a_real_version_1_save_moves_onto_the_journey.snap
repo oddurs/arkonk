@@ -1,0 +1,18 @@
+---
+source: src/storage.rs
+expression: visible(&rewritten)
+---
+ARKONK 2\n
+best 60800\n
+unlocked 28\n
+settings 0 7\n
+display 0\n
+locale de\n
+effects 1\n
+record 0 7 15776\n
+record 8 7 25562\n
+record 16 7 20948\n
+record 20 7 25644\n
+record 23 7 23956\n
+record 24 7 17157\n
+checkpoint 27 60800 4 140269\n

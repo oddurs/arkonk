@@ -15,7 +15,7 @@ mod layout;
 pub mod script;
 pub mod spec;
 
-pub use data::{Error, Face, Font, Image, Images, Strike};
+pub use data::{Error, Face, Font, Image, Images, Strike, locale_bit};
 pub use layout::{Fonts, ICON_EM, Placed, Source};
 
 use ark_text::Locale;
@@ -61,5 +61,6 @@ pub fn fonts(locale: Locale) -> Result<Fonts, Error> {
         latin: Font::parse(LATIN)?,
         local,
         script: locale.script(),
+        locale,
     })
 }

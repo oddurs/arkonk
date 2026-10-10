@@ -1,13 +1,13 @@
 ---
-source: tests/replay.rs
+source: crates/ark/tests/replay.rs
 expression: r.out
 ---
 every power in turn, twice
-  1024  sector 05 playing   score    250  lives 3  bricks 50  12384c9da039e0a1
-  2048  sector 05 playing   score    775  lives 3  bricks 46  e59e0da730fba9b3
-  3072  sector 05 playing   score   6375  lives 3  bricks 24  e2b52ffe3c2cafef
-  4096  sector 05 playing   score   6975  lives 3  bricks 22  919e2a1bbe3cd0ca
-  5120  sector 05 playing   score   7575  lives 3  bricks 18  0e16f27db9645e91
-  6144  sector 05 playing   score   8025  lives 3  bricks 15  de15e2fe69ca18ab
-  7168  sector 05 playing   score   8150  lives 3  bricks 14  780b2adefefad732
-  8192  sector 05 playing   score  11250  lives 2  bricks  1  58ee7f2fda86589d
+  1024  sector 25 playing   score    250  lives 3  bricks 50  0877761ba79ae051
+  2048  sector 25 playing   score    775  lives 3  bricks 46  97a33966dc4108f3
+  3072  sector 25 playing   score   6375  lives 3  bricks 24  d68e1445b7ac9e4f
+  4096  sector 25 playing   score   6975  lives 3  bricks 22  355704589663d262
+  5120  sector 25 playing   score   7575  lives 3  bricks 18  abd8ef018bd6d461
+  6144  sector 25 playing   score   8025  lives 3  bricks 15  390fab9fde0556b3
+  7168  sector 25 playing   score   8150  lives 3  bricks 14  fed314aa40818a1a
+  8192  sector 25 playing   score  11250  lives 2  bricks  1  50eb4ef447bd431d

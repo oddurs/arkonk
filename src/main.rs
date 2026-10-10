@@ -328,11 +328,13 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             profile.settings.muted = !profile.settings.muted;
             dirty = true;
         }
-        if is_key_pressed(KeyCode::LeftBracket) {
+        // On sector select the brackets turn chapters instead.
+        let brackets = ui.screen != Screen::Sectors;
+        if brackets && is_key_pressed(KeyCode::LeftBracket) {
             profile.settings.volume = profile.settings.volume.saturating_sub(1);
             dirty = true;
         }
-        if is_key_pressed(KeyCode::RightBracket) {
+        if brackets && is_key_pressed(KeyCode::RightBracket) {
             profile.settings.volume = (profile.settings.volume + 1).min(settings::MAX_VOLUME);
             dirty = true;
         }
@@ -376,6 +378,7 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             down,
             left,
             right,
+            page,
             restart,
             focus_lost,
         } = if flow {
@@ -505,23 +508,17 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 if escape {
                     home(&mut ui);
                 }
-                let at = ui.sector.index();
-                // A Compact screen shows one sector a page, so left and
-                // right turn one page; elsewhere they cross a chapter.
-                let compact =
-                    render::View::current().map(|v| v.class) == Some(render::Class::Compact);
-                let across = if compact { 1 } else { 4 };
-                if up {
-                    ui.sector = SectorId::clamped(at.saturating_sub(1));
-                }
-                if down {
-                    ui.sector = SectorId::clamped(at + 1);
-                }
-                if left {
-                    ui.sector = SectorId::clamped(at.saturating_sub(across));
-                }
-                if right {
-                    ui.sector = SectorId::clamped(at + across);
+                // A chapter's sectors lie in rows of four, of two on a
+                // Small screen; a Compact screen lists them a page each.
+                let cols = match render::View::current().map(|v| v.class) {
+                    Some(render::Class::Compact) => 1,
+                    Some(render::Class::Small) => 2,
+                    _ => 4,
+                };
+                let dx = i32::from(right) - i32::from(left);
+                let dy = i32::from(down) - i32::from(up);
+                if dx != 0 || dy != 0 || page != 0 {
+                    ui.sector = ui::sector_step(ui.sector, cols, (dx, dy), i32::from(page));
                 }
                 let hovered = renderer
                     .hits()
@@ -531,6 +528,11 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                     && let Some(index) = hovered
                 {
                     ui.sector = index;
+                }
+                // A chapter's tab turns to its page, keeping the place.
+                if click && let Some(chapter) = renderer.hits().tab_at(pointer) {
+                    let place = ui.sector.chapter_index();
+                    ui.sector = SectorId::clamped(chapter.first_sector().index() + place);
                 }
                 if click && renderer.hits().back_at(pointer) {
                     home(&mut ui);
@@ -853,6 +855,18 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
             renderer.capture_at((&staged, &play, &look), shot.size, &path);
             renderer.swap_fx(live);
         }
+        let first_page = measured + smoke::LAYOUT_FRAMES + smoke::SHOTS.len() as u32;
+        let page = (layouts && frames >= first_page)
+            .then(|| smoke::PAGES.get((frames - first_page) as usize))
+            .flatten();
+        if let Some(page) = page {
+            let mut at = ui.clone();
+            (at.screen, at.paused, at.settings, at.preview) = (page.screen, false, None, None);
+            at.sector = SectorId::clamped(page.sector);
+            at.choice = 0;
+            let path = format!("target/journey-{}-{}.png", page.class, page.name);
+            renderer.capture_at((&game, &at, &showcase), page.size, &path);
+        }
         ui.preview = None;
         ui.screen = actual_screen;
         ui.paused = actual_pause;
@@ -911,7 +925,8 @@ async fn run(mut profile: Profile, path: Option<PathBuf>, save_blocked: bool) {
                 println!("{line}");
             }
         }
-        let staged_frames = smoke::LAYOUT_FRAMES + smoke::SHOTS.len() as u32;
+        let staged_frames =
+            smoke::LAYOUT_FRAMES + smoke::SHOTS.len() as u32 + smoke::PAGES.len() as u32;
         if smoke && !flow && frames >= measured + if layouts { staged_frames } else { 0 } {
             break;
         }

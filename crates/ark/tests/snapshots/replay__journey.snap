@@ -1,5 +1,5 @@
 ---
-source: tests/replay.rs
+source: crates/ark/tests/replay.rs
 expression: out
 ---
 journey seed 7
@@ -8,121 +8,121 @@ journey seed 7
   3072  sector 01 playing   score   1150  lives 3  bricks 26  f41cabf50dfc688a
   4096  sector 01 playing   score   1400  lives 3  bricks 24  8307eada357de06b
   5120  sector 01 playing   score   1650  lives 3  bricks 22  a12c9ca011c5ca22
-  6144  sector 01 playing   score   2525  lives 3  bricks 17  86aa8c4022943391
-  7168  sector 01 playing   score   2650  lives 3  bricks 16  d56779083e28a5aa
-  8192  sector 01 playing   score   2900  lives 3  bricks 14  a1d1e0568b9f74b7
-  9216  sector 01 playing   score   3175  lives 3  bricks 12  d669bb5fec6839f0
- 10240  sector 01 playing   score   3175  lives 3  bricks 12  7600fb858f155790
- 11264  sector 01 playing   score   3300  lives 3  bricks 11  357d67318a18aea2
- 12288  sector 01 playing   score   3575  lives 3  bricks  9  a6481c10a5edfa57
- 13312  sector 01 playing   score   3850  lives 3  bricks  7  c54abaddfd975d32
- 14336  sector 01 playing   score   3850  lives 3  bricks  7  f901bd45431ce58b
- 15360  sector 01 playing   score   4100  lives 3  bricks  5  f75e7a8813139482
- 16384  sector 01 playing   score   4225  lives 3  bricks  4  8c364f20a6be0897
- 17408  sector 01 playing   score   4225  lives 3  bricks  4  0f4696f42c29a02d
- 18432  sector 01 playing   score   4225  lives 3  bricks  4  04e856c4201bddd7
- 19456  sector 01 playing   score   4500  lives 3  bricks  2  43b376962afd4167
- 20480  sector 01 playing   score   4500  lives 2  bricks  2  689e0ba94101ed97
- 21504  sector 01 playing   score   4625  lives 2  bricks  1  eb6fcb0a73e1c23b
- 22528  sector 02 playing   score   6375  lives 2  bricks 35  4e15896e45ac832f
- 23552  sector 02 playing   score   6775  lives 2  bricks 32  ec3d78b7846f6f25
- 24576  sector 02 playing   score   7175  lives 2  bricks 29  dcc18365615b938a
- 25600  sector 02 playing   score   7425  lives 2  bricks 27  112751bd6ee49ce0
- 26624  sector 02 playing   score   7825  lives 2  bricks 24  1cb3adba72952f85
- 27648  sector 02 playing   score   8100  lives 2  bricks 22  77f944dd56783d1f
- 28672  sector 02 playing   score   8350  lives 2  bricks 20  0f5d30430e7727a2
- 29696  sector 02 playing   score   8500  lives 2  bricks 19  164ee2ff5e23c0fc
- 30720  sector 02 playing   score   9075  lives 2  bricks 15  6a65d4902684a84c
- 31744  sector 02 playing   score   9200  lives 2  bricks 14  397f2a35e67781f9
- 32768  sector 02 playing   score   9200  lives 2  bricks 14  8efd27a4569541c9
- 33792  sector 02 playing   score   9475  lives 2  bricks 12  3d8bce8baebd59f8
- 34816  sector 02 playing   score   9475  lives 2  bricks 12  f31d23be57fe3be1
- 35840  sector 02 playing   score   9625  lives 2  bricks 11  c1ae7cf2fbe61887
- 36864  sector 02 playing   score   9625  lives 2  bricks 11  355868304410cda4
- 37888  sector 02 playing   score  10200  lives 2  bricks  7  bd1baf456ffa80e8
- 38912  sector 02 playing   score  10650  lives 2  bricks  4  419ce809596b9d9a
- 39936  sector 02 playing   score  10900  lives 2  bricks  2  94712b8d0e7d3bf3
- 40960  sector 02 playing   score  11025  lives 2  bricks  1  684513d62896a22b
- 41984  sector 02 playing   score  11025  lives 2  bricks  1  6af7896f9ef8a043
- 43008  sector 02 cleared   score  12650  lives 1  bricks  0  694f8a78fdf0caf9
- 44032  sector 03 playing   score  12900  lives 1  bricks 34  9b64c644ecf43f0a
- 45056  sector 03 playing   score  13900  lives 1  bricks 29  3bc7db17dd37dbcf
- 46080  sector 03 playing   score  14350  lives 1  bricks 26  069c161d8bd1ad62
- 47104  sector 03 playing   score  14600  lives 1  bricks 24  2ef5def8e448ea89
- 48128  sector 03 playing   score  15050  lives 1  bricks 21  7266b379b32ad171
- 49152  sector 03 playing   score  15175  lives 1  bricks 20  5c723d3238cedd91
- 50176  sector 03 playing   score  15425  lives 1  bricks 18  f10699b2a8294939
- 51200  sector 03 playing   score  16000  lives 1  bricks 14  75e06a15152f0bbf
- 52224  sector 03 playing   score  17125  lives 1  bricks  8  d98ddacb963e2a72
- 53248  sector 03 playing   score  17125  lives 1  bricks  8  33a99a5ca1ff8add
- 54272  sector 03 playing   score  17400  lives 1  bricks  6  323952392705da8f
- 55296  sector 03 playing   score  17400  lives 1  bricks  6  bb105e02d1c0e2dc
- 56320  sector 03 playing   score  17400  lives 1  bricks  6  c2190345f17757e7
- 57344  sector 03 playing   score  17400  lives 1  bricks  6  3730a6a273098256
- 58368  sector 03 playing   score  17400  lives 1  bricks  6  0a724d35057a78f2
- 59392  sector 03 playing   score  17400  lives 1  bricks  6  7415e54088e14951
- 60416  sector 03 playing   score  17650  lives 1  bricks  4  01b508887e5777b2
- 61440  sector 03 playing   score  17775  lives 1  bricks  3  a3b5064dd9236244
- 62464  sector 03 playing   score  17775  lives 1  bricks  3  da6b6fa84fc826f4
- 63488  sector 03 playing   score  17900  lives 1  bricks  2  4126dfa26baacb92
- 64512  sector 03 playing   score  17900  lives 1  bricks  2  70583c95a3de88d4
- 65536  sector 04 playing   score  20175  lives 1  bricks 42  c5775d281009900b
- 66560  sector 04 playing   score  20750  lives 1  bricks 38  52e3067e1495511f
- 67584  sector 04 playing   score  21725  lives 1  bricks 34  5a138501e773b440
- 68608  sector 04 playing   score  21850  lives 1  bricks 33  9b84067d83878b41
- 69632  sector 04 playing   score  22100  lives 1  bricks 31  99f8a64dbad537ce
- 70656  sector 04 playing   score  22975  lives 1  bricks 26  279cd8244bfbd679
- 71680  sector 04 playing   score  23100  lives 1  bricks 25  a3a9a612d08a55f3
- 72704  sector 04 playing   score  23500  lives 1  bricks 22  ab67f95266a6b2ac
- 73728  sector 04 playing   score  23500  lives 1  bricks 22  3741157198d9cd81
- 74752  sector 04 playing   score  27600  lives 1  bricks  6  a97b73841d132c3c
- 75776  sector 04 playing   score  27725  lives 1  bricks  5  c8e34c7de3e0870c
- 76800  sector 04 playing   score  27850  lives 1  bricks  4  485288e18a52ebcb
- 77824  sector 04 playing   score  27850  lives 1  bricks  4  f68ea86f89714db5
- 78848  sector 04 playing   score  27850  lives 1  bricks  4  9e30513b2323ea9f
- 79872  sector 04 playing   score  27975  lives 1  bricks  3  2a42ebfc178b8ab7
- 80896  sector 01 playing   score      0  lives 3  bricks 34  eba49f330cfdca4a
- 81920  sector 01 playing   score    250  lives 3  bricks 32  288375e3c2be5788
- 82944  sector 01 playing   score    500  lives 3  bricks 30  ab423aa1c979d937
- 83968  sector 01 playing   score   1050  lives 3  bricks 26  8e2bd079825a6afb
- 84992  sector 01 playing   score   1175  lives 3  bricks 25  32970bf13365e1b7
- 86016  sector 01 playing   score   1625  lives 3  bricks 22  274fc3298adb2ae7
- 87040  sector 01 playing   score   1900  lives 3  bricks 20  d824105e5d2b3d0f
- 88064  sector 01 playing   score   2175  lives 3  bricks 18  b07ee2c626681501
- 89088  sector 01 ready     score   2300  lives 2  bricks 17  bd9c4bdff8e45d3f
- 90112  sector 01 playing   score   2550  lives 2  bricks 15  629191819b90ff5b
- 91136  sector 01 playing   score   2825  lives 2  bricks 13  6bfd811958741cc9
- 92160  sector 01 playing   score   2950  lives 2  bricks 12  c9fa769042fe5c22
- 93184  sector 01 playing   score   3200  lives 2  bricks 10  4b611663a6f94ca5
- 94208  sector 01 playing   score   3450  lives 2  bricks  8  1ce128c17a1e9fdd
- 95232  sector 01 playing   score   3575  lives 2  bricks  7  c436d4f48a576437
- 96256  sector 01 playing   score   4025  lives 2  bricks  4  4b3d437e5c839911
- 97280  sector 01 playing   score   4150  lives 2  bricks  3  3c75f105911097fa
- 98304  sector 01 playing   score   4425  lives 2  bricks  1  0ebe2910495f1265
- 99328  sector 02 playing   score   6300  lives 2  bricks 34  766b6f615d071263
-100352  sector 02 playing   score   6550  lives 1  bricks 32  83412e9ac1b350c0
-101376  sector 02 playing   score   6800  lives 1  bricks 30  854ea3106bac4e45
-102400  sector 02 playing   score   7100  lives 1  bricks 28  66ffea041d9dce77
-103424  sector 02 playing   score   7675  lives 1  bricks 24  12995b8856b960fb
-104448  sector 02 playing   score   7800  lives 1  bricks 23  c581c8e5d08f9ef1
-105472  sector 02 playing   score   8050  lives 1  bricks 21  0d77d50d0aa29900
-106496  sector 02 playing   score   8175  lives 1  bricks 20  205b1fd4ff79ee9d
-107520  sector 02 playing   score   8425  lives 1  bricks 18  ff581e64aedc0b95
-108544  sector 02 playing   score   8675  lives 1  bricks 16  f3905a3085e61fa6
-109568  sector 02 playing   score   8675  lives 1  bricks 16  2cd6a8914d13b1a9
-110592  sector 02 playing   score   8675  lives 1  bricks 16  136af3156d5b3e43
-111616  sector 02 playing   score   8800  lives 1  bricks 15  a9b2a20e98c06594
-112640  sector 02 playing   score   8800  lives 1  bricks 15  073ce8357ad3b5f1
-113664  sector 01 playing   score    125  lives 3  bricks 33  ab2c7fa4f0eaee52
-114688  sector 01 playing   score    775  lives 3  bricks 29  2df95f243567a5f4
-115712  sector 01 playing   score   1025  lives 3  bricks 27  84517ba26c0d6a1f
-116736  sector 01 playing   score   1150  lives 3  bricks 26  b2afdb937ea472e8
-117760  sector 01 playing   score   2025  lives 3  bricks 21  802f17810ad93c4a
-118784  sector 01 playing   score   2900  lives 3  bricks 16  4bf28e43ae8270f1
-119808  sector 01 playing   score   3425  lives 3  bricks 14  3612c9ac037d294f
-120832  sector 01 playing   score   3700  lives 3  bricks 12  47241a78ddb58153
-121856  sector 01 playing   score   3700  lives 3  bricks 12  e9132b16fffa17b8
-122880  sector 01 playing   score   3825  lives 3  bricks 11  23f3a40e00620604
+  6144  sector 01 playing   score   2525  lives 3  bricks 17  29327ec47ac9c27a
+  7168  sector 01 playing   score   2775  lives 3  bricks 15  66d18a649b471839
+  8192  sector 01 playing   score   2775  lives 3  bricks 15  64f582915cb06bfc
+  9216  sector 01 playing   score   3050  lives 3  bricks 13  a089ab26f8122d9b
+ 10240  sector 01 playing   score   3175  lives 3  bricks 12  a54cefd45675bccb
+ 11264  sector 01 playing   score   3425  lives 3  bricks 10  1bd18f5a82f58928
+ 12288  sector 01 playing   score   3700  lives 3  bricks  8  2834af80f1fda052
+ 13312  sector 01 playing   score   3825  lives 3  bricks  7  067200378e946e33
+ 14336  sector 01 playing   score   3950  lives 2  bricks  6  356eaa69e9cf48b4
+ 15360  sector 01 playing   score   4075  lives 2  bricks  5  9fd2b39f3d7cc2d9
+ 16384  sector 01 playing   score   4225  lives 2  bricks  4  de45fc0c0e23b97b
+ 17408  sector 01 playing   score   4350  lives 2  bricks  3  752955aca98bde9e
+ 18432  sector 01 playing   score   4350  lives 2  bricks  3  58f94065b83edd00
+ 19456  sector 01 playing   score   4350  lives 2  bricks  3  a972257280febe80
+ 20480  sector 01 playing   score   4475  lives 2  bricks  2  4b85fe92f487a018
+ 21504  sector 01 playing   score   4600  lives 2  bricks  1  c9ad2a0fa9094e23
+ 22528  sector 01 playing   score   4600  lives 2  bricks  1  8c047f4e19963cf1
+ 23552  sector 02 playing   score   6225  lives 1  bricks 24  6cbf8865083feb24
+ 24576  sector 02 playing   score   7925  lives 1  bricks 16  e7a7587fc8cd68be
+ 25600  sector 02 playing   score   9725  lives 1  bricks 10  4c05bf821afedff6
+ 26624  sector 02 playing   score   9850  lives 1  bricks  9  b12d98043f7021ad
+ 27648  sector 01 playing   score      0  lives 3  bricks 34  d0b1cb729b97363a
+ 28672  sector 01 playing   score    250  lives 3  bricks 32  8071be8ecb4cf567
+ 29696  sector 01 playing   score    500  lives 3  bricks 30  a6c6fa8166e43722
+ 30720  sector 01 playing   score    750  lives 3  bricks 28  587a245c03f360d6
+ 31744  sector 01 playing   score    875  lives 3  bricks 27  4e1d73c3d344c886
+ 32768  sector 01 playing   score    875  lives 3  bricks 27  80a47ce6e58cff36
+ 33792  sector 01 playing   score   1125  lives 3  bricks 25  b0ff41f296c03b7a
+ 34816  sector 01 playing   score   1700  lives 3  bricks 21  acd80da42e8239a0
+ 35840  sector 01 playing   score   2375  lives 3  bricks 18  7b650e6f4e38c578
+ 36864  sector 01 playing   score   3225  lives 3  bricks 14  f93fef18730f3f6e
+ 37888  sector 01 playing   score   3350  lives 3  bricks 13  7af98967e0f1049f
+ 38912  sector 01 playing   score   3475  lives 3  bricks 12  6136b5ab8f9ece18
+ 39936  sector 01 playing   score   3600  lives 3  bricks 11  f93c0d323ea0e77f
+ 40960  sector 01 playing   score   4000  lives 3  bricks  8  83060ab8c4cd9034
+ 41984  sector 01 playing   score   4150  lives 3  bricks  7  c3bbc79e9241ba18
+ 43008  sector 01 playing   score   4275  lives 2  bricks  6  6bc8803ab909c02f
+ 44032  sector 01 playing   score   4275  lives 2  bricks  6  9ef22d2a12c8a6ca
+ 45056  sector 01 playing   score   4550  lives 2  bricks  4  6620c61a889bd3d6
+ 46080  sector 01 playing   score   4550  lives 2  bricks  4  9fda7ba43929fc83
+ 47104  sector 01 playing   score   4800  lives 2  bricks  2  a7b480ca80a83767
+ 48128  sector 01 playing   score   4800  lives 2  bricks  2  7ba178ffd30f27bb
+ 49152  sector 01 playing   score   4800  lives 2  bricks  2  2002b4581ba3007b
+ 50176  sector 01 playing   score   4800  lives 2  bricks  2  88400b8127d3b7e5
+ 51200  sector 01 playing   score   4800  lives 2  bricks  2  afc4315e276b4216
+ 52224  sector 01 playing   score   4800  lives 2  bricks  2  e2da7abc4d6fca16
+ 53248  sector 01 playing   score   4800  lives 2  bricks  2  8d876683574ae0d4
+ 54272  sector 01 playing   score   4925  lives 2  bricks  1  80fca929b3da7905
+ 55296  sector 01 playing   score   4925  lives 2  bricks  1  e7c7dcd1c88ea9a8
+ 56320  sector 01 playing   score   4925  lives 2  bricks  1  4f0884f686af9a91
+ 57344  sector 01 playing   score   4925  lives 2  bricks  1  a1763248d76db903
+ 58368  sector 01 playing   score   4925  lives 2  bricks  1  cf6117a12e586ee3
+ 59392  sector 02 playing   score   6675  lives 2  bricks 23  28a084cbf6c2917d
+ 60416  sector 02 playing   score   6950  lives 2  bricks 21  14296291da61ec16
+ 61440  sector 02 playing   score   7350  lives 2  bricks 18  a3eb2be062088209
+ 62464  sector 02 playing   score   7600  lives 2  bricks 16  d466ee9cd607550d
+ 63488  sector 02 playing   score   7850  lives 2  bricks 14  ff382dfa5b7df017
+ 64512  sector 02 playing   score   7975  lives 2  bricks 13  9c93b22aaf82d20a
+ 65536  sector 02 playing   score   8225  lives 2  bricks 11  ed315638fbd1223f
+ 66560  sector 02 playing   score   8475  lives 2  bricks  9  a5e11900dcc367cc
+ 67584  sector 02 playing   score   8475  lives 2  bricks  9  6f610d93578a859c
+ 68608  sector 02 playing   score   8750  lives 2  bricks  7  325fffb00ac8bb16
+ 69632  sector 02 playing   score   8875  lives 2  bricks  6  dcce543008334896
+ 70656  sector 02 playing   score   9000  lives 2  bricks  5  9e7fbd5e491de521
+ 71680  sector 02 playing   score   9125  lives 2  bricks  4  4eec127b4fac4e59
+ 72704  sector 02 playing   score   9125  lives 2  bricks  4  f6a546bc1f1f665b
+ 73728  sector 02 playing   score   9125  lives 2  bricks  4  c34f9e7823368373
+ 74752  sector 02 playing   score   9125  lives 1  bricks  4  528b3a88c592d562
+ 75776  sector 02 playing   score   9250  lives 1  bricks  3  be02bf7b44228d6f
+ 76800  sector 01 playing   score      0  lives 3  bricks 34  7489675402a23333
+ 77824  sector 01 playing   score    250  lives 2  bricks 32  104ac1e04416b98d
+ 78848  sector 01 playing   score    500  lives 2  bricks 30  6793cd8088e1f812
+ 79872  sector 01 playing   score    625  lives 2  bricks 29  bece2908b9481891
+ 80896  sector 01 playing   score    750  lives 2  bricks 28  09c5b9d55c89cab6
+ 81920  sector 01 playing   score   1150  lives 2  bricks 25  86e803004079e260
+ 82944  sector 01 playing   score   1275  lives 1  bricks 24  9cd0581cbc631ab4
+ 83968  sector 01 playing   score   1525  lives 1  bricks 22  cb4f82040f9a0496
+ 84992  sector 01 playing   score   1650  lives 1  bricks 21  f4ad0d76e3c916b5
+ 86016  sector 01 playing   score   1900  lives 1  bricks 19  42f45afbd4493bfe
+ 87040  sector 01 playing   score    125  lives 3  bricks 33  e769fc5d5681fd01
+ 88064  sector 01 playing   score    525  lives 3  bricks 30  2361be1e2bfbda05
+ 89088  sector 01 playing   score    800  lives 3  bricks 28  1c973b73310133ea
+ 90112  sector 01 playing   score   1050  lives 3  bricks 26  3e5cefec1d8b67e1
+ 91136  sector 01 playing   score   1500  lives 3  bricks 23  b5a656ad157e2bab
+ 92160  sector 01 playing   score   1750  lives 3  bricks 21  1d560ecee5af37b1
+ 93184  sector 01 playing   score   2150  lives 3  bricks 18  4327482c64722cf9
+ 94208  sector 01 playing   score   2275  lives 3  bricks 17  4f3033e44c5333f1
+ 95232  sector 01 playing   score   2925  lives 3  bricks 13  0374d676ed3ae72c
+ 96256  sector 01 playing   score   3700  lives 3  bricks  8  f008126b8d695c08
+ 97280  sector 01 playing   score   4450  lives 2  bricks  4  582667e06148ef17
+ 98304  sector 01 playing   score   4450  lives 2  bricks  4  379f54736a70182b
+ 99328  sector 01 playing   score   4700  lives 2  bricks  2  fdebe592febf57c2
+100352  sector 01 playing   score   4825  lives 2  bricks  1  1077a8a347409a46
+101376  sector 02 playing   score   6700  lives 2  bricks 22  3af3e21c9c1c507e
+102400  sector 02 playing   score   7150  lives 2  bricks 19  68cf578ed39a194f
+103424  sector 02 playing   score   7400  lives 2  bricks 17  06757cb3bc1e5255
+104448  sector 02 playing   score   7675  lives 2  bricks 15  9c254f5907705350
+105472  sector 02 playing   score   8950  lives 2  bricks  9  6bfcb38470c0aafc
+106496  sector 02 playing   score   8950  lives 2  bricks  9  6ceb38db5d3ed84f
+107520  sector 02 playing   score   9400  lives 2  bricks  6  1ed67a7cb3b346ea
+108544  sector 02 playing   score   9600  lives 2  bricks  5  1f40c245ba5d93d0
+109568  sector 02 playing   score   9600  lives 2  bricks  5  bc3b9a94362d4a70
+110592  sector 02 playing   score   9600  lives 2  bricks  5  0b27fde5d5e170f3
+111616  sector 02 playing   score   9600  lives 2  bricks  5  ca078a07516eecdc
+112640  sector 02 playing   score   9600  lives 2  bricks  5  8f71c608f807b7dc
+113664  sector 02 playing   score   9600  lives 1  bricks  5  87eecb1cbb366c33
+114688  sector 02 playing   score   9850  lives 1  bricks  3  95e70a776fe80f8b
+115712  sector 02 playing   score   9850  lives 1  bricks  3  254ba67d3d14ce67
+116736  sector 02 playing   score   9850  lives 1  bricks  3  9eb454e37a519a0f
+117760  sector 02 playing   score   9975  lives 1  bricks  2  d1aded0ce9f9984f
+118784  sector 02 playing   score  10100  lives 1  bricks  1  78b0aae64b1c4e73
+119808  sector 02 playing   score  10100  lives 1  bricks  1  1758d8640d49c68e
+120832  sector 02 playing   score  10100  lives 1  bricks  1  b26e875528bce191
+121856  sector 02 playing   score  10100  lives 1  bricks  1  2bdedb3b340f16e0
+122880  sector 03 playing   score  11850  lives 1  bricks 29  e04e70e0d74c8019
 journey seed 8
   1024  sector 01 playing   score    775  lives 3  bricks 29  1c445304275dba95
   2048  sector 01 playing   score    775  lives 3  bricks 29  23c37d61e527244c
@@ -152,98 +152,98 @@ journey seed 8
  26624  sector 01 playing   score   3800  lives 2  bricks  7  0960386c8871cbbb
  27648  sector 01 playing   score   4050  lives 2  bricks  5  84e7326c0a967287
  28672  sector 01 playing   score   4175  lives 2  bricks  4  10dabdca53070f20
- 29696  sector 01 playing   score   4575  lives 2  bricks  1  6a26cdeea6357957
- 30720  sector 01 cleared   score   6200  lives 2  bricks  0  a264df68759f38cb
- 31744  sector 02 playing   score   6450  lives 2  bricks 34  8e075bdd7c80e1ec
- 32768  sector 02 playing   score   6700  lives 2  bricks 32  4b2f8f6b456db5f3
- 33792  sector 02 playing   score   6825  lives 2  bricks 31  6b49232438ee2447
- 34816  sector 02 playing   score   6975  lives 2  bricks 30  0527a57afb55f7a2
- 35840  sector 02 playing   score   7225  lives 2  bricks 28  3fac6762408a1cf4
- 36864  sector 02 playing   score   7475  lives 2  bricks 26  86b6f79c43533834
- 37888  sector 02 playing   score   7725  lives 2  bricks 24  145e7858a4e6b58c
- 38912  sector 02 playing   score   7850  lives 2  bricks 23  02c71ab2768c28a6
- 39936  sector 02 playing   score   8125  lives 2  bricks 21  d24e42cf21602b58
- 40960  sector 02 playing   score   8125  lives 2  bricks 21  c5707bd9af3baace
- 41984  sector 02 playing   score   9000  lives 2  bricks 16  cd6817d3b8a9c45f
- 43008  sector 02 playing   score   9025  lives 2  bricks 16  df443e4ef721ff33
- 44032  sector 02 playing   score   9025  lives 2  bricks 16  99bd8566fc473680
- 45056  sector 02 playing   score   9400  lives 2  bricks 13  3788ff17e64f48b5
- 46080  sector 02 playing   score   9650  lives 2  bricks 11  0db908b83e77c34f
- 47104  sector 02 playing   score   9800  lives 2  bricks 10  66dec344a7b4daf6
- 48128  sector 02 playing   score   9925  lives 2  bricks  9  9c033265900001b1
- 49152  sector 02 playing   score  10050  lives 2  bricks  8  82099fbe1269645f
- 50176  sector 02 playing   score  10050  lives 2  bricks  8  37207282923dcca7
- 51200  sector 02 playing   score  10450  lives 2  bricks  5  fc60b0643720b485
- 52224  sector 02 playing   score  10575  lives 2  bricks  4  6c8a355cfecb1f63
- 53248  sector 02 playing   score  10575  lives 2  bricks  4  112bcde7d0bf0630
- 54272  sector 02 playing   score  10700  lives 2  bricks  3  e94a6a78a0382674
- 55296  sector 02 playing   score  10825  lives 2  bricks  2  d9295cba48a2f558
- 56320  sector 02 playing   score  10825  lives 2  bricks  2  ae0ec9eddf48557e
- 57344  sector 02 playing   score  10950  lives 2  bricks  1  daa3077b253e7ab7
- 58368  sector 02 playing   score  10975  lives 2  bricks  1  75356f81b3bb1124
- 59392  sector 02 playing   score  10975  lives 2  bricks  1  1b3fbd1a1defa2af
- 60416  sector 02 playing   score  10975  lives 2  bricks  1  0a38051c47a63b60
- 61440  sector 02 playing   score  10975  lives 2  bricks  1  88df660e50513840
- 62464  sector 02 playing   score  10975  lives 2  bricks  1  e2d2ae527a9f9e3c
- 63488  sector 03 playing   score  12850  lives 2  bricks 34  c6f0cac3bef68843
- 64512  sector 03 playing   score  13300  lives 2  bricks 31  38a20280e88733fb
- 65536  sector 03 playing   score  13675  lives 2  bricks 28  1ac9f66eb3f7168b
- 66560  sector 03 playing   score  14675  lives 2  bricks 22  f454dee500b94b03
- 67584  sector 03 playing   score  14675  lives 1  bricks 22  4ca741b88c13d114
- 68608  sector 03 playing   score  14925  lives 1  bricks 20  25a8493fae349854
- 69632  sector 03 playing   score  15850  lives 1  bricks 14  35fbe0c843ec19cd
- 70656  sector 03 playing   score  15975  lives 1  bricks 13  55f0a456d37af458
- 71680  sector 03 playing   score  16225  lives 1  bricks 11  8419404a04793df6
- 72704  sector 03 playing   score  16800  lives 1  bricks  7  2ebb58ba1476fc71
- 73728  sector 03 playing   score  16800  lives 1  bricks  7  21b03076be594162
- 74752  sector 03 playing   score  17525  lives 1  bricks  2  63aae43893b06e3a
- 75776  sector 03 playing   score  17525  lives 1  bricks  2  451e60a4b63d126b
- 76800  sector 03 playing   score  17650  lives 1  bricks  1  93bde78fb478cee4
- 77824  sector 03 playing   score  17650  lives 1  bricks  1  caccaa9092ca8138
- 78848  sector 04 playing   score  19400  lives 1  bricks 41  180b2d433151957b
- 79872  sector 04 playing   score  27400  lives 1  bricks 12  1b13483400e7a120
- 80896  sector 04 playing   score  27550  lives 1  bricks 11  48c0dcb72a5fbcea
- 81920  sector 04 playing   score  27800  lives 1  bricks  9  2cfdc91fab1a0df3
- 82944  sector 04 playing   score  28050  lives 1  bricks  7  f8cb3703027ea1c8
- 83968  sector 04 playing   score  28175  lives 1  bricks  6  4147eaf035650633
- 84992  sector 04 playing   score  28425  lives 1  bricks  4  70f9e61f2f49e1b0
- 86016  sector 04 playing   score  28425  lives 1  bricks  4  c713278604ed2904
- 87040  sector 04 playing   score  28425  lives 1  bricks  4  cf465970094f3098
- 88064  sector 04 playing   score  28550  lives 1  bricks  3  1b84d57887b6332c
- 89088  sector 01 playing   score    250  lives 3  bricks 32  1b4b5b8e9b2048e1
- 90112  sector 01 playing   score   1050  lives 3  bricks 27  86122f9ba09055ab
- 91136  sector 01 playing   score   1925  lives 3  bricks 22  533ce32c871f7900
- 92160  sector 01 playing   score   2200  lives 3  bricks 20  441bd8d971b2a708
- 93184  sector 01 playing   score   2450  lives 3  bricks 18  69e467cb5a5575c6
- 94208  sector 01 playing   score   2575  lives 3  bricks 17  64867469b2b37021
- 95232  sector 01 playing   score   3025  lives 3  bricks 14  b7e66ae0f81a2e6a
- 96256  sector 01 playing   score   3300  lives 3  bricks 12  67bab7f682244d71
- 97280  sector 01 playing   score   3425  lives 3  bricks 11  01e89989ad3867c7
- 98304  sector 01 playing   score   3675  lives 3  bricks  9  6c76e4a670f7a677
- 99328  sector 01 playing   score   3675  lives 3  bricks  9  7d64518b11e406fa
-100352  sector 01 playing   score   3950  lives 3  bricks  7  58ba26e83db01470
-101376  sector 01 playing   score   4075  lives 3  bricks  6  dc982cd20d127100
-102400  sector 01 playing   score   4075  lives 3  bricks  6  1bcdbdb386e1bf4d
-103424  sector 01 playing   score   4350  lives 3  bricks  4  2685c1a6949a9d78
-104448  sector 01 playing   score   4600  lives 3  bricks  2  1f5a536f6953def5
-105472  sector 01 playing   score   4600  lives 3  bricks  2  82a7ee88712cbba5
-106496  sector 01 playing   score   4725  lives 3  bricks  1  9c5be320dd9209e8
-107520  sector 01 playing   score   4725  lives 3  bricks  1  6178e5c80b61e209
-108544  sector 01 playing   score   4725  lives 3  bricks  1  1b427fb829e0a90f
-109568  sector 02 playing   score   7100  lives 3  bricks 34  ccef62604ef71b86
-110592  sector 02 playing   score   7500  lives 3  bricks 31  6357c1fcc701a1ed
-111616  sector 02 playing   score   8075  lives 3  bricks 27  29f5a56101496594
-112640  sector 02 playing   score   8200  lives 3  bricks 26  b30f99cb4918c5e4
-113664  sector 02 playing   score   8450  lives 3  bricks 24  ec683e113f6927bb
-114688  sector 02 playing   score   8450  lives 3  bricks 24  15dcfb86200741a4
-115712  sector 02 playing   score   8900  lives 3  bricks 21  831f21a6e6e5f058
-116736  sector 02 playing   score   9175  lives 3  bricks 19  b0f3cff4932cde2c
-117760  sector 02 playing   score   9325  lives 3  bricks 18  2c50c1c22ae5e2e2
-118784  sector 02 playing   score   9450  lives 3  bricks 17  f3e566100e37934d
-119808  sector 02 playing   score   9725  lives 2  bricks 15  2e9e27829483ae52
-120832  sector 02 playing   score   9850  lives 2  bricks 14  0a8c53744f3d01fa
-121856  sector 02 playing   score   9975  lives 2  bricks 13  2e8c871cd81d8189
-122880  sector 02 playing   score   9975  lives 2  bricks 13  95123fe346413809
+ 29696  sector 01 playing   score   4575  lives 2  bricks  1  b8df8c8617aacf54
+ 30720  sector 01 cleared   score   6200  lives 2  bricks  0  cc36a69f41e58daf
+ 31744  sector 02 playing   score   6450  lives 2  bricks 22  0b7fb97825b1ac96
+ 32768  sector 02 playing   score   6575  lives 2  bricks 21  115d5e1ecff71aa2
+ 33792  sector 02 playing   score   7825  lives 2  bricks 14  8e0871112ddabf93
+ 34816  sector 02 playing   score   7950  lives 2  bricks 13  d88d2e51ae90a211
+ 35840  sector 02 playing   score   8075  lives 2  bricks 12  e28bf6344e3b0f13
+ 36864  sector 02 playing   score   8350  lives 2  bricks 10  e44f36e936e05204
+ 37888  sector 02 playing   score   8475  lives 2  bricks  9  c8b59b380e268af5
+ 38912  sector 02 playing   score   8725  lives 2  bricks  7  d837c40adacbea0f
+ 39936  sector 02 playing   score   8975  lives 2  bricks  5  9e3bf26032d0af17
+ 40960  sector 02 playing   score   8975  lives 2  bricks  5  cc2355bf4ba4e5bf
+ 41984  sector 02 playing   score   9100  lives 2  bricks  4  ba3929f7b26a6092
+ 43008  sector 02 playing   score   9100  lives 2  bricks  4  6d7c4e8bd27d1b5d
+ 44032  sector 02 playing   score   9225  lives 2  bricks  3  0fc7215ce127712e
+ 45056  sector 02 playing   score   9225  lives 2  bricks  3  e9bf83e6da7224e1
+ 46080  sector 02 playing   score   9225  lives 2  bricks  3  3c16f8846adbdd91
+ 47104  sector 02 playing   score   9225  lives 2  bricks  3  19bb7b23254f4c41
+ 48128  sector 02 playing   score   9350  lives 2  bricks  2  37a789953b06642a
+ 49152  sector 02 playing   score   9350  lives 2  bricks  2  1ec6d8a1899f95f3
+ 50176  sector 02 playing   score   9475  lives 2  bricks  1  62cda1bdb27526eb
+ 51200  sector 02 playing   score   9475  lives 1  bricks  1  8eb567d9fd329a90
+ 52224  sector 02 playing   score   9475  lives 1  bricks  1  16fb80430a1a87e8
+ 53248  sector 03 playing   score  11225  lives 1  bricks 29  437df9f58f2eefa2
+ 54272  sector 03 playing   score  11625  lives 1  bricks 26  b790c179298edf69
+ 55296  sector 03 playing   score  11875  lives 1  bricks 24  2962559b3781a5f0
+ 56320  sector 03 playing   score  12000  lives 1  bricks 23  1fb173feca6e1412
+ 57344  sector 03 playing   score  12250  lives 1  bricks 21  66e6a96dece227fa
+ 58368  sector 03 playing   score  13125  lives 1  bricks 16  fd9b24b5f408cba8
+ 59392  sector 03 playing   score  14550  lives 1  bricks 11  3c0cbf8070045385
+ 60416  sector 03 playing   score  14675  lives 1  bricks 10  6d6de8d448d45e06
+ 61440  sector 03 playing   score  14800  lives 1  bricks  9  7f526fe0bc996546
+ 62464  sector 03 playing   score  15450  lives 1  bricks  5  f229f5c38806d618
+ 63488  sector 03 playing   score  15725  lives 1  bricks  3  88549924ebf6eabe
+ 64512  sector 01 playing   score    125  lives 3  bricks 33  12f7abe2e02e50c0
+ 65536  sector 01 playing   score    250  lives 3  bricks 32  09bae7cf8c8337ea
+ 66560  sector 01 playing   score    900  lives 3  bricks 28  e733aa02c8746085
+ 67584  sector 01 playing   score   1025  lives 3  bricks 27  03ee1a75e545615a
+ 68608  sector 01 playing   score   1025  lives 3  bricks 27  f5758c218110825d
+ 69632  sector 01 playing   score   1150  lives 3  bricks 26  fccd9153dc9c33f2
+ 70656  sector 01 playing   score   1275  lives 3  bricks 25  578b86de6a39531b
+ 71680  sector 01 playing   score   1400  lives 3  bricks 24  b88cd2c9a824d5d2
+ 72704  sector 01 playing   score   1925  lives 3  bricks 21  05b859eedd6dac30
+ 73728  sector 01 playing   score   2400  lives 3  bricks 19  e26a0f173b551599
+ 74752  sector 01 playing   score   2525  lives 3  bricks 18  6826530dc880cbc0
+ 75776  sector 01 playing   score   2925  lives 3  bricks 15  7dc71d9bcf81d6e5
+ 76800  sector 01 playing   score   3100  lives 3  bricks 14  49393da61a1a054d
+ 77824  sector 01 playing   score   3350  lives 3  bricks 12  9dd670ad93039bd5
+ 78848  sector 01 playing   score   3600  lives 3  bricks 10  f1a065b5c69e50e0
+ 79872  sector 01 playing   score   4050  lives 3  bricks  7  7e049cb87a01370b
+ 80896  sector 01 playing   score   4325  lives 3  bricks  5  9e7a20dc4a54155f
+ 81920  sector 01 playing   score   4600  lives 3  bricks  3  152505a501a7e9a5
+ 82944  sector 01 playing   score   4725  lives 3  bricks  2  a797d779bb3b5a09
+ 83968  sector 01 playing   score   4850  lives 3  bricks  1  95414fdbb09574e5
+ 84992  sector 01 playing   score   4850  lives 3  bricks  1  979de6ab5ccac251
+ 86016  sector 01 cleared   score   6975  lives 3  bricks  0  ace7f643ad793272
+ 87040  sector 02 playing   score   7550  lives 3  bricks 20  34b71d7dbd190085
+ 88064  sector 02 playing   score   7875  lives 2  bricks 18  1ef4e3e5f6272a13
+ 89088  sector 02 playing   score   8125  lives 1  bricks 16  b15ce7b17d0b36db
+ 90112  sector 02 playing   score   8375  lives 1  bricks 14  7b2f2b878859b4fe
+ 91136  sector 02 playing   score   8900  lives 1  bricks 11  474be35105807691
+ 92160  sector 02 playing   score   9025  lives 1  bricks 10  610430f3a5216aaf
+ 93184  sector 02 playing   score   9775  lives 1  bricks  6  c11394a18e0de29f
+ 94208  sector 02 playing   score   9775  lives 1  bricks  6  332e9239af0d3510
+ 95232  sector 02 playing   score   9900  lives 1  bricks  5  04b34633480efc98
+ 96256  sector 02 playing   score   9900  lives 1  bricks  5  398867f84ff10ad0
+ 97280  sector 02 playing   score  10175  lives 1  bricks  3  e6f0405e3af9e5b6
+ 98304  sector 02 playing   score  10175  lives 1  bricks  3  271692f337050705
+ 99328  sector 02 playing   score  10175  lives 1  bricks  3  a6eee75c564ed2fd
+100352  sector 02 playing   score  10300  lives 1  bricks  2  9b257dcd2736c620
+101376  sector 02 playing   score  10300  lives 1  bricks  2  88620ea7192f2b1b
+102400  sector 02 playing   score  10425  lives 1  bricks  1  10e1d39e207f7c3c
+103424  sector 02 playing   score  10425  lives 1  bricks  1  57d8ef6ec690d363
+104448  sector 02 playing   score  10425  lives 1  bricks  1  d445dd1b338fe57f
+105472  sector 02 playing   score  10425  lives 1  bricks  1  78793da74d1a347a
+106496  sector 03 playing   score  12300  lives 1  bricks 28  90d9cb10b4168116
+107520  sector 03 playing   score  12550  lives 1  bricks 26  dff716d2ed1d5a14
+108544  sector 03 playing   score  12800  lives 1  bricks 24  fc229fc5cb33ecd2
+109568  sector 03 playing   score  13050  lives 1  bricks 22  a445c5233c4ac5ee
+110592  sector 03 playing   score  14875  lives 1  bricks 13  6a311445f9d6f57d
+111616  sector 03 playing   score  15300  lives 1  bricks 11  4c327677fc699e85
+112640  sector 03 playing   score  15300  lives 1  bricks 11  aea8244e4ef6b699
+113664  sector 03 playing   score  15425  lives 1  bricks 10  57b19ac866507e81
+114688  sector 03 playing   score  15675  lives 1  bricks  8  ccc1ffde3f3069ba
+115712  sector 03 playing   score  15800  lives 1  bricks  7  f9d62c6602bc7cb0
+116736  sector 03 playing   score  15925  lives 1  bricks  6  abfdd8527284d161
+117760  sector 03 playing   score  16050  lives 1  bricks  5  135a11b074f9911f
+118784  sector 01 ready     score      0  lives 3  bricks 34  f02b1fe1b55a5d66
+119808  sector 01 playing   score    250  lives 3  bricks 32  aec7decc8e07d81e
+120832  sector 01 playing   score    675  lives 3  bricks 29  5c4b381e604eafa4
+121856  sector 01 playing   score    950  lives 3  bricks 27  b05904e76ac792fc
+122880  sector 01 playing   score   1400  lives 3  bricks 24  01435603efa9f770
 journey seed 9
   1024  sector 01 playing   score    250  lives 3  bricks 32  a2bbf866056bed9a
   2048  sector 01 playing   score    500  lives 3  bricks 30  ad66d948f4bc1292
@@ -253,115 +253,115 @@ journey seed 9
   6144  sector 01 playing   score   1400  lives 2  bricks 23  de52e6639ff42e78
   7168  sector 01 playing   score   1675  lives 2  bricks 21  0326d8e1588c1bb7
   8192  sector 01 playing   score   1925  lives 2  bricks 19  9040582259c08ce6
-  9216  sector 01 playing   score   2200  lives 2  bricks 17  0a75859f9ef0d389
- 10240  sector 01 playing   score   2475  lives 2  bricks 15  16f5e3e43655b416
- 11264  sector 01 playing   score   2725  lives 2  bricks 13  ca2f6b069d9febeb
- 12288  sector 01 playing   score   2850  lives 2  bricks 12  89ebcb788664b3ac
- 13312  sector 01 playing   score   2975  lives 2  bricks 11  d5932b36c172b34c
- 14336  sector 01 playing   score   3725  lives 2  bricks  7  dd2c8541a512cafe
- 15360  sector 01 playing   score   3975  lives 2  bricks  6  44a27ac465f19a58
- 16384  sector 01 playing   score   4100  lives 2  bricks  5  00f71760df731b02
- 17408  sector 01 playing   score   4375  lives 2  bricks  3  1774da2804063aa3
- 18432  sector 01 playing   score   4375  lives 2  bricks  3  5ee69bfdfa53ff8b
- 19456  sector 01 playing   score   4625  lives 2  bricks  1  7767442cafd35d03
- 20480  sector 01 playing   score   4625  lives 2  bricks  1  8eea45219f269e72
- 21504  sector 02 playing   score   6375  lives 1  bricks 35  1594e3a57911f16b
- 22528  sector 01 playing   score    125  lives 3  bricks 33  beee12e7cf8c5d4d
- 23552  sector 01 playing   score    450  lives 2  bricks 31  00c9f2afb8fad40c
- 24576  sector 01 playing   score    700  lives 2  bricks 29  d524be6c5d72b29a
- 25600  sector 01 playing   score   1350  lives 2  bricks 25  04d44bae832a79fd
- 26624  sector 01 playing   score   1475  lives 2  bricks 24  ea9ce887d0657930
- 27648  sector 01 playing   score   1600  lives 2  bricks 23  38085c772c24e561
- 28672  sector 01 playing   score   1875  lives 2  bricks 21  efc7d91b90aaf730
- 29696  sector 01 playing   score   1875  lives 2  bricks 21  e8ed544032e7f0e8
- 30720  sector 01 playing   score   2150  lives 2  bricks 19  058f312a22e429d7
- 31744  sector 01 playing   score   2600  lives 1  bricks 16  05262c683bb942c8
- 32768  sector 01 playing   score   2725  lives 1  bricks 15  a7b337a502f3f302
- 33792  sector 01 playing   score   2975  lives 1  bricks 13  11d5c2cdb05cd0ac
- 34816  sector 01 playing   score    250  lives 3  bricks 32  ff588274d16f0b69
- 35840  sector 01 playing   score    375  lives 3  bricks 31  69efe4050bb43d55
- 36864  sector 01 playing   score    650  lives 3  bricks 29  d33d41c9870bab4c
- 37888  sector 01 playing   score    775  lives 3  bricks 28  6344103af13beacb
- 38912  sector 01 playing   score   1425  lives 3  bricks 24  871d2545309bc6b3
- 39936  sector 01 playing   score   1675  lives 3  bricks 22  a2aaa1723a6b9cf1
- 40960  sector 01 playing   score   1925  lives 3  bricks 20  4b756a9e650d2848
- 41984  sector 01 playing   score   2200  lives 3  bricks 18  3354dab2dd8d523d
- 43008  sector 01 playing   score   2650  lives 3  bricks 15  3c2d9a83eb79e219
- 44032  sector 01 playing   score   2925  lives 3  bricks 13  81eec77c712bebfa
- 45056  sector 01 playing   score   3325  lives 3  bricks 10  ddae2dc1a89a671b
- 46080  sector 01 playing   score   3325  lives 3  bricks 10  bcfd772a75c69074
- 47104  sector 01 playing   score   3450  lives 3  bricks  9  2e1453a1388811c9
- 48128  sector 01 playing   score   3450  lives 3  bricks  9  955199393e2eb992
- 49152  sector 01 playing   score   3575  lives 3  bricks  8  b6e833bc509d23f6
- 50176  sector 01 playing   score   3575  lives 2  bricks  8  420dcfe7e75f2711
- 51200  sector 01 playing   score   3700  lives 2  bricks  7  1ad13f4eac228710
- 52224  sector 01 playing   score   3825  lives 2  bricks  6  e39749540c1de5b8
- 53248  sector 01 playing   score   3950  lives 2  bricks  5  cc80db9f8b9885b6
- 54272  sector 01 playing   score   4400  lives 1  bricks  2  43eb5ee4ff7453e8
- 55296  sector 01 playing   score   4400  lives 1  bricks  2  852ffbe0cc2b7f2f
- 56320  sector 02 playing   score   6300  lives 1  bricks 35  5ef488eb4ee57a77
- 57344  sector 02 playing   score   6550  lives 1  bricks 33  fcbedc8edab995f8
- 58368  sector 01 playing   score    125  lives 3  bricks 33  5f663d621754b810
- 59392  sector 01 playing   score    375  lives 1  bricks 31  56db79241bc69ddd
- 60416  sector 01 playing   score    500  lives 1  bricks 30  edcb49ae0a4ca641
- 61440  sector 01 playing   score    900  lives 1  bricks 27  7380d1e14472eee7
- 62464  sector 01 playing   score   1300  lives 1  bricks 24  976c18233a14702b
- 63488  sector 01 playing   score   1425  lives 1  bricks 23  98305dcc0f8dc5a4
- 64512  sector 01 playing   score   1675  lives 1  bricks 21  0a4dc8fee9054fca
- 65536  sector 01 playing   score   1950  lives 1  bricks 19  453004ea4416892a
- 66560  sector 01 playing   score   1950  lives 1  bricks 19  3225a08d203d467b
- 67584  sector 01 playing   score   2075  lives 1  bricks 18  3d76db7a6b85d7cc
- 68608  sector 01 playing   score   2200  lives 1  bricks 17  770da11b92b64f21
- 69632  sector 01 playing   score   2325  lives 1  bricks 16  2a688344e2e9de6d
- 70656  sector 01 playing   score   2450  lives 1  bricks 15  a3a8fecda91819f6
- 71680  sector 01 playing   score   2850  lives 1  bricks 12  d7bc1d1246e79537
- 72704  sector 01 playing   score   3100  lives 1  bricks 10  eb756d969928c9a7
- 73728  sector 01 playing   score   3500  lives 1  bricks  7  a0f6f7f88da8869c
- 74752  sector 01 playing   score   3625  lives 1  bricks  6  30ef85247405d37d
- 75776  sector 01 playing   score   3750  lives 1  bricks  5  be45b76ca5468c29
- 76800  sector 01 playing   score   3750  lives 1  bricks  5  b9bd7797780bca96
- 77824  sector 01 playing   score   3750  lives 1  bricks  5  886bc65eafcd93df
- 78848  sector 01 playing   score   3875  lives 1  bricks  4  e7270853b4da38ac
- 79872  sector 01 playing   score   4125  lives 1  bricks  2  4e7c7acb2fe9dd4d
- 80896  sector 01 playing   score      0  lives 3  bricks 34  2744a8006cc6535e
- 81920  sector 01 playing   score    250  lives 3  bricks 32  91122e2b82253f39
- 82944  sector 01 playing   score    500  lives 3  bricks 30  858cadd290923262
- 83968  sector 01 playing   score    775  lives 3  bricks 28  0dfd3ae12b133df2
- 84992  sector 01 playing   score   1025  lives 3  bricks 26  650ddbd46d178c51
- 86016  sector 01 playing   score   1425  lives 3  bricks 23  06212e3518c7d41e
- 87040  sector 01 playing   score   1825  lives 3  bricks 20  bafbcb03cd38bc7f
- 88064  sector 01 playing   score   2325  lives 3  bricks 17  3fe90dfa1d645804
- 89088  sector 01 playing   score   2575  lives 3  bricks 15  8a857cc6ef470e80
- 90112  sector 01 playing   score   2700  lives 3  bricks 14  de45a6316ccdc203
- 91136  sector 01 playing   score   2700  lives 3  bricks 14  a19d051d50593a62
- 92160  sector 01 playing   score   2950  lives 3  bricks 12  b2af6f7310fcb2bd
- 93184  sector 01 playing   score   3200  lives 3  bricks 10  761c8ec50c314e93
- 94208  sector 01 playing   score   3325  lives 3  bricks  9  dd98689e38f0b047
- 95232  sector 01 playing   score   3575  lives 3  bricks  7  bf52c6d63f701abd
- 96256  sector 01 playing   score   3575  lives 3  bricks  7  499d51c55dc7daff
- 97280  sector 01 playing   score   3850  lives 3  bricks  5  1a05ccb34f94e4bc
- 98304  sector 01 playing   score   3975  lives 3  bricks  4  3397c599e86f5ef8
- 99328  sector 01 playing   score   4100  lives 3  bricks  3  f9ca7774f59c9bd6
-100352  sector 01 playing   score   4100  lives 3  bricks  3  5b3f01d630daba91
-101376  sector 01 playing   score   4100  lives 3  bricks  3  a8aa9fe1f762bd08
-102400  sector 01 playing   score   4225  lives 2  bricks  2  c72277897a4ae4f1
-103424  sector 01 playing   score   4350  lives 2  bricks  1  02db615046e25848
-104448  sector 01 playing   score   4350  lives 2  bricks  1  2daeaac3be79f31f
-105472  sector 01 playing   score   4350  lives 2  bricks  1  f201886f54a4d0b5
-106496  sector 01 playing   score   4350  lives 2  bricks  1  0ab0c1770e24e554
-107520  sector 01 playing   score   4350  lives 2  bricks  1  1c2517a0996a20ff
-108544  sector 01 playing   score   4350  lives 2  bricks  1  594946f71a965cc0
-109568  sector 01 playing   score   4350  lives 2  bricks  1  6f4bfeaff5bd56ec
-110592  sector 02 playing   score   5725  lives 2  bricks 34  6c231b5b8b293d5c
-111616  sector 02 playing   score   5850  lives 2  bricks 33  2f0c86fc8d0b2c94
-112640  sector 02 playing   score   6100  lives 2  bricks 31  7ac8e328440f8b03
-113664  sector 02 playing   score   6500  lives 2  bricks 28  73352a63dfcfd4c8
-114688  sector 02 playing   score   6900  lives 2  bricks 25  9c2e7aaf16da120f
-115712  sector 02 playing   score   7150  lives 2  bricks 23  62dbf8419aa19921
-116736  sector 02 playing   score   7400  lives 2  bricks 21  7b7422f2a2a0fb2a
-117760  sector 02 playing   score   7650  lives 2  bricks 19  14d95eb293ef0854
-118784  sector 02 playing   score   7800  lives 2  bricks 18  8a180a5ce9a84a10
-119808  sector 02 playing   score   7800  lives 2  bricks 18  5cce39c51a24483f
-120832  sector 02 playing   score   7925  lives 2  bricks 17  68e364c67a82fd17
-121856  sector 02 playing   score   8375  lives 2  bricks 14  5d9345359ce02b5d
-122880  sector 02 playing   score   8400  lives 2  bricks 14  568464b0a5fcd2c1
+  9216  sector 01 playing   score   2200  lives 2  bricks 17  1ff744e0e8417d31
+ 10240  sector 01 playing   score   2475  lives 2  bricks 15  361bf5213da2744e
+ 11264  sector 01 playing   score   2725  lives 2  bricks 13  8f13a7a4a8ea15f3
+ 12288  sector 01 playing   score   2850  lives 2  bricks 12  034a506d80370678
+ 13312  sector 01 playing   score   2975  lives 2  bricks 11  aa7228b35dff4f8c
+ 14336  sector 01 playing   score   3725  lives 2  bricks  7  6552b86f8298f60a
+ 15360  sector 01 playing   score   3975  lives 2  bricks  6  bb564ef51203c2cc
+ 16384  sector 01 playing   score   4100  lives 2  bricks  5  55b267366d255e8e
+ 17408  sector 01 playing   score   4375  lives 2  bricks  3  78722db9f769b927
+ 18432  sector 01 playing   score   4375  lives 2  bricks  3  61159751bd7069e7
+ 19456  sector 01 playing   score   4625  lives 2  bricks  1  7b6894794c00939f
+ 20480  sector 01 playing   score   4625  lives 2  bricks  1  28c71ed16a65cf06
+ 21504  sector 02 playing   score   6375  lives 1  bricks 23  a488841b452de8fc
+ 22528  sector 02 playing   score   6625  lives 1  bricks 21  1bf631b5cc53d4d6
+ 23552  sector 02 playing   score   6625  lives 1  bricks 21  aeccf2bb2d864941
+ 24576  sector 02 playing   score   6875  lives 1  bricks 19  d15849e004e96811
+ 25600  sector 02 playing   score   7000  lives 1  bricks 18  1ff79596b4692e1a
+ 26624  sector 02 playing   score   7125  lives 1  bricks 17  d730a28958b6a971
+ 27648  sector 02 playing   score   7525  lives 1  bricks 14  7c1f0cd6ee1c6e5f
+ 28672  sector 02 playing   score   8100  lives 1  bricks 10  e09ecb4e47cba671
+ 29696  sector 02 playing   score   8550  lives 1  bricks  7  5d658ef49a288480
+ 30720  sector 02 playing   score   8800  lives 1  bricks  5  9febbf4a1d71bd26
+ 31744  sector 02 playing   score   9075  lives 1  bricks  3  9ce8ddc34eb023ac
+ 32768  sector 02 playing   score   9200  lives 1  bricks  2  0ac62fbf1e4ec2b8
+ 33792  sector 02 playing   score   9200  lives 1  bricks  2  9dbb26776d6e4633
+ 34816  sector 02 playing   score   9325  lives 1  bricks  1  288f806faf3398bf
+ 35840  sector 02 playing   score   9325  lives 1  bricks  1  ebc3b75c5fa15c7d
+ 36864  sector 02 playing   score   9325  lives 1  bricks  1  2c734290fc5439b7
+ 37888  sector 02 cleared   score  10950  lives 1  bricks  0  c0c62fa547319258
+ 38912  sector 03 playing   score  11200  lives 1  bricks 28  2eb1fe3544f422b2
+ 39936  sector 03 playing   score  11325  lives 1  bricks 27  f6624ab437897b83
+ 40960  sector 03 playing   score  11450  lives 1  bricks 26  63b5408b90a87d05
+ 41984  sector 03 playing   score  12575  lives 1  bricks 20  a6b46836b252dc23
+ 43008  sector 03 playing   score  12825  lives 1  bricks 18  4341fbc4e6de5556
+ 44032  sector 03 playing   score  13100  lives 1  bricks 16  26eef513502d42af
+ 45056  sector 03 playing   score  13350  lives 1  bricks 14  dfdbe593599444a0
+ 46080  sector 03 playing   score  13600  lives 1  bricks 12  a4f123bc8a991645
+ 47104  sector 03 playing   score  14250  lives 1  bricks  8  570c8abf7ce2cf8e
+ 48128  sector 03 playing   score  14250  lives 1  bricks  8  13f57d72403e4a1a
+ 49152  sector 03 playing   score  14525  lives 1  bricks  6  ec2c40ecbca3869b
+ 50176  sector 03 playing   score  14775  lives 1  bricks  4  47f620def5eb4cba
+ 51200  sector 03 playing   score  14900  lives 1  bricks  3  5b9b1c9a0992151f
+ 52224  sector 03 playing   score  14900  lives 1  bricks  3  57fecebc824a7188
+ 53248  sector 03 playing   score  14900  lives 1  bricks  3  533699f76771d60d
+ 54272  sector 03 playing   score  14900  lives 1  bricks  3  4935da0b16929756
+ 55296  sector 04 playing   score  17300  lives 1  bricks 25  9e7704e8c12fbaed
+ 56320  sector 04 playing   score  18300  lives 1  bricks 19  49c2a52c6eb78fe6
+ 57344  sector 04 playing   score  19700  lives 1  bricks 12  b53f2a7df6f155b1
+ 58368  sector 04 playing   score  19825  lives 1  bricks 11  4b845c29d6b4ae16
+ 59392  sector 04 playing   score  19825  lives 1  bricks 11  6c04775eff59ea7a
+ 60416  sector 04 playing   score  20475  lives 1  bricks  7  7987fa669af60718
+ 61440  sector 04 playing   score  20725  lives 1  bricks  5  d7c09e4a6e8fedb1
+ 62464  sector 04 playing   score  20850  lives 1  bricks  4  8fca17ac5f9c31cf
+ 63488  sector 01 playing   score    250  lives 3  bricks 32  8939cae1e60315a6
+ 64512  sector 01 playing   score    700  lives 3  bricks 29  716eb5119dbf1ae7
+ 65536  sector 01 playing   score    825  lives 3  bricks 28  7efd71dd342d1685
+ 66560  sector 01 playing   score   1225  lives 3  bricks 25  e95d259484629719
+ 67584  sector 01 playing   score   1825  lives 3  bricks 22  74711b2153f2ee76
+ 68608  sector 01 playing   score   2075  lives 3  bricks 20  d81549bbc9e99152
+ 69632  sector 01 playing   score   2200  lives 3  bricks 19  5dc9e3767607f17a
+ 70656  sector 01 playing   score   2450  lives 3  bricks 17  1f97f5e56c59dfbe
+ 71680  sector 01 playing   score   2575  lives 3  bricks 16  bd993c6aa6a0f364
+ 72704  sector 01 playing   score   3150  lives 3  bricks 12  0e8610bab9d0baaf
+ 73728  sector 01 playing   score   3150  lives 3  bricks 12  7e4a0e74abb6ee9d
+ 74752  sector 01 playing   score   3275  lives 3  bricks 11  3f8d769cfede05f2
+ 75776  sector 01 playing   score   3400  lives 3  bricks 10  bbc383e24c2b6df8
+ 76800  sector 01 playing   score   3525  lives 3  bricks  9  e62c05b5a4a1a400
+ 77824  sector 01 playing   score   3775  lives 3  bricks  7  252e8d2231767c99
+ 78848  sector 01 playing   score   4425  lives 3  bricks  3  5041c07bcd4a47fd
+ 79872  sector 01 playing   score   4550  lives 3  bricks  2  6c53c6edb196dba1
+ 80896  sector 01 cleared   score   6800  lives 3  bricks  0  480d6c83c7e311b6
+ 81920  sector 02 playing   score   7050  lives 3  bricks 22  a9570d3116ac296b
+ 82944  sector 02 playing   score   8175  lives 3  bricks 16  d9c998a71175c485
+ 83968  sector 02 playing   score   8750  lives 3  bricks 14  4df99c1255c71e5a
+ 84992  sector 02 playing   score   8875  lives 3  bricks 13  90564d2089331464
+ 86016  sector 02 playing   score   8875  lives 3  bricks 13  92f2b50ec952f06f
+ 87040  sector 02 playing   score   9125  lives 3  bricks 11  2830a47ff6db075f
+ 88064  sector 02 playing   score   9400  lives 3  bricks  9  3607a8ad1d85f541
+ 89088  sector 02 playing   score   9525  lives 3  bricks  8  5103c439772b13b5
+ 90112  sector 02 playing   score   9525  lives 3  bricks  8  a9eedce62312d729
+ 91136  sector 02 playing   score   9800  lives 3  bricks  6  384139b33b1ce4c0
+ 92160  sector 02 playing   score   9925  lives 2  bricks  5  4941dd8563b73642
+ 93184  sector 02 playing   score  10175  lives 2  bricks  3  85931ec4b86ac843
+ 94208  sector 02 playing   score  10175  lives 2  bricks  3  b0000e5c9c04b9c7
+ 95232  sector 02 playing   score  10175  lives 2  bricks  3  3c1c0075952d69d2
+ 96256  sector 02 playing   score  10175  lives 2  bricks  3  cfb2cb5f1294c72e
+ 97280  sector 02 playing   score  10175  lives 2  bricks  3  61edb1adc84213a6
+ 98304  sector 02 playing   score  10300  lives 2  bricks  2  10d9f93465935296
+ 99328  sector 02 playing   score  10425  lives 2  bricks  1  9c26554e823cfe75
+100352  sector 02 playing   score  10425  lives 2  bricks  1  29d0d79c3aaee1ca
+101376  sector 02 playing   score  10425  lives 2  bricks  1  1d1f6e8786c9a595
+102400  sector 02 playing   score  10425  lives 2  bricks  1  46eea4be41e620b6
+103424  sector 02 playing   score  10425  lives 2  bricks  1  753e2a42daacd1b1
+104448  sector 02 playing   score  10425  lives 2  bricks  1  bca58be126e92228
+105472  sector 02 playing   score  10425  lives 2  bricks  1  543a39d487f6fd41
+106496  sector 02 playing   score  10425  lives 2  bricks  1  e22f54134105c309
+107520  sector 02 cleared   score  11550  lives 2  bricks  0  1a88c16b1d1a7ec9
+108544  sector 03 playing   score  11800  lives 2  bricks 28  2f0a064baff564bf
+109568  sector 03 playing   score  12375  lives 2  bricks 24  830cdbd40bb84067
+110592  sector 03 playing   score  13025  lives 2  bricks 20  6075c9c0fc47e200
+111616  sector 03 playing   score  13300  lives 2  bricks 18  95811ea34c586372
+112640  sector 03 playing   score  13875  lives 2  bricks 14  2877030f9b49ec01
+113664  sector 03 playing   score  14150  lives 2  bricks 12  3cbed676b79018e0
+114688  sector 03 playing   score  14400  lives 2  bricks 10  8527bf69706259a2
+115712  sector 03 playing   score  14525  lives 2  bricks  9  12d9d3b5b4b06d0c
+116736  sector 03 playing   score  14525  lives 2  bricks  9  69ee7b0c698d23ed
+117760  sector 03 playing   score  14525  lives 2  bricks  9  d0452e1e6152d97f
+118784  sector 03 playing   score  14775  lives 2  bricks  7  23731a3bbe859fd6
+119808  sector 03 playing   score  15350  lives 2  bricks  3  fdab75b81b6dbc47
+120832  sector 03 playing   score  15625  lives 2  bricks  1  29ea99a1acaf0a35
+121856  sector 04 playing   score  17875  lives 2  bricks 24  5af08fba9564815a
+122880  sector 04 playing   score  18450  lives 2  bricks 20  c4055275a9049523

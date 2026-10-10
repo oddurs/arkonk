@@ -9,8 +9,12 @@ GitHub Release notes, so each `## [x.y.z]` heading must exist before tagging.
 
 ### Added
 
-- Twelve authored sectors across three chapters (Daybreak, Blue Hour,
-  Afterlight) with saved checkpoints, replayable sectors, and 36 medals.
+- A 64-sector journey in eight chapters, one day from dawn to dawn
+  (Daybreak, Morning, Zenith, Golden Hour, Afterlight, Blue Hour, Eclipse,
+  Aurora), with saved checkpoints, replayable sectors, and 192 medals.
+  Eclipse's gate bricks go solid and ghost on a beat; Blue Hour's boards
+  show only near the ball and the paddle's keel light. Saves from the
+  12-sector journey carry over. See `docs/journey.md`.
 - Five capsules (Wide, Slow, Multi, Anchor, Phase) and relay cores that chain
   explosions through adjacent bricks.
 - Direct mouse, keyboard, and gamepad control; prompts follow the last device used.

@@ -205,7 +205,8 @@ fn arguments_follow_each_languages_word_order() {
         format(Locale::Ja, TextId::PlaySector, &[Arg::Sector(sector)]),
         "セクター 03 をプレイ"
     );
-    let saved = [Arg::Text(TextId::SectorName(sector)), Arg::Count(2450)];
+    let slipstream = ark::sectors::SectorId::from_slug("slipstream").unwrap();
+    let saved = [Arg::Text(TextId::SectorName(slipstream)), Arg::Count(2450)];
     assert_eq!(
         format(Locale::En, TextId::ContinueDetail, &saved),
         "Slipstream · 2,450"
@@ -232,8 +233,12 @@ fn arguments_follow_each_languages_word_order() {
 #[test]
 fn capsule_letters_are_the_same_in_every_language() {
     for locale in Locale::ALL {
-        for (sector, power) in [(0, Power::Wide), (1, Power::Anchor), (8, Power::Phase)] {
-            let id = TextId::SectorTip(ark::sectors::SectorId::new(sector).unwrap());
+        for (sector, power) in [
+            ("first_light", Power::Wide),
+            ("satellites", Power::Anchor),
+            ("afterglow", Power::Phase),
+        ] {
+            let id = TextId::SectorTip(ark::sectors::SectorId::from_slug(sector).unwrap());
             let tip = format(locale, id, &[]);
             assert!(
                 tip.starts_with(capsule(power)) || tip.starts_with(&format!("[{}", capsule(power))),
@@ -259,7 +264,7 @@ fn pseudo_locale_expands_accents_and_brackets() {
         TextId::SectorTip(ark::sectors::SectorId::FIRST),
         &[],
     );
-    assert!(tip.starts_with("[W ") && tip.contains(" S "), "{tip}");
+    assert!(tip.starts_with("[W ") && tip.contains(" Wídé"), "{tip}");
 }
 
 #[test]
@@ -269,7 +274,7 @@ fn icons_can_come_out_as_marks_for_the_renderer() {
         let mut marked = String::new();
         write_icons(&mut marked, locale, Form::Full, tip, &[]).unwrap();
         let marks: Vec<_> = marked.chars().filter_map(icon_power).collect();
-        assert_eq!(marks, [Power::Wide, Power::Slow], "{locale:?}: {marked}");
+        assert_eq!(marks, [Power::Wide], "{locale:?}: {marked}");
         // Everything else reads as the lettered text does.
         let lettered: String = marked
             .chars()
@@ -294,9 +299,12 @@ fn thai_marks_where_lines_may_break_and_nothing_else_does() {
                 "{locale:?} {id:?} holds a zero width space"
             );
         }
-        // Long Thai text must offer somewhere to wrap.
+        // Long Thai text must offer somewhere to wrap: a marked break, or
+        // a space the table writes, as Thai does around a number, a Latin
+        // word or a capsule icon.
         let thai = template(Locale::Th, id);
-        if thai.chars().count() > 12 {
+        let script = thai.chars().any(|c| ('\u{0E00}'..='\u{0E7F}').contains(&c));
+        if script && thai.chars().count() > 12 {
             assert!(
                 thai.contains('\u{200B}') || thai.contains(' '),
                 "{id:?} cannot wrap: {thai}"

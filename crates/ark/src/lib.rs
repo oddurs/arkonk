@@ -60,7 +60,7 @@
 //!
 //! # Content and text
 //!
-//! [`sectors`] holds the twelve layouts, parsed at compile time. `ark`
+//! [`sectors`] holds the 64 layouts, parsed at compile time. `ark`
 //! carries no display text: sectors, chapters and powers have stable slugs
 //! and ids, and the front end owns the words.
 //!
