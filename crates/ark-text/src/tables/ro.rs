@@ -75,13 +75,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "ZORI",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "DIMINEAȚĂ",
+            Chapter::Zenith => "ZENIT",
+            Chapter::GoldenHour => "ORA DE AUR",
             Chapter::Afterlight => "AMURG",
             Chapter::BlueHour => "ORA ALBASTRĂ",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "ECLIPSĂ",
+            Chapter::Aurora => "AURORĂ",
         },
         PowerName(p) => match p {
             Power::Wide => "LAT",
@@ -149,202 +149,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Prima lumină",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Plutire",
+    "Orizont",
+    "Sclipire",
+    "Ciocârlie",
+    "Felinare",
+    "Maree",
+    "Răsărit de soare",
     "Sateliți",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Punct de rouă",
+    "Diafragmă",
+    "Claustru",
+    "Cheia de boltă",
+    "Ceas solar",
+    "Cameră obscură",
+    "Roza vânturilor",
     "Siaj",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Filament",
+    "Meridian",
+    "Cascadă",
     "Fondu",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Serpentine",
+    "Solstițiu",
     "Rezonanță",
     "Prismă",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Fagure",
+    "Stropi de mare",
     "Curent de fund",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Recoltă",
+    "Caleidoscop",
+    "Tapiserie",
+    "Umbre lungi",
     "Licăr de apus",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Crisalidă",
+    "Geodă",
     "Paralaxă",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Citadelă",
+    "Nautilus",
+    "Vecernie",
     "Supernovă",
     "Răsărit de lună",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Înserare",
+    "Lumină de lampă",
+    "Licurici",
+    "Far",
+    "Nocturnă",
+    "Câmp adânc",
+    "Constelație",
+    "Penumbră",
+    "Metronom",
+    "Coroană solară",
+    "Sizigie",
+    "Pulsar",
+    "Obturator",
+    "Umbră",
+    "Totalitate",
+    "Vânt solar",
+    "Boreală",
+    "Panglici",
+    "Noapte polară",
+    "Catedrală",
+    "Sclipici",
+    "Singularitate",
     "Întoarcere acasă",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Prima lumină",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Plutire",
+    "Orizont",
+    "Sclipire",
+    "Ciocârlie",
+    "Felinare",
+    "Maree",
+    "Soare",
     "Sateliți",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Rouă",
+    "Diafragmă",
+    "Claustru",
+    "Cheie",
+    "Ceas",
+    "Obscură",
+    "Roza",
     "Siaj",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Filament",
+    "Meridian",
+    "Cascadă",
     "Fondu",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Serpentine",
+    "Solstițiu",
     "Rezonanță",
     "Prismă",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Fagure",
+    "Stropi",
     "Curent",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Recoltă",
+    "Caleido",
+    "Tapiserie",
+    "Umbre",
     "Licăr",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Crisalidă",
+    "Geodă",
     "Paralaxă",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Citadelă",
+    "Nautilus",
+    "Vecernie",
     "Supernovă",
     "Lună",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Înserare",
+    "Lampă",
+    "Licurici",
+    "Far",
+    "Nocturnă",
+    "Adânc",
+    "Stele",
+    "Penumbră",
+    "Metronom",
+    "Coroană",
+    "Sizigie",
+    "Pulsar",
+    "Obturator",
+    "Umbră",
+    "Totalitate",
+    "Vânt",
+    "Boreală",
+    "Panglici",
+    "Noapte polară",
+    "Catedrală",
+    "Sclipici",
+    "Singularitate",
     "Întoarcere",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Lat: prinde capsula care cade",
+    "{icon:slow} Lent: prinde-o și mingea se liniștește",
+    "Condu: marginile paletei trimit mingea larg",
+    "Scântei singure: urmărește-le pe fiecare",
+    "Trimite mingea în sus pe aripile deschise",
+    "Curăță fiecare felinar de jos",
+    "Călărește valul: ricoșează din pereții laterali",
+    "Cioplește soarele de jos, rând cu rând",
     "{icon:anchor} Ancoră: prinde mingea, țintește, apoi elibereaz-o",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Cărămizile blindate rezistă două lovituri: ai grijă la margini",
+    "{icon:anchor} Țintește prin spărtura din zid",
+    "O singură ușă: trimite mingea în curte",
+    "Dărâmă cheia de boltă și arcul se deschide",
+    "Citește unghiurile: fiecare umbră e o lovitură",
+    "{icon:anchor} Un singur orificiu îngust: ține, țintește, eliberează",
+    "Fiecare punct cardinal duce la inimă",
     "Nuclee de chihlimbar: fiecare explozie atinge cei patru vecini",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Atinge filamentul oriunde: arde în ambele sensuri",
+    "Împarte terenul pe meridian",
+    "Pornește cascada de la oricare capăt",
     "Deschide un drum prin cele două linii de relee",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Trei linii de relee: câte o lovitură curată",
+    "Inelul arde întreg: găsește un drum până la margine",
     "Nucleele vecine duc reacția mai departe",
     "{icon:multi} Multiminge: trei mingi, o singură deschidere",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Un nucleu în fiecare celulă: sparge-le",
+    "Stropi peste tot: eliberează trei mingi",
     "Pătrunde în buzunarele din spatele blindajului",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Teren plin: {icon:multi} Multiminge îl curăță repede",
+    "Oglinzi peste tot: sparge o parte, apoi geamăna ei",
+    "Trage de un fir și țesătura se desface",
+    "Sparge podeaua și aprinde fitilul lung",
     "{icon:phase} Fază: trei atingeri de cărămizi fără ricoșeu",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Faza trece prin carcasă până la nucleu",
+    "Sparge o geodă și cristalele ei se aprind",
     "Străpunge carcasa, apoi aprinde traseul interior",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Intră pe poartă sau prin zid cu {icon:phase} Faza",
+    "În spirală spre interior: spira exterioară se aprinde prima",
+    "Trei clopote: sună-le pe fiecare de jos",
     "Prinde o minge care revine în timp ce celelalte zboară",
     "Urmează releul în jurul centrului deschis",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Lumina se stinge: învață terenul cât poți",
+    "În întuneric, mingea și paleta duc lumina",
+    "Licurici: nucleele strălucesc chiar și în întuneric",
+    "Mătură coasta cu lumina paletei",
+    "Mai multe mingi, mai multă lumină: {icon:multi} Multiminge",
+    "Câmp adânc: fiecare punct slab e o cărămidă",
+    "Unește stelele: cele strălucitoare sunt nuclee",
+    "Porțile pălesc pe ritm: așteaptă deschiderea",
+    "Tic-tac: porțile țin timpul",
+    "Coroana se deschide pe ritm: lovește înăuntru",
+    "O poartă fantomă ignoră explozia: potrivește scânteia",
+    "Un pulsar: bătăi rapide, mâini rapide",
+    "Obturatorul se deschide o clipă: fii gata",
+    "Pe jumătate în umbră: partea cu porți ține ritmul",
+    "Aprinde soarele cât timp luna e solidă",
+    "Vântul bate într-o singură direcție: călărește-l până la nuclee",
+    "Perdele de lumină: mătură-le cu {icon:multi} Multiminge",
+    "Fiecare panglică e legată de o poartă: taie ambele jumătăți",
+    "Noaptea lungă: ghidează-te după lumina pe care o porți",
+    "Intră pe uși, urcă la rozetă",
+    "Toate deodată: urmărește nucleele",
+    "Lovește inelul când porțile devin solide",
     "O ultimă orbită: fă ca fiecare deschidere să conteze",
 ];

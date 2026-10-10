@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "HAJNAL",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "REGGEL",
+            Chapter::Zenith => "ZENIT",
+            Chapter::GoldenHour => "ARANYÓRA",
             Chapter::Afterlight => "ALKONY",
             Chapter::BlueHour => "KÉK ÓRA",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "FOGYATKOZÁS",
+            Chapter::Aurora => "AURÓRA",
         },
         PowerName(p) => match p {
             Power::Wide => "SZÉLES",
@@ -150,202 +150,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Első fény",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Sodródás",
+    "Látóhatár",
+    "Villanás",
+    "Pacsirta",
+    "Lámpások",
+    "Dagály",
+    "Napkelte",
     "Műholdak",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Harmatpont",
+    "Rekesz",
+    "Kolostor",
+    "Zárókő",
+    "Napóra",
+    "Tűlyuk",
+    "Szélrózsa",
     "Szélárnyék",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Izzószál",
+    "Délkör",
+    "Zuhatag",
     "Áttűnés",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Szerpentin",
+    "Napforduló",
     "Rezonancia",
     "Prizma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Méhsejt",
+    "Tajték",
     "Örvény",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Aratás",
+    "Kaleidoszkóp",
+    "Kárpit",
+    "Hosszú árnyak",
     "Utófény",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Báb",
+    "Geoda",
     "Parallaxis",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Fellegvár",
+    "Nautilus",
+    "Vecsernye",
     "Szupernóva",
     "Holdkelte",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Szürkület",
+    "Lámpafény",
+    "Szentjánosbogarak",
+    "Világítótorony",
+    "Noktürn",
+    "Mélyég",
+    "Csillagkép",
+    "Félárnyék",
+    "Metronóm",
+    "Korona",
+    "Szizigia",
+    "Pulsar",
+    "Zár",
+    "Umbra",
+    "Teljesség",
+    "Napszél",
+    "Sarki fény",
+    "Szalagok",
+    "Sarki éjszaka",
+    "Katedrális",
+    "Csillámlás",
+    "Szingularitás",
     "Hazatérés",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Első fény",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Sodródás",
+    "Látóhatár",
+    "Villanás",
+    "Pacsirta",
+    "Lámpások",
+    "Dagály",
+    "Napkelte",
     "Műholdak",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Harmat",
+    "Rekesz",
+    "Kolostor",
+    "Zárókő",
+    "Napóra",
+    "Tűlyuk",
+    "Szélrózsa",
     "Szélárnyék",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Szál",
+    "Délkör",
+    "Zuhatag",
     "Áttűnés",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Szerpentin",
+    "Napforduló",
     "Rezonancia",
     "Prizma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Méhsejt",
+    "Tajték",
     "Örvény",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Aratás",
+    "Kaleido",
+    "Kárpit",
+    "Árnyak",
     "Utófény",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Báb",
+    "Geoda",
     "Parallaxis",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Fellegvár",
+    "Nautilus",
+    "Vecsernye",
     "Szupernóva",
     "Holdkelte",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Szürkület",
+    "Lámpafény",
+    "Bogarak",
+    "Torony",
+    "Noktürn",
+    "Mélyég",
+    "Csillagok",
+    "Félárnyék",
+    "Metronóm",
+    "Korona",
+    "Szizigia",
+    "Pulsar",
+    "Zár",
+    "Umbra",
+    "Teljesség",
+    "Napszél",
+    "Fény",
+    "Szalagok",
+    "Sarki éj",
+    "Katedrális",
+    "Csillám",
+    "Szingularitás",
     "Hazatérés",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Széles: kapd el a hulló kapszulát",
+    "{icon:slow} Lassú: kapd el, és a labda lelassul",
+    "Irányíts: az ütő szélei szélesen lövik el a labdát",
+    "Magányos szikrák: vadászd le mindet",
+    "Küldd a labdát felfelé a nyitott szárnyakon",
+    "Tisztítsd meg alulról az összes lámpást",
+    "Lovagold meg a hullámot: pattintsd az oldalfalakról",
+    "Faragd a napot alulról, sorról sorra",
     "{icon:anchor} Horgony: kapd el a labdát, célozz, majd engedd el",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "A páncélozott téglák két találatot bírnak: figyeld a széleket",
+    "{icon:anchor} Célozz a fal résén át",
+    "Egyetlen ajtó: küldd a labdát az udvarba",
+    "Üsd ki a zárókövet, és az ív megnyílik",
+    "Olvasd a szögeket: minden árnyék egy lövés",
+    "{icon:anchor} Egyetlen keskeny tűlyuk: tartsd, célozz, engedd el",
+    "Minden égtáj a szívhez vezet",
     "Borostyánmagok: minden robbanás eléri a négy szomszédot",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Érintsd meg az izzószálat bárhol: mindkét irányba ég",
+    "Oszd ketté a mezőt a délkör mentén",
+    "Indítsd a zuhatagot bármelyik végén",
     "Nyiss utat a két reléláncon át",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Három relésor: soronként egy tiszta lövés",
+    "A gyűrű egészében ég: találd meg az utat a pereméig",
     "A szomszédos magok továbbviszik a reakciót",
     "{icon:multi} Többlabda: három labda, egy rés",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Mag minden cellában: törd fel őket",
+    "Tajték mindenütt: szabadíts el három labdát",
     "Törj be a páncél mögötti zsebekbe",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Teli mező: a {icon:multi} Többlabda gyorsan letarolja",
+    "Tükrök mindenütt: törd az egyik oldalt, aztán az ikerpárját",
+    "Húzz meg egy szálat, és szétfeslik a szövet",
+    "Törj át a padlón, és gyújtsd meg a hosszú kanócot",
     "{icon:phase} Fázis: három téglaérintés visszapattanás nélkül",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Fázis átsiklik a héjon egészen a magig",
+    "Törj fel egy geodát, és kristályai felizzanak",
     "Törd át a héjat, aztán gyújtsd be a belső utat",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Be a kapun, vagy át a falon {icon:phase} Fázissal",
+    "Spirálisan befelé: a külső menet gyullad ki először",
+    "Három harang: üss meg mindet alulról",
     "Kapj el egy visszatérő labdát, amíg a többi repül",
     "Kövesd a relét a nyitott közép körül",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "A fény elmegy: tanuld meg a mezőt, amíg tudod",
+    "A sötétben a labdád és az ütőd viszi a fényt",
+    "Szentjánosbogarak: a magok a sötétben is izzanak",
+    "Söpörd végig az ütő fényét a parton",
+    "Több labda, több fény: {icon:multi} Többlabda",
+    "Mélyég: minden halvány pötty egy tégla",
+    "Kösd össze a csillagokat: a fényesek magok",
+    "A kapuk ütemre halványulnak: várd meg a rést",
+    "Tik-tak: a kapuk tartják az időt",
+    "A korona ütemre nyílik: ütés befelé",
+    "A szellemkapu lerázza a robbanást: időzítsd a szikrát",
+    "Egy pulsar: gyors ütemek, gyors kezek",
+    "A zár egy pillanatra kinyílik: légy készen",
+    "Félig árnyékban: a kapus oldal tartja az ütemet",
+    "Gyújtsd be a napot, amíg a hold szilárd",
+    "A szél egy irányba fúj: lovagold meg a magokig",
+    "Fényfüggönyök: söpörd le őket {icon:multi} Többlabdával",
+    "Minden szalag egy kapuhoz van kötve: vágd el mindkét felét",
+    "A hosszú éjszaka: a hordozott fény szerint célozz",
+    "Be az ajtókon, fel a rózsaablakhoz",
+    "Minden egyszerre: figyeld a magokat",
+    "Üsd a gyűrűt, amikor a kapuk szilárddá válnak",
     "Egy utolsó kör: használj ki minden rést",
 ];

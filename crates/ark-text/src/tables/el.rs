@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "ΑΥΓΗ",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "ΠΡΩΙ",
+            Chapter::Zenith => "ΖΕΝΙΘ",
+            Chapter::GoldenHour => "ΧΡΥΣΗ ΩΡΑ",
             Chapter::Afterlight => "ΛΥΚΟΦΩΣ",
             Chapter::BlueHour => "ΜΠΛΕ ΩΡΑ",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "ΕΚΛΕΙΨΗ",
+            Chapter::Aurora => "ΑΥΡΟΡΑ",
         },
         PowerName(p) => match p {
             Power::Wide => "ΦΑΡΔΥ",
@@ -151,202 +151,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Πρώτο φως",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Παρασυρμός",
+    "Ορίζοντας",
+    "Λάμψη",
+    "Κορυδαλλός",
+    "Φανάρια",
+    "Παλίρροια",
+    "Ανατολή ηλίου",
     "Δορυφόροι",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Σημείο δρόσου",
+    "Διάφραγμα",
+    "Μοναστήρι",
+    "Κλειδί θόλου",
+    "Ηλιακό ρολόι",
+    "Μικρή οπή",
+    "Ανεμολόγιο",
     "Ρεύμα έλξης",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Νήμα",
+    "Μεσημβρινός",
+    "Καταρράκτης",
     "Διασταύρωση",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Ελιγμοί",
+    "Ηλιοστάσιο",
     "Συντονισμός",
     "Πρίσμα",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Κηρήθρα",
+    "Αφρός θάλασσας",
     "Υπόρρευμα",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Συγκομιδή",
+    "Καλειδοσκόπιο",
+    "Ταπισερί",
+    "Μακριές σκιές",
     "Απόλαμψη",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Χρυσαλίδα",
+    "Γεώδες",
     "Παράλλαξη",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Ακρόπολη",
+    "Ναυτίλος",
+    "Εσπερινός",
     "Σουπερνόβα",
     "Ανατολή σελήνης",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Σούρουπο",
+    "Φως λάμπας",
+    "Πυγολαμπίδες",
+    "Φάρος",
+    "Νυκτερινό",
+    "Βαθύ πεδίο",
+    "Αστερισμός",
+    "Παρασκιά",
+    "Μετρονόμος",
+    "Κορώνα",
+    "Συζυγία",
+    "Πάλσαρ",
+    "Κλείστρο",
+    "Ολοσκιά",
+    "Ολικότητα",
+    "Ηλιακός άνεμος",
+    "Βόρειο σέλας",
+    "Κορδέλες",
+    "Πολική νύχτα",
+    "Καθεδρικός",
+    "Σπινθηρισμός",
+    "Ανωμαλία",
     "Επιστροφή",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Πρώτο φως",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Παρασυρμός",
+    "Ορίζοντας",
+    "Λάμψη",
+    "Κορυδαλλός",
+    "Φανάρια",
+    "Παλίρροια",
+    "Ήλιος",
     "Δορυφόροι",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Δρόσος",
+    "Διάφραγμα",
+    "Μοναστήρι",
+    "Κλειδί",
+    "Ρολόι",
+    "Οπή",
+    "Ανεμολόγιο",
     "Ρεύμα",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Νήμα",
+    "Μεσημβρινός",
+    "Καταρράκτης",
     "Διασταύρωση",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Ελιγμοί",
+    "Ηλιοστάσιο",
     "Συντονισμός",
     "Πρίσμα",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Κηρήθρα",
+    "Αφρός",
     "Υπόρρευμα",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Συγκομιδή",
+    "Καλειδο",
+    "Ταπισερί",
+    "Σκιές",
     "Απόλαμψη",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Χρυσαλίδα",
+    "Γεώδες",
     "Παράλλαξη",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Ακρόπολη",
+    "Ναυτίλος",
+    "Εσπερινός",
     "Σουπερνόβα",
     "Σελήνη",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Σούρουπο",
+    "Λάμπα",
+    "Πυγολαμπίδες",
+    "Φάρος",
+    "Νυκτερινό",
+    "Βάθος",
+    "Αστέρια",
+    "Παρασκιά",
+    "Μετρονόμος",
+    "Κορώνα",
+    "Συζυγία",
+    "Πάλσαρ",
+    "Κλείστρο",
+    "Ολοσκιά",
+    "Ολικότητα",
+    "Άνεμος",
+    "Σέλας",
+    "Κορδέλες",
+    "Πολική νύχτα",
+    "Καθεδρικός",
+    "Σπινθηρισμός",
+    "Ανωμαλία",
     "Επιστροφή",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Φαρδύ: πιάσε την κάψουλα που πέφτει",
+    "{icon:slow} Αργό: πιάσε την και η μπάλα χαλαρώνει",
+    "Καθοδήγησε: οι άκρες της ρακέτας στέλνουν την μπάλα πλάγια",
+    "Μοναχικοί σπινθήρες: κυνήγησε τον καθένα",
+    "Στείλε την μπάλα πάνω από τα ανοιχτά φτερά",
+    "Καθάρισε κάθε φανάρι από κάτω",
+    "Ανέβα στο κύμα: αναπήδησε στους πλαϊνούς τοίχους",
+    "Σπάσε τον ήλιο από κάτω, σειρά σειρά",
     "{icon:anchor} Άγκυρα: πιάσε την μπάλα, σημάδεψε και άφησέ τη",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Τα θωρακισμένα τούβλα αντέχουν δύο χτυπήματα: πρόσεχε τις άκρες",
+    "{icon:anchor} Σημάδεψε μέσα από το κενό στον τοίχο",
+    "Μία μόνο πόρτα: στείλε την μπάλα στην αυλή",
+    "Γκρέμισε το κλειδί και η αψίδα ανοίγει",
+    "Διάβασε τις γωνίες: κάθε σκιά είναι μια βολή",
+    "{icon:anchor} Μία στενή οπή: κράτα, σημάδεψε, άφησε",
+    "Κάθε σημείο του ορίζοντα οδηγεί στην καρδιά",
     "Κεχριμπαρένιοι πυρήνες: κάθε έκρηξη φτάνει τους τέσσερις γείτονες",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Άγγιξε το νήμα οπουδήποτε: καίει και προς τις δύο κατευθύνσεις",
+    "Χώρισε το πεδίο στον μεσημβρινό",
+    "Ξεκίνα τον καταρράκτη από όποιο άκρο θες",
     "Άνοιξε δρόμο μέσα από τις δύο γραμμές αναμεταδοτών",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Τρεις γραμμές αναμεταδοτών: μία καθαρή βολή η καθεμία",
+    "Ο δακτύλιος καίγεται ολόκληρος: βρες δρόμο ως την άκρη του",
     "Οι γειτονικοί πυρήνες μεταφέρουν την αντίδραση",
     "{icon:multi} Πολλαπλή μπάλα: τρεις μπάλες, ένα άνοιγμα",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Ένας πυρήνας σε κάθε κελί: σπάσε τα",
+    "Αφροί παντού: άφησε ελεύθερες τρεις μπάλες",
     "Μπες στις κοιλότητες πίσω από τη θωράκιση",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Γεμάτο πεδίο: η {icon:multi} Πολλαπλή μπάλα το καθαρίζει γρήγορα",
+    "Καθρέφτες παντού: σπάσε τη μία πλευρά και μετά τη δίδυμή της",
+    "Τράβηξε μία κλωστή και το ύφασμα ξηλώνεται",
+    "Σπάσε το πάτωμα και άναψε το μακρύ φυτίλι",
     "{icon:phase} Φάση: τρεις επαφές με τούβλα χωρίς αναπήδηση",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Η Φάση περνά το κέλυφος ως τον πυρήνα",
+    "Σπάσε μια γεώδη και οι κρύσταλλοι ανάβουν",
     "Τρύπησε το κέλυφος και άναψε την εσωτερική διαδρομή",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Μπες από την πύλη ή μέσα από τον τοίχο με {icon:phase} Φάση",
+    "Σπειροειδώς προς τα μέσα: η εξωτερική περιέλιξη ανάβει πρώτη",
+    "Τρεις καμπάνες: χτύπησε την καθεμία από κάτω",
     "Πιάσε μια μπάλα που επιστρέφει ενώ οι άλλες συνεχίζουν",
     "Ακολούθησε τον αναμεταδότη γύρω από το ανοιχτό κέντρο",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Το φως φεύγει: μάθε το πεδίο όσο μπορείς",
+    "Στο σκοτάδι, η μπάλα και η ρακέτα κουβαλούν το φως",
+    "Πυγολαμπίδες: οι πυρήνες λάμπουν και στο σκοτάδι",
+    "Σάρωσε την ακτή με το φως της ρακέτας",
+    "Περισσότερες μπάλες, περισσότερο φως: {icon:multi} Πολλαπλή μπάλα",
+    "Βαθύ πεδίο: κάθε αχνή κουκκίδα είναι τούβλο",
+    "Ένωσε τα αστέρια: τα φωτεινά είναι πυρήνες",
+    "Οι πύλες σβήνουν στον ρυθμό: περίμενε το κενό",
+    "Τικ, τακ: οι πύλες κρατούν τον χρόνο",
+    "Η κορώνα ανοίγει στον ρυθμό: χτύπα μέσα",
+    "Μια πύλη-φάντασμα αγνοεί την έκρηξη: χρονομέτρησε τον σπινθήρα",
+    "Ένα πάλσαρ: γρήγοροι χτύποι, γρήγορα χέρια",
+    "Το κλείστρο ανοίγει για μια στιγμή: να είσαι έτοιμος",
+    "Μισό στη σκιά: η πλευρά με τις πύλες κρατά τον ρυθμό",
+    "Άναψε τον ήλιο όσο το φεγγάρι είναι στερεό",
+    "Ο άνεμος φυσά μόνο προς μία κατεύθυνση: ακολούθησέ τον ως τους πυρήνες",
+    "Κουρτίνες φωτός: σάρωσέ τες με {icon:multi} Πολλαπλή μπάλα",
+    "Κάθε κορδέλα δένεται σε μια πύλη: κόψε και τα δύο μισά",
+    "Η μεγάλη νύχτα: σημάδευε με το φως που κουβαλάς",
+    "Μπες από τις πόρτες, ανέβα στο ρόδακα",
+    "Όλα μαζί: πρόσεχε τους πυρήνες",
+    "Χτύπα τον δακτύλιο όταν οι πύλες στερεοποιούνται",
     "Μία τελευταία τροχιά: αξιοποίησε κάθε άνοιγμα",
 ];
