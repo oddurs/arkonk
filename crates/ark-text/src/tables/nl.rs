@@ -75,13 +75,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "DAGERAAD",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "OCHTEND",
+            Chapter::Zenith => "ZENIT",
+            Chapter::GoldenHour => "GOUDEN UUR",
             Chapter::Afterlight => "SCHEMERING",
             Chapter::BlueHour => "BLAUWE UUR",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "ECLIPS",
+            Chapter::Aurora => "AURORA",
         },
         PowerName(p) => match p {
             Power::Wide => "BREED",
@@ -149,202 +149,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Eerste licht",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Drijven",
+    "Horizon",
+    "Glinster",
+    "Leeuwerik",
+    "Lantaarns",
+    "Getijde",
+    "Zonsopgang",
     "Satellieten",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Dauwpunt",
+    "Opening",
+    "Klooster",
+    "Sluitsteen",
+    "Zonnewijzer",
+    "Speldengat",
+    "Windroos",
     "Zuigstroom",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Gloeidraad",
+    "Meridiaan",
+    "Cascade",
     "Overvloeier",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Haarspeldbocht",
+    "Zonnewende",
     "Resonantie",
     "Prisma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Honingraat",
+    "Schuimspray",
     "Onderstroom",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Oogst",
+    "Caleidoscoop",
+    "Wandtapijt",
+    "Lange schaduwen",
     "Avondgloed",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Cocon",
+    "Geode",
     "Parallax",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Citadel",
+    "Nautilus",
+    "Vespers",
     "Supernova",
     "Maansopkomst",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Schemeruur",
+    "Lamplicht",
+    "Vuurvliegjes",
+    "Vuurtoren",
+    "Nocturne",
+    "Diepveld",
+    "Sterrenbeeld",
+    "Halfschaduw",
+    "Metronoom",
+    "Corona",
+    "Syzygie",
+    "Pulsar",
+    "Sluiter",
+    "Umbra",
+    "Totaliteit",
+    "Zonnewind",
+    "Noorderlicht",
+    "Linten",
+    "Poolnacht",
+    "Kathedraal",
+    "Geflonker",
+    "Singulariteit",
     "Thuiskomst",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Eerste licht",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Drijven",
+    "Horizon",
+    "Glinster",
+    "Leeuwerik",
+    "Lantaarns",
+    "Getijde",
+    "Zon",
     "Satellieten",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Dauwpunt",
+    "Opening",
+    "Klooster",
+    "Sluitsteen",
+    "Zonnewijzer",
+    "Speldengat",
+    "Windroos",
     "Zuigstroom",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Draad",
+    "Meridiaan",
+    "Cascade",
     "Overvloeier",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Haarspeld",
+    "Zonnewende",
     "Resonantie",
     "Prisma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Raat",
+    "Spray",
     "Onderstroom",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Oogst",
+    "Caleido",
+    "Tapijt",
+    "Schaduwen",
     "Avondgloed",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Cocon",
+    "Geode",
     "Parallax",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Citadel",
+    "Nautilus",
+    "Vespers",
     "Supernova",
     "Maan",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Schemeruur",
+    "Lamplicht",
+    "Vuurvliegjes",
+    "Vuurtoren",
+    "Nocturne",
+    "Diepveld",
+    "Sterren",
+    "Halfschaduw",
+    "Metronoom",
+    "Corona",
+    "Syzygie",
+    "Pulsar",
+    "Sluiter",
+    "Umbra",
+    "Totaliteit",
+    "Zonnewind",
+    "Noorderlicht",
+    "Linten",
+    "Poolnacht",
+    "Kathedraal",
+    "Geflonker",
+    "Singulariteit",
     "Thuiskomst",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Breed: vang de vallende capsule",
+    "{icon:slow} Traag: vang hem en de bal wordt rustiger",
+    "Stuur: de randen van het batje sturen de bal opzij",
+    "Losse vonken: jaag op elke vonk",
+    "Stuur de bal omhoog langs de open vleugels",
+    "Ruim elke lantaarn van onderaf op",
+    "Rijd op de deining: kaats af op de zijmuren",
+    "Hak de zon van onderaf weg, rij na rij",
     "{icon:anchor} Anker: vang de bal, richt en laat hem los",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Gepantserde stenen vragen twee treffers: let op de randen",
+    "{icon:anchor} Richt door de opening in de muur",
+    "Eén deur: stuur de bal de binnenplaats in",
+    "Sla de sluitsteen weg en de boog staat open",
+    "Lees de hoeken: elke schaduw is een schot",
+    "{icon:anchor} Eén smal gaatje: vasthouden, richten, loslaten",
+    "Elke windstreek leidt naar het hart",
     "Amberkernen: elke explosie raakt de vier buren",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Raak de gloeidraad overal aan: hij brandt twee kanten op",
+    "Splits het veld langs de meridiaan",
+    "Start de cascade aan een van beide uiteinden",
     "Open een route door de twee relaislijnen",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Drie relaislijnen: één zuiver schot per lijn",
+    "De ring brandt in zijn geheel: vind een weg naar de rand",
     "Naburige kernen dragen de reactie verder",
     "{icon:multi} Multibal: drie ballen, één opening",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Een kern in elke cel: kraak ze open",
+    "Spray overal: laat drie ballen los",
     "Breek door naar de holtes achter het pantser",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Vol veld: {icon:multi} Multibal ruimt het snel op",
+    "Overal spiegels: breek één kant, dan zijn tweeling",
+    "Trek aan één draad en het weefsel raakt los",
+    "Breek door de vloer en steek de lange lont aan",
     "{icon:phase} Fase: drie steentreffers zonder te stuiteren",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Fase glipt door de schil naar de kern",
+    "Kraak een geode en de kristallen lichten op",
     "Doorboor de schil en ontsteek dan de binnenste route",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Via de poort naar binnen, of door de muur met {icon:phase} Fase",
+    "Spiraal naar binnen: de buitenste winding licht eerst op",
+    "Drie klokken: luid elk van onderaf",
     "Vang een terugkerende bal terwijl de andere doorgaan",
     "Volg het relais rond het open midden",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Het licht verdwijnt: leer het veld zolang het kan",
+    "In het donker dragen je bal en batje het licht",
+    "Vuurvliegjes: de kernen gloeien zelfs in het donker",
+    "Veeg het licht van het batje over de kust",
+    "Meer ballen, meer licht: {icon:multi} Multibal",
+    "Diepveld: elke vage stip is een steen",
+    "Verbind de sterren: de heldere zijn kernen",
+    "Poorten vervagen op de maat: wacht op de opening",
+    "Tik, tak: de poorten houden de tijd",
+    "De corona opent op de maat: raak binnenin",
+    "Een spookpoort schudt een explosie af: timing is alles",
+    "Een pulsar: snelle slagen, snelle handen",
+    "De sluiter gaat even open: wees klaar",
+    "Half in de schaduw: de poortkant houdt de maat",
+    "Ontsteek de zon terwijl de maan vast is",
+    "De wind waait één kant op: rijd mee naar de kernen",
+    "Gordijnen van licht: veeg ze op met {icon:multi} Multibal",
+    "Elk lint hangt aan een poort: knip beide helften door",
+    "De lange nacht: richt op het licht dat je draagt",
+    "Door de deuren naar binnen, omhoog naar het roosvenster",
+    "Alles tegelijk: let op de kernen",
+    "Raak de ring als de poorten vast worden",
     "Een laatste baan: laat elke opening tellen",
 ];

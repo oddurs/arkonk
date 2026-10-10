@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "AAMUNKOITTO",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "AAMU",
+            Chapter::Zenith => "HUIPPU",
+            Chapter::GoldenHour => "KULTAINEN HETKI",
             Chapter::Afterlight => "ILTAHÄMÄRÄ",
             Chapter::BlueHour => "SININEN HETKI",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "PIMENNYS",
+            Chapter::Aurora => "REVONTULET",
         },
         PowerName(p) => match p {
             Power::Wide => "LEVEÄ",
@@ -150,202 +150,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Ensivalo",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Ajelehtiminen",
+    "Horisontti",
+    "Tuike",
+    "Leivo",
+    "Lyhdyt",
+    "Vuorovesi",
+    "Auringonnousu",
     "Satelliitit",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Kastepiste",
+    "Aukko",
+    "Luostari",
+    "Huippukivi",
+    "Aurinkokello",
+    "Neulanreikä",
+    "Tuuliruusu",
     "Imuvirta",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Hehkulanka",
+    "Meridiaani",
+    "Kaskadi",
     "Ristihäivytys",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Serpentiini",
+    "Päivänseisaus",
     "Resonanssi",
     "Prisma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Mehiläiskenno",
+    "Meriroiske",
     "Pohjavirta",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Sato",
+    "Kaleidoskooppi",
+    "Kuvakudos",
+    "Pitkät varjot",
     "Jälkihehku",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Kotelo",
+    "Geodi",
     "Parallaksi",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Linnake",
+    "Nautilus",
+    "Iltarukous",
     "Supernova",
     "Kuunnousu",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Hämärä",
+    "Lampunvalo",
+    "Tulikärpäset",
+    "Majakka",
+    "Nokturni",
+    "Syväkenttä",
+    "Tähtikuvio",
+    "Puolivarjo",
+    "Metronomi",
+    "Korona",
+    "Syzygia",
+    "Pulsari",
+    "Suljin",
+    "Umbra",
+    "Täydellisyys",
+    "Aurinkotuuli",
+    "Pohjanvalo",
+    "Nauhat",
+    "Napayö",
+    "Katedraali",
+    "Kimallus",
+    "Singulariteetti",
     "Kotiinpaluu",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Ensivalo",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Ajelehti",
+    "Horisontti",
+    "Tuike",
+    "Leivo",
+    "Lyhdyt",
+    "Vuorovesi",
+    "Aurinko",
     "Satelliitit",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Kastepiste",
+    "Aukko",
+    "Luostari",
+    "Huippukivi",
+    "Aurinkokello",
+    "Neulanreikä",
+    "Tuuliruusu",
     "Imuvirta",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Lanka",
+    "Meridiaani",
+    "Kaskadi",
     "Häivytys",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Serpentiini",
+    "Seisaus",
     "Resonanssi",
     "Prisma",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Kenno",
+    "Roiske",
     "Pohjavirta",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Sato",
+    "Kaleido",
+    "Kuvakudos",
+    "Varjot",
     "Jälkihehku",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Kotelo",
+    "Geodi",
     "Parallaksi",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Linnake",
+    "Nautilus",
+    "Iltarukous",
     "Supernova",
     "Kuunnousu",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Hämärä",
+    "Lampunvalo",
+    "Tulikärpäset",
+    "Majakka",
+    "Nokturni",
+    "Syväkenttä",
+    "Tähdet",
+    "Puolivarjo",
+    "Metronomi",
+    "Korona",
+    "Syzygia",
+    "Pulsari",
+    "Suljin",
+    "Umbra",
+    "Täydellisyys",
+    "Aurinkotuuli",
+    "Pohjanvalo",
+    "Nauhat",
+    "Napayö",
+    "Katedraali",
+    "Kimallus",
+    "Singulariteetti",
     "Kotiinpaluu",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Leveä: nappaa putoava kapseli",
+    "{icon:slow} Hidas: nappaa se, niin pallo rauhoittuu",
+    "Ohjaa: mailan reunat lähettävät pallon sivuille",
+    "Yksittäiset kipinät: jahtaa jokainen",
+    "Lähetä pallo ylös avoimia siipiä pitkin",
+    "Tyhjennä jokainen lyhty alhaalta",
+    "Ratsasta aallolla: kimmota sivuseinistä",
+    "Louhi aurinkoa alhaalta, rivi riviltä",
     "{icon:anchor} Ankkuri: nappaa pallo, tähtää ja vapauta",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Panssaroidut tiilet kestävät kaksi osumaa: varo reunoja",
+    "{icon:anchor} Tähtää muurin aukosta",
+    "Vain yksi ovi: lähetä pallo sisäpihalle",
+    "Kaada huippukivi, niin kaari aukeaa",
+    "Lue kulmat: jokainen varjo on laukaus",
+    "{icon:anchor} Yksi kapea neulanreikä: pidä, tähtää, vapauta",
+    "Jokainen ilmansuunta johtaa sydämeen",
     "Meripihkaytimet: räjähdys osuu neljään naapuriin",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Kosketa hehkulankaa mistä tahansa: se palaa molempiin suuntiin",
+    "Jaa kenttä meridiaania pitkin",
+    "Käynnistä kaskadi kummasta päästä tahansa",
     "Avaa reitti kahden välityslinjan läpi",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Kolme välityslinjaa: yksi puhdas laukaus kullekin",
+    "Rengas palaa kokonaan: etsi reitti sen reunalle",
     "Vierekkäiset ytimet välittävät reaktion",
     "{icon:multi} Monipallo: kolme palloa, yksi aukko",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "Ydin jokaisessa kennossa: murra ne auki",
+    "Roiskeita joka puolella: päästä kolme palloa irti",
     "Murtaudu panssarin takaisiin taskuihin",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Täysi kenttä: {icon:multi} Monipallo putsaa sen nopeasti",
+    "Peilejä kaikkialla: riko yksi puoli, sitten sen kaksonen",
+    "Vedä yhdestä langasta, niin kudos purkautuu",
+    "Murra lattia läpi ja sytytä pitkä sytytyslanka",
     "{icon:phase} Vaihe: kolme tiiliosumaa ilman kimpoamista",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Vaihe liukuu kuoren läpi ytimeen",
+    "Murra geodi, niin sen kiteet syttyvät",
     "Läpäise kuori ja sytytä sitten sisäreitti",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Porttia pitkin sisään tai muurin läpi {icon:phase} Vaiheella",
+    "Kierrä sisäänpäin: uloin kierros syttyy ensin",
+    "Kolme kelloa: soita jokaista alhaalta",
     "Nappaa palaava pallo muiden lentäessä",
     "Seuraa välitystä avoimen keskustan ympäri",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Valo katoaa: opettele kenttä, kun vielä ehdit",
+    "Pimeässä pallosi ja mailasi kantavat valoa",
+    "Tulikärpäset: ytimet hehkuvat pimeässäkin",
+    "Pyyhkäise mailan valo rannikon yli",
+    "Lisää palloja, lisää valoa: {icon:multi} Monipallo",
+    "Syväkenttä: jokainen himmeä piste on tiili",
+    "Yhdistä tähdet: kirkkaat ovat ytimiä",
+    "Portit himmenevät tahdissa: odota aukkoa",
+    "Tik, tak: portit pitävät tahtia",
+    "Korona aukeaa tahdissa: iske sisään",
+    "Aaveportti ravistaa räjähdyksen pois: ajoita kipinä",
+    "Pulsari: nopeat iskut, nopeat kädet",
+    "Suljin aukeaa hetkeksi: ole valmis",
+    "Puoliksi varjossa: porttipuoli pitää tahdin",
+    "Sytytä aurinko, kun kuu on kiinteä",
+    "Tuuli puhaltaa yhteen suuntaan: ratsasta sillä ytimille",
+    "Valoverhot: pyyhi ne pois {icon:multi} Monipallolla",
+    "Jokainen nauha on sidottu porttiin: katkaise molemmat puolikkaat",
+    "Pitkä yö: tähtää kantamasi valon mukaan",
+    "Ovista sisään ja ylös ruusuikkunalle",
+    "Kaikki kerralla: tarkkaile ytimiä",
+    "Iske renkaaseen, kun portit muuttuvat kiinteiksi",
     "Viimeinen kierros: hyödynnä jokainen aukko",
 ];

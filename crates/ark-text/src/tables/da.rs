@@ -75,13 +75,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "DAGGRY",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "MORGEN",
+            Chapter::Zenith => "ZENIT",
+            Chapter::GoldenHour => "GYLDEN TIME",
             Chapter::Afterlight => "EFTERLYS",
             Chapter::BlueHour => "BLÅ TIME",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "FORMØRKELSE",
+            Chapter::Aurora => "AURORA",
         },
         PowerName(p) => match p {
             Power::Wide => "BRED",
@@ -149,202 +149,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "Første lys",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Drift",
+    "Horisont",
+    "Glimt",
+    "Lærke",
+    "Lanterner",
+    "Tidevand",
+    "Solopgang",
     "Satellitter",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Dugpunkt",
+    "Blænde",
+    "Kloster",
+    "Slutsten",
+    "Solur",
+    "Nålehul",
+    "Vindrose",
     "Slipstrøm",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Glødetråd",
+    "Meridian",
+    "Kaskade",
     "Overtoning",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Hårnålesving",
+    "Solhverv",
     "Resonans",
     "Prisme",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Vokskage",
+    "Skumsprøjt",
     "Understrøm",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "Høst",
+    "Kaleidoskop",
+    "Gobelin",
+    "Lange skygger",
     "Efterglød",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Puppe",
+    "Geode",
     "Parallakse",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Citadel",
+    "Nautilus",
+    "Aftensang",
     "Supernova",
     "Måneopgang",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "Tusmørke",
+    "Lampelys",
+    "Ildfluer",
+    "Fyrtårn",
+    "Nocturne",
+    "Dybfelt",
+    "Stjernebillede",
+    "Halvskygge",
+    "Metronom",
+    "Korona",
+    "Syzygi",
+    "Pulsar",
+    "Lukker",
+    "Umbra",
+    "Totalitet",
+    "Solvind",
+    "Nordlys",
+    "Bånd",
+    "Polarnat",
+    "Katedral",
+    "Glimmer",
+    "Singularitet",
     "Hjemkomst",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "Første lys",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "Drift",
+    "Horisont",
+    "Glimt",
+    "Lærke",
+    "Lanterner",
+    "Tidevand",
+    "Sol",
     "Satellitter",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "Dugpunkt",
+    "Blænde",
+    "Kloster",
+    "Slutsten",
+    "Solur",
+    "Nålehul",
+    "Vindrose",
     "Slipstrøm",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "Tråd",
+    "Meridian",
+    "Kaskade",
     "Overtoning",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "Hårnål",
+    "Solhverv",
     "Resonans",
     "Prisme",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "Voks",
+    "Skumsprøjt",
     "Understrøm",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "Høst",
+    "Kaleido",
+    "Gobelin",
+    "Skygger",
     "Efterglød",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "Puppe",
+    "Geode",
     "Parallakse",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "Citadel",
+    "Nautilus",
+    "Aftensang",
     "Supernova",
     "Måne",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "Tusmørke",
+    "Lampelys",
+    "Ildfluer",
+    "Fyrtårn",
+    "Nocturne",
+    "Dybfelt",
+    "Stjerner",
+    "Halvskygge",
+    "Metronom",
+    "Korona",
+    "Syzygi",
+    "Pulsar",
+    "Lukker",
+    "Umbra",
+    "Totalitet",
+    "Solvind",
+    "Nordlys",
+    "Bånd",
+    "Polarnat",
+    "Katedral",
+    "Glimmer",
+    "Singularitet",
     "Hjemkomst",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} Bred: grib den faldende kapsel",
+    "{icon:slow} Langsom: grib den, og bolden tager det roligt",
+    "Styr: battets kanter sender bolden bredt ud",
+    "Enlige gnister: jag hver eneste",
+    "Send bolden op ad de åbne fløje",
+    "Ryd hver lanterne nedefra",
+    "Rid på dønningen: spil af mod sidevæggene",
+    "Hug solen væk nedefra, række for række",
     "{icon:anchor} Anker: grib bolden, sigt, og slip den",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "Panserklodser tager to slag: pas på kanterne",
+    "{icon:anchor} Sigt gennem hullet i muren",
+    "Kun én dør: send bolden ind i gården",
+    "Slå slutstenen ud, og buen står åben",
+    "Læs vinklerne: hver skygge er et skud",
+    "{icon:anchor} Ét smalt nålehul: hold, sigt, slip",
+    "Hvert verdenshjørne fører til hjertet",
     "Ravkerner: hver eksplosion rammer de fire naboer",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "Rør glødetråden et vilkårligt sted: den brænder begge veje",
+    "Del banen langs meridianen",
+    "Start kaskaden i begge ender",
     "Åbn en vej gennem de to relælinjer",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "Tre relælinjer: ét rent skud til hver",
+    "Ringen brænder helt: find en vej til kanten",
     "Nabokerner fører reaktionen videre",
     "{icon:multi} Multibold: tre bolde, én åbning",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "En kerne i hver celle: knæk dem op",
+    "Sprøjt overalt: slip tre bolde løs",
     "Bryd ind i lommerne bag panseret",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "Fuld bane: {icon:multi} Multibold rydder den hurtigt",
+    "Spejle overalt: bryd den ene side, så dens tvilling",
+    "Træk i én tråd, og vævningen går op",
+    "Bryd gennem gulvet og tænd den lange lunte",
     "{icon:phase} Fase: tre klodsramninger uden at prelle af",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} Fase glider gennem skallen til kernen",
+    "Knæk en geode, og dens krystaller lyser op",
     "Gennembryd skallen, og antænd så den indre rute",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "Ind ad porten, eller gennem muren med {icon:phase} Fase",
+    "Spiral indad: den yderste vinding lyser først",
+    "Tre klokker: ring på hver nedefra",
     "Grib en returbold, mens de andre fortsætter",
     "Følg relæet rundt om den åbne midte",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "Lyset forsvinder: lær banen, mens du kan",
+    "I mørket bærer din bold og dit bat lyset",
+    "Ildfluer: kernerne gløder selv i mørket",
+    "Fej batets lys hen over kysten",
+    "Flere bolde, mere lys: {icon:multi} Multibold",
+    "Dybfelt: hver svag plet er en klods",
+    "Forbind stjernerne: de klare er kerner",
+    "Porte blegner i takt: vent på åbningen",
+    "Tik, tak: portene holder takten",
+    "Koronaen åbner i takt: ram indeni",
+    "En spøgelsesport ryster en eksplosion af sig: tim gnisten",
+    "En pulsar: hurtige slag, hurtige hænder",
+    "Lukkeren åbner et øjeblik: vær klar",
+    "Halvt i skygge: portsiden holder takten",
+    "Tænd solen, mens månen er fast",
+    "Vinden blæser kun én vej: rid med den til kernerne",
+    "Lysgardiner: fej dem væk med {icon:multi} Multibold",
+    "Hvert bånd er bundet til en port: skær begge halvdele over",
+    "Den lange nat: sigt efter det lys, du bærer",
+    "Ind ad dørene, op til rosevinduet",
+    "Alt på én gang: hold øje med kernerne",
+    "Ram ringen, når portene bliver faste",
     "En sidste bane: få hver åbning til at tælle",
 ];
