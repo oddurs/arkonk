@@ -297,8 +297,10 @@ macOS arm64 release binary, symbols kept, measured side by side:
 | Build | Bytes |
 | --- | ---: |
 | Twelve languages (`main` before this change, `cjk` on) | 3,977,840 |
-| All thirty languages (default, `scripts` on) | 5,333,376 |
-| All thirty languages without `scripts` (Latin, Greek, Cyrillic only) | 2,971,648 |
+| All thirty languages (`scripts` on), before the journey | 5,333,376 |
+| All thirty languages without `scripts` (Latin, Greek, Cyrillic only), before the journey | 2,971,648 |
+| All thirty languages with the journey (default, `scripts` on) | 8,526,800 |
+| All thirty languages with the journey, without `scripts` | 3,374,432 |
 
 | Atlas file | Holds | Thirty languages | Journey, every string as body text too | Journey, each string in its roles |
 | --- | --- | ---: | ---: | ---: |
