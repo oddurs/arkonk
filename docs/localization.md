@@ -319,25 +319,17 @@ preference. The desktop size budget is measured without `scripts` (as Steam
 is measured separately): the Steam and desktop packages carry every
 language, while portable and minimal builds hold the size line.
 
-## Awaiting translation
+## The 64-sector journey text
 
-The 64-sector journey (`docs/journey.md`) added text that every table
-except English carries **in English, as a placeholder**, marked
-`// awaiting translation` on its line. Each locale is waiting on the same
-162 entries. `es-419` inherits them from `es`. Pseudo is generated
-from English, so it is complete.
-
-- **Chapter names** (`TextId::ChapterName`, Label role, capitals): `Morning`, `Zenith`, `GoldenHour`, `Eclipse`, `Aurora`.
-- **Sector names and their short forms** (`TextId::SectorName`, the `NAMES`
-  and `SHORT_NAMES` arrays), 52 sectors by slug: `drift`, `horizon`, `glimmer`, `skylark`, `lanterns`, `tidewater`, `sunrise`, `dewpoint`, `aperture`, `cloister`, `keystone`, `sundial`, `pinhole`, `windrose`, `filament`, `meridian`, `cascade`, `switchback`, `solstice`, `honeycomb`, `spindrift`, `harvest`, `kaleidoscope`, `tapestry`, `long_shadows`, `chrysalis`, `geode`, `citadel`, `nautilus`, `vespers`, `gloaming`, `lamplight`, `fireflies`, `lighthouse`, `nocturne`, `deep_field`, `constellation`, `penumbra`, `metronome`, `corona`, `syzygy`, `pulsar`, `shutter`, `umbra`, `totality`, `solar_wind`, `borealis`, `ribbons`, `polar_night`, `cathedral`, `shimmer`, `singularity`.
-- **Sector tips** (`TextId::SectorTip`, the `TIPS` array), 53 by slug: the
-  same 52 sectors, and `first_light`, whose English changed: it now
-  teaches Wide alone, since Slow has its own sector (`drift`).
-
-The other 3 chapter names and 11 sectors kept their slugs, and their existing
-drafts stay where they were. `docs/steam/rich_presence/*.vdf` show the
-placeholders too until the tables change; rerun
-`ARKONK_WRITE_PRESENCE=1 cargo test presence` after translating.
+The journey (`docs/journey.md`) added 5 chapter names, 52 sector names with
+short forms and 53 sector tips (`first_light` was reworded to teach Wide
+alone). Every table carries them as drafts like the rest: written from the
+English by the same rules, reusing each table's own words for powers, bricks
+and cores, and awaiting native review. `es-419` inherits them from `es`;
+pseudo is generated from English. The sector names are evocative rather than
+literal, so a reviewer should judge them as names. The rich presence files in
+`docs/steam/rich_presence/` come from the tables: rerun
+`ARKONK_WRITE_PRESENCE=1 cargo test presence` after changing any of them.
 
 ## Known gaps
 
