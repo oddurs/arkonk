@@ -76,13 +76,13 @@ pub(super) fn text(id: TextId) -> &'static str {
         SectorTip(s) => TIPS[s.index()],
         ChapterName(c) => match c {
             Chapter::Daybreak => "暁",
-            Chapter::Morning => "MORNING", // awaiting translation
-            Chapter::Zenith => "ZENITH",   // awaiting translation
-            Chapter::GoldenHour => "GOLDEN HOUR", // awaiting translation
+            Chapter::Morning => "朝",
+            Chapter::Zenith => "天頂",
+            Chapter::GoldenHour => "ゴールデンアワー",
             Chapter::Afterlight => "黄昏",
             Chapter::BlueHour => "ブルーアワー",
-            Chapter::Eclipse => "ECLIPSE", // awaiting translation
-            Chapter::Aurora => "AURORA",   // awaiting translation
+            Chapter::Eclipse => "日食",
+            Chapter::Aurora => "オーロラ",
         },
         PowerName(p) => match p {
             Power::Wide => "ワイド",
@@ -149,202 +149,202 @@ pub(super) fn short(id: TextId) -> Option<&'static str> {
 
 const NAMES: [&str; SECTOR_COUNT] = [
     "夜明けの光",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "漂流",
+    "地平線",
+    "微光",
+    "ヒバリ",
+    "灯籠",
+    "潮",
+    "日の出",
     "サテライト",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "露点",
+    "絞り",
+    "回廊",
+    "要石",
+    "日時計",
+    "ピンホール",
+    "風配図",
     "スリップストリーム",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "フィラメント",
+    "子午線",
+    "カスケード",
     "クロスフェード",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "つづら折り",
+    "至点",
     "共鳴",
     "プリズム",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "ハニカム",
+    "波しぶき",
     "引き潮",
-    "Harvest",      // awaiting translation
-    "Kaleidoscope", // awaiting translation
-    "Tapestry",     // awaiting translation
-    "Long Shadows", // awaiting translation
+    "収穫",
+    "万華鏡",
+    "タペストリー",
+    "長い影",
     "残光",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "蛹",
+    "ジオード",
     "視差",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "城塞",
+    "オウムガイ",
+    "晩祷",
     "超新星",
     "月の出",
-    "Gloaming",      // awaiting translation
-    "Lamplight",     // awaiting translation
-    "Fireflies",     // awaiting translation
-    "Lighthouse",    // awaiting translation
-    "Nocturne",      // awaiting translation
-    "Deep Field",    // awaiting translation
-    "Constellation", // awaiting translation
-    "Penumbra",      // awaiting translation
-    "Metronome",     // awaiting translation
-    "Corona",        // awaiting translation
-    "Syzygy",        // awaiting translation
-    "Pulsar",        // awaiting translation
-    "Shutter",       // awaiting translation
-    "Umbra",         // awaiting translation
-    "Totality",      // awaiting translation
-    "Solar Wind",    // awaiting translation
-    "Borealis",      // awaiting translation
-    "Ribbons",       // awaiting translation
-    "Polar Night",   // awaiting translation
-    "Cathedral",     // awaiting translation
-    "Shimmer",       // awaiting translation
-    "Singularity",   // awaiting translation
+    "薄暮",
+    "灯火",
+    "蛍",
+    "灯台",
+    "ノクターン",
+    "ディープフィールド",
+    "星座",
+    "半影",
+    "メトロノーム",
+    "コロナ",
+    "朔望",
+    "パルサー",
+    "シャッター",
+    "本影",
+    "皆既",
+    "太陽風",
+    "北極光",
+    "リボン",
+    "極夜",
+    "大聖堂",
+    "きらめき",
+    "特異点",
     "帰還",
 ];
 
 /// Sector names for narrow places: the band and a Compact page.
 const SHORT_NAMES: [&str; SECTOR_COUNT] = [
     "夜明け",
-    "Drift",     // awaiting translation
-    "Horizon",   // awaiting translation
-    "Glimmer",   // awaiting translation
-    "Skylark",   // awaiting translation
-    "Lanterns",  // awaiting translation
-    "Tidewater", // awaiting translation
-    "Sunrise",   // awaiting translation
+    "漂流",
+    "地平線",
+    "微光",
+    "ヒバリ",
+    "灯籠",
+    "潮",
+    "日の出",
     "サテライト",
-    "Dewpoint", // awaiting translation
-    "Aperture", // awaiting translation
-    "Cloister", // awaiting translation
-    "Keystone", // awaiting translation
-    "Sundial",  // awaiting translation
-    "Pinhole",  // awaiting translation
-    "Windrose", // awaiting translation
+    "露点",
+    "絞り",
+    "回廊",
+    "要石",
+    "日時計",
+    "ピンホール",
+    "風配図",
     "スリップ",
-    "Filament", // awaiting translation
-    "Meridian", // awaiting translation
-    "Cascade",  // awaiting translation
+    "フィラメント",
+    "子午線",
+    "カスケード",
     "クロス",
-    "Switchback", // awaiting translation
-    "Solstice",   // awaiting translation
+    "つづら折り",
+    "至点",
     "共鳴",
     "プリズム",
-    "Honeycomb", // awaiting translation
-    "Spindrift", // awaiting translation
+    "ハニカム",
+    "波しぶき",
     "引き潮",
-    "Harvest",  // awaiting translation
-    "Kaleido",  // awaiting translation
-    "Tapestry", // awaiting translation
-    "Shadows",  // awaiting translation
+    "収穫",
+    "万華鏡",
+    "タペストリー",
+    "長影",
     "残光",
-    "Chrysalis", // awaiting translation
-    "Geode",     // awaiting translation
+    "蛹",
+    "ジオード",
     "視差",
-    "Citadel",  // awaiting translation
-    "Nautilus", // awaiting translation
-    "Vespers",  // awaiting translation
+    "城塞",
+    "オウムガイ",
+    "晩祷",
     "超新星",
     "月の出",
-    "Gloaming",    // awaiting translation
-    "Lamplight",   // awaiting translation
-    "Fireflies",   // awaiting translation
-    "Lighthouse",  // awaiting translation
-    "Nocturne",    // awaiting translation
-    "Deep Field",  // awaiting translation
-    "Stars",       // awaiting translation
-    "Penumbra",    // awaiting translation
-    "Metronome",   // awaiting translation
-    "Corona",      // awaiting translation
-    "Syzygy",      // awaiting translation
-    "Pulsar",      // awaiting translation
-    "Shutter",     // awaiting translation
-    "Umbra",       // awaiting translation
-    "Totality",    // awaiting translation
-    "Solar Wind",  // awaiting translation
-    "Borealis",    // awaiting translation
-    "Ribbons",     // awaiting translation
-    "Polar Night", // awaiting translation
-    "Cathedral",   // awaiting translation
-    "Shimmer",     // awaiting translation
-    "Singularity", // awaiting translation
+    "薄暮",
+    "灯火",
+    "蛍",
+    "灯台",
+    "ノクターン",
+    "ディープ",
+    "星座",
+    "半影",
+    "メトロノーム",
+    "コロナ",
+    "朔望",
+    "パルサー",
+    "シャッター",
+    "本影",
+    "皆既",
+    "太陽風",
+    "北極光",
+    "リボン",
+    "極夜",
+    "大聖堂",
+    "きらめき",
+    "特異点",
     "帰還",
 ];
 
 const TIPS: [&str; SECTOR_COUNT] = [
-    "{icon:wide} Wide: catch the falling capsule", // awaiting translation
-    "{icon:slow} Slow: catch it and the ball eases off", // awaiting translation
-    "Steer: the paddle's edges send the ball wide", // awaiting translation
-    "Lone sparks: chase each one down",            // awaiting translation
-    "Send the ball up the open wings",             // awaiting translation
-    "Clear each lantern from below",               // awaiting translation
-    "Ride the swell: bank shots off the side walls", // awaiting translation
-    "Chip the sun away from below, row by row",    // awaiting translation
+    "{icon:wide} ワイド：落ちてくるカプセルをキャッチ",
+    "{icon:slow} スロー：取るとボールが落ち着く",
+    "操作：パドルの端でボールを大きく飛ばせ",
+    "点在する火花：一つずつ追い詰めろ",
+    "開いた両翼からボールを上へ",
+    "灯籠を下から一つずつ片づけよう",
+    "うねりに乗れ：横の壁で跳ね返せ",
+    "太陽を下から一列ずつ削れ",
     "{icon:anchor} アンカー：ボールを受け止め、狙って放つ",
-    "Armored bricks take two hits: watch the rims", // awaiting translation
-    "{icon:anchor} Aim through the gap in the wall", // awaiting translation
-    "One door in: send the ball into the courtyard", // awaiting translation
-    "Knock out the keystone and the arch is open",  // awaiting translation
-    "Read the angles: each shadow is a shot",       // awaiting translation
-    "{icon:anchor} One narrow pinhole: hold, aim, release", // awaiting translation
-    "Every point of the compass leads to the heart", // awaiting translation
+    "装甲ブロックは2回で割れる：縁に注意",
+    "{icon:anchor} 壁の隙間を狙い撃て",
+    "入口は一つ：ボールを中庭へ",
+    "要石を崩せば、アーチが開く",
+    "角度を読め：影の一つ一つが一打",
+    "{icon:anchor} 細いピンホール：保持、狙って、放て",
+    "どの方角も中心へ続く",
     "琥珀のコア：爆発は隣接する4つに届く",
-    "Touch the filament anywhere: it burns both ways", // awaiting translation
-    "Split the field down the meridian",               // awaiting translation
-    "Start the cascade at either end",                 // awaiting translation
+    "フィラメントはどこに触れても両側へ燃える",
+    "子午線に沿って場を二分しよう",
+    "カスケードはどちらの端からでも",
     "2本のリレーラインの間に道を開こう",
-    "Three relay lines: one clean shot each", // awaiting translation
-    "The ring burns whole: find a way to its edge", // awaiting translation
+    "3本のリレーライン：それぞれ一発で決めろ",
+    "リングは丸ごと燃える：縁までの道を見つけよう",
     "隣り合うコアが連鎖を伝える",
     "{icon:multi} マルチボール：3つのボールで1つの突破口を",
-    "A core in every cell: crack them open", // awaiting translation
-    "Spray everywhere: let three balls loose", // awaiting translation
+    "すべてのセルにコア：割って開けろ",
+    "しぶきが舞う：3つのボールを解き放て",
     "装甲の奥にあるポケットへ切り込め",
-    "A full field: {icon:multi} Multiball reaps it fast", // awaiting translation
-    "Mirrors everywhere: break one side, then its twin",  // awaiting translation
-    "Pull one thread and the weave comes loose",          // awaiting translation
-    "Break through the floor and light the long fuse",    // awaiting translation
+    "満杯の場：{icon:multi} マルチボールで一掃",
+    "鏡だらけ：片側を割り、次に双子を割れ",
+    "糸を一本引けば織物がほどける",
+    "床を突き破り、長い導火線に火をつけろ",
     "{icon:phase} フェイズ：跳ね返らずにブロックへ3回接触",
-    "{icon:phase} Phase slips through the shell to the core", // awaiting translation
-    "Crack a geode and its crystals light up",                // awaiting translation
+    "{icon:phase} フェイズ：外殻をすり抜けてコアへ",
+    "ジオードを割れば、結晶が輝き出す",
     "外殻を貫き、内側のルートに点火せよ",
-    "In by the gate, or through the wall with {icon:phase} Phase", // awaiting translation
-    "Spiral in: the outer coil lights first",                      // awaiting translation
-    "Three bells: ring each one from beneath",                     // awaiting translation
+    "ゲートから入るか、{icon:phase} フェイズで壁を抜けろ",
+    "渦を描いて進め：外側の渦が先に灯る",
+    "3つの鐘：それぞれを下から鳴らせ",
     "他のボールが飛ぶ間に戻りをキャッチ",
     "空いた中心の周りをリレーに沿って進め",
-    "Light is leaving: learn the field while you can", // awaiting translation
-    "In the dark, your ball and keel carry the light", // awaiting translation
-    "Fireflies: the cores glow even in the dark",      // awaiting translation
-    "Sweep the keel's light across the coast",         // awaiting translation
-    "More balls, more light: {icon:multi} Multiball",  // awaiting translation
-    "Deep field: every faint speck is a brick",        // awaiting translation
-    "Join the stars: the bright ones are cores",       // awaiting translation
-    "Gates fade on a beat: wait for the gap",          // awaiting translation
-    "Tick, tock: the gates keep time",                 // awaiting translation
-    "The corona opens on the beat: strike inside",     // awaiting translation
-    "A ghost gate shrugs off a blast: time the spark", // awaiting translation
-    "A pulsar: quick beats, quick hands",              // awaiting translation
-    "The shutter opens for a moment: be ready",        // awaiting translation
-    "Half in shadow: the gated side keeps time",       // awaiting translation
-    "Ignite the sun while the moon is solid",          // awaiting translation
-    "The wind runs one way: ride it to the cores",     // awaiting translation
-    "Curtains of light: sweep them with {icon:multi} Multiball", // awaiting translation
-    "Each ribbon is tied with a gate: cut both halves", // awaiting translation
-    "The long night: aim by the light you carry",      // awaiting translation
-    "In through the doors, up to the rose window",     // awaiting translation
-    "Everything at once: watch the cores",             // awaiting translation
-    "Strike the ring as the gates turn solid",         // awaiting translation
+    "光が去っていく：今のうちに場を覚えろ",
+    "闇の中ではボールとパドルが光を運ぶ",
+    "蛍：コアは暗闇でも光る",
+    "パドルの光で海岸を照らせ",
+    "ボールが増えれば光も増える：{icon:multi} マルチボール",
+    "ディープフィールド：かすかな点はすべてブロック",
+    "星をつなげ：明るいものがコア",
+    "ゲートは拍に合わせて薄れる：隙間を待て",
+    "カチ、コチ：ゲートが時を刻む",
+    "コロナは拍に合わせて開く：内側を打て",
+    "幽霊ゲートは爆発を受け流す：火花のタイミングを計れ",
+    "パルサー：速い拍、速い手",
+    "シャッターは一瞬だけ開く：備えよ",
+    "半分は影の中：ゲート側が拍を刻む",
+    "月が実体のうちに太陽へ点火せよ",
+    "風は一方向：コアまで乗っていけ",
+    "光のカーテン：{icon:multi} マルチボールで払え",
+    "リボンはそれぞれゲートに結ばれている：両半分を断て",
+    "長い夜：持っている光を頼りに狙え",
+    "扉から入り、バラ窓へ上がれ",
+    "すべてが同時に：コアに注意",
+    "ゲートが固くなる瞬間にリングを打て",
     "最後の一周：すべての突破口を生かせ",
 ];
